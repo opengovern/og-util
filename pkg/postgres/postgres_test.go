@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"github.com/ory/dockertest/v3"
 	"os"
 	"testing"
 	"time"

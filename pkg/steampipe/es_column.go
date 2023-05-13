@@ -8,8 +8,6 @@ import (
 	"net"
 	"strings"
 
-	"gitlab.com/keibiengine/keibi-engine/pkg/source"
-
 	"github.com/golang/protobuf/ptypes"
 	"github.com/hashicorp/go-hclog"
 	"github.com/turbot/go-kit/helpers"
@@ -18,9 +16,6 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v4/plugin"
 	"github.com/turbot/steampipe-plugin-sdk/v4/plugin/context_key"
 	"github.com/turbot/steampipe-plugin-sdk/v4/plugin/transform"
-	"gitlab.com/keibiengine/steampipe-plugin-aws/aws"
-	"gitlab.com/keibiengine/steampipe-plugin-azure/azure"
-	"gitlab.com/keibiengine/steampipe-plugin-azuread/azuread"
 )
 
 func buildContext() context.Context {
@@ -29,27 +24,6 @@ func buildContext() context.Context {
 	return ctx
 }
 
-func AzureDescriptionToRecord(resource interface{}, indexName string) (map[string]*proto.Column, error) {
-	return DescriptionToRecord(azure.Plugin(buildContext()), resource, indexName)
-}
-
-func AzureADDescriptionToRecord(resource interface{}, indexName string) (map[string]*proto.Column, error) {
-	return DescriptionToRecord(azuread.Plugin(buildContext()), resource, indexName)
-}
-
-func AWSDescriptionToRecord(resource interface{}, indexName string) (map[string]*proto.Column, error) {
-	return DescriptionToRecord(aws.Plugin(buildContext()), resource, indexName)
-}
-
-func AWSCells(indexName string) ([]string, error) {
-	return Cells(aws.Plugin(buildContext()), indexName)
-}
-func AzureCells(indexName string) ([]string, error) {
-	return Cells(azure.Plugin(buildContext()), indexName)
-}
-func AzureADCells(indexName string) ([]string, error) {
-	return Cells(azuread.Plugin(buildContext()), indexName)
-}
 func Cells(plg *plugin.Plugin, indexName string) ([]string, error) {
 	var cells []string
 	table, ok := plg.TableMap[indexName]
@@ -98,13 +72,13 @@ func DescriptionToRecord(plg *plugin.Plugin, resource interface{}, indexName str
 
 			cells[column.Name] = c
 		} else if column == nil {
-			fmt.Println("column is null", indexName)
+			//fmt.Println("column is null", indexName)
 		} else if column.Transform == nil {
-			if indexName != "aws_cloudtrail_trail_event" && //ignore warnings
-				indexName != "aws_cost_by_account_daily" &&
-				indexName != "aws_ecr_repository" {
-				fmt.Println("column transform is null", indexName, column.Name)
-			}
+			//if indexName != "aws_cloudtrail_trail_event" && //ignore warnings
+			//	indexName != "aws_cost_by_account_daily" &&
+			//	indexName != "aws_ecr_repository" {
+			//	fmt.Println("column transform is null", indexName, column.Name)
+			//}
 		}
 	}
 
@@ -235,15 +209,7 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 
 }
 
-func SourceTypeByResourceType(resourceType string) source.Type {
-	if strings.HasPrefix(strings.ToLower(resourceType), "aws") {
-		return source.CloudAWS
-	} else {
-		return source.CloudAzure
-	}
-}
-
-func ConvertToDescription(resourceType string, data interface{}) (interface{}, error) {
+func ConvertToDescription(resourceType string, data interface{}, descriptionMap map[string]interface{}) (interface{}, error) {
 	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -275,34 +241,17 @@ func ConvertToDescription(resourceType string, data interface{}) (interface{}, e
 		bs = bs[:startIdx] + bs[endIdx:]
 	}
 
-	sourceType := SourceTypeByResourceType(resourceType)
-	if sourceType == source.CloudAWS {
-		var d interface{}
-		for k, v := range AWSDescriptionMap {
-			if strings.ToLower(resourceType) == strings.ToLower(k) {
-				d = v
-			}
+	var d interface{}
+	for k, v := range descriptionMap {
+		if strings.ToLower(resourceType) == strings.ToLower(k) {
+			d = v
 		}
-		err = json.Unmarshal([]byte(bs), &d)
-		if err != nil {
-			log.Println("failed to unmarshal to description: ", bs)
-			return nil, fmt.Errorf("unmarshalling: %v", err)
-		}
-		d = helpers.DereferencePointer(d)
-		return d, nil
-	} else {
-		var d interface{}
-		for k, v := range AzureDescriptionMap {
-			if strings.ToLower(resourceType) == strings.ToLower(k) {
-				d = v
-			}
-		}
-		err = json.Unmarshal([]byte(bs), &d)
-		if err != nil {
-			log.Println("failed to unmarshal to description: ", bs)
-			return nil, fmt.Errorf("unmarshalling: %v", err)
-		}
-		d = helpers.DereferencePointer(d)
-		return d, nil
 	}
+	err = json.Unmarshal([]byte(bs), &d)
+	if err != nil {
+		log.Println("failed to unmarshal to description: ", bs)
+		return nil, fmt.Errorf("unmarshalling: %v", err)
+	}
+	d = helpers.DereferencePointer(d)
+	return d, nil
 }

@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/kaytu-io/kaytu-util/pkg/api"
+	"github.com/labstack/echo/v4"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/kaytu-io/kaytu-util/pkg/httpserver"
-	"gitlab.com/keibiengine/keibi-engine/pkg/auth/api"
 )
 
 type EchoError struct {

@@ -2,7 +2,6 @@ package neo4j
 
 import (
 	"context"
-	"github.com/ory/dockertest"
 	"github.com/ory/dockertest/v3"
 	"os"
 	"testing"

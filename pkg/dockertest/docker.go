@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ory/dockertest/v3"
+	"gopkg.in/Shopify/sarama.v1"
 	"io/ioutil"
 	"net/http"
 	"os"

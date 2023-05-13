@@ -1,5 +1,7 @@
 package producer
 
+import "gopkg.in/Shopify/sarama.v1"
+
 type InMemorySaramaProducer struct {
 	Messages []*sarama.ProducerMessage
 }
