@@ -182,6 +182,10 @@ func NewPaginator(client *elasticsearchv7.Client, index string, filters []BoolFi
 	}, nil
 }
 
+func (p *BaseESPaginator) Done() bool {
+	return p.done
+}
+
 // The response will be marshalled if the search was successfull
 func (p *BaseESPaginator) Search(ctx context.Context, response interface{}) error {
 	if p.done {
