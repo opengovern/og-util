@@ -16,14 +16,14 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v4/plugin"
 )
 
-func closeSafe(resp *esapi.Response) {
+func CloseSafe(resp *esapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = ioutil.ReadAll(resp.Body)
 		resp.Body.Close() //nolint,gosec
 	}
 }
 
-func checkError(resp *esapi.Response) error {
+func CheckError(resp *esapi.Response) error {
 	if !resp.IsError() {
 		return nil
 	}
@@ -41,7 +41,7 @@ func checkError(resp *esapi.Response) error {
 	return e
 }
 
-func isIndexNotFoundErr(err error) bool {
+func IsIndexNotFoundErr(err error) bool {
 	var e ErrorResponse
 	return errors.As(err, &e) &&
 		strings.EqualFold(e.Info.Type, "index_not_found_exception")
@@ -51,7 +51,7 @@ type BoolFilter interface {
 	IsBoolFilter()
 }
 
-func buildFilter(equalQuals plugin.KeyColumnEqualsQualMap, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
+func BuildFilter(equalQuals plugin.KeyColumnEqualsQualMap, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
 	var filters []BoolFilter
 	for columnName, filterName := range filtersQuals {
 		if equalQuals[columnName] == nil {
@@ -61,7 +61,7 @@ func buildFilter(equalQuals plugin.KeyColumnEqualsQualMap, filtersQuals map[stri
 		var filter BoolFilter
 		value := equalQuals[columnName]
 		if value.GetStringValue() != "" {
-			filter = TermFilter(filterName, equalQuals[columnName].GetStringValue())
+			filter = NewTermFilter(filterName, equalQuals[columnName].GetStringValue())
 		} else if value.GetListValue() != nil {
 			list := value.GetListValue()
 			values := make([]string, 0, len(list.Values))
@@ -83,24 +83,24 @@ func buildFilter(equalQuals plugin.KeyColumnEqualsQualMap, filtersQuals map[stri
 		case "azure":
 			accountFieldName = "subscription_id"
 		}
-		filters = append(filters, TermFilter("metadata."+accountFieldName, accountID))
+		filters = append(filters, NewTermFilter("metadata."+accountFieldName, accountID))
 	}
 	return filters
 }
 
-type termFilter struct {
+type TermFilter struct {
 	field string
 	value string
 }
 
-func TermFilter(field, value string) BoolFilter {
-	return termFilter{
+func NewTermFilter(field, value string) BoolFilter {
+	return TermFilter{
 		field: field,
 		value: value,
 	}
 }
 
-func (t termFilter) MarshalJSON() ([]byte, error) {
+func (t TermFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"term": map[string]string{
 			t.field: t.value,
@@ -108,7 +108,7 @@ func (t termFilter) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (t termFilter) IsBoolFilter() {}
+func (t TermFilter) IsBoolFilter() {}
 
 type termsFilter struct {
 	field  string
@@ -132,7 +132,7 @@ func (t termsFilter) MarshalJSON() ([]byte, error) {
 
 func (t termsFilter) IsBoolFilter() {}
 
-type baseESPaginator struct {
+type BaseESPaginator struct {
 	client *elasticsearchv7.Client
 
 	index    string                 // Query index
@@ -147,7 +147,7 @@ type baseESPaginator struct {
 	done        bool
 }
 
-func newPaginator(client *elasticsearchv7.Client, index string, filters []BoolFilter, limit *int64) (*baseESPaginator, error) {
+func NewPaginator(client *elasticsearchv7.Client, index string, filters []BoolFilter, limit *int64) (*BaseESPaginator, error) {
 	var query map[string]interface{}
 	if len(filters) > 0 {
 		query = map[string]interface{}{
@@ -172,7 +172,7 @@ func newPaginator(client *elasticsearchv7.Client, index string, filters []BoolFi
 		return nil, fmt.Errorf("invalid limit: %d", max)
 	}
 
-	return &baseESPaginator{
+	return &BaseESPaginator{
 		client:   client,
 		index:    index,
 		query:    query,
@@ -183,13 +183,13 @@ func newPaginator(client *elasticsearchv7.Client, index string, filters []BoolFi
 }
 
 // The response will be marshalled if the search was successfull
-func (p *baseESPaginator) search(ctx context.Context, response interface{}) error {
+func (p *BaseESPaginator) Search(ctx context.Context, response interface{}) error {
 	if p.done {
 		return errors.New("no more page to query")
 	}
 
-	if err := p.createPit(ctx); err != nil {
-		if isIndexNotFoundErr(err) {
+	if err := p.CreatePit(ctx); err != nil {
+		if IsIndexNotFoundErr(err) {
 			return nil
 		}
 		return err
@@ -227,11 +227,11 @@ func (p *baseESPaginator) search(ctx context.Context, response interface{}) erro
 	}
 
 	res, err := p.client.Search(opts...)
-	defer closeSafe(res)
+	defer CloseSafe(res)
 	if err != nil {
 		return err
-	} else if err := checkError(res); err != nil {
-		if isIndexNotFoundErr(err) {
+	} else if err := CheckError(res); err != nil {
+		if IsIndexNotFoundErr(err) {
 			return nil
 		}
 		return err
@@ -250,7 +250,7 @@ func (p *baseESPaginator) search(ctx context.Context, response interface{}) erro
 }
 
 // createPit, sets up the PointInTime for the search with more than 10000 limit
-func (p *baseESPaginator) createPit(ctx context.Context) error {
+func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 	if p.limit < p.pageSize {
 		return nil
 	} else if p.pitID != "" {
@@ -260,10 +260,10 @@ func (p *baseESPaginator) createPit(ctx context.Context) error {
 	resPit, err := p.client.OpenPointInTime([]string{p.index}, "1m",
 		p.client.OpenPointInTime.WithContext(ctx),
 	)
-	defer closeSafe(resPit)
+	defer CloseSafe(resPit)
 	if err != nil {
 		return err
-	} else if err := checkError(resPit); err != nil {
+	} else if err := CheckError(resPit); err != nil {
 		return err
 	}
 
@@ -281,7 +281,7 @@ func (p *baseESPaginator) createPit(ctx context.Context) error {
 	return nil
 }
 
-func (p *baseESPaginator) updateState(numHits int64, searchAfter []interface{}, pitID string) {
+func (p *BaseESPaginator) UpdateState(numHits int64, searchAfter []interface{}, pitID string) {
 	p.queried += numHits
 	if p.queried > p.limit {
 		// Have found enough documents
@@ -312,11 +312,11 @@ func (c Client) Count(ctx context.Context, index string) (int64, error) {
 	}
 
 	res, err := c.es.Count(opts...)
-	defer closeSafe(res)
+	defer CloseSafe(res)
 	if err != nil {
 		return 0, err
-	} else if err := checkError(res); err != nil {
-		if isIndexNotFoundErr(err) {
+	} else if err := CheckError(res); err != nil {
+		if IsIndexNotFoundErr(err) {
 			return 0, nil
 		}
 		return 0, err
@@ -343,11 +343,11 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 	}
 
 	res, err := c.es.Search(opts...)
-	defer closeSafe(res)
+	defer CloseSafe(res)
 	if err != nil {
 		return err
-	} else if err := checkError(res); err != nil {
-		if isIndexNotFoundErr(err) {
+	} else if err := CheckError(res); err != nil {
+		if IsIndexNotFoundErr(err) {
 			return nil
 		}
 		return err
@@ -370,11 +370,11 @@ func (c Client) GetByID(ctx context.Context, index string, id string, response i
 	}
 
 	res, err := c.es.Get(index, id, opts...)
-	defer closeSafe(res)
+	defer CloseSafe(res)
 	if err != nil {
 		return err
-	} else if err := checkError(res); err != nil {
-		if isIndexNotFoundErr(err) {
+	} else if err := CheckError(res); err != nil {
+		if IsIndexNotFoundErr(err) {
 			return nil
 		}
 		return err
@@ -420,11 +420,11 @@ func DeleteByQuery(ctx context.Context, es *elasticsearchv7.Client, indices []st
 		esutil.NewJSONReader(query),
 		append(defaultOpts, opts...)...,
 	)
-	defer closeSafe(resp)
+	defer CloseSafe(resp)
 	if err != nil {
 		return DeleteByQueryResponse{}, err
-	} else if err := checkError(resp); err != nil {
-		if isIndexNotFoundErr(err) {
+	} else if err := CheckError(resp); err != nil {
+		if IsIndexNotFoundErr(err) {
 			return DeleteByQueryResponse{}, nil
 		}
 		return DeleteByQueryResponse{}, err
