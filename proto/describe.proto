@@ -61,6 +61,7 @@ message DeliverResultRequest {
   string error = 4;
   DescribeJob describe_job = 5;
   repeated string described_resource_ids = 6;
+  string errorCode = 7;
 }
 
 message ResponseOK {
