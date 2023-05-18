@@ -54,6 +54,10 @@ func NewSteampipeDatabase(option Option) (*Database, error) {
 	return &Database{conn: conn}, nil
 }
 
+func (s *Database) Conn() *pgxpool.Pool {
+	return s.conn
+}
+
 func (s *Database) Query(query string, from, size int, orderBy string,
 	orderDir DirectionType) (*Result, error) {
 
