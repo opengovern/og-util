@@ -417,6 +417,7 @@ func DeleteByQuery(ctx context.Context, es *elasticsearchv7.Client, indices []st
 	defaultOpts := []func(*esapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
+		es.DeleteByQuery.WithRefresh(true),
 	}
 
 	resp, err := es.DeleteByQuery(
