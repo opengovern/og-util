@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ory/dockertest/v3"
-	"gopkg.in/Shopify/sarama.v1"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -13,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	confluence_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
 	"github.com/kaytu-io/kaytu-util/pkg/postgres"
+	"github.com/ory/dockertest/v3"
 	dc "github.com/ory/dockertest/v3/docker"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/require"
@@ -164,7 +164,7 @@ func StartupRabbitMQ(t *testing.T) RabbitMQServer {
 
 type KafkaServer struct {
 	Address  string
-	Producer sarama.SyncProducer
+	Producer *confluence_kafka.Producer
 }
 
 func StartupKafka(t *testing.T) KafkaServer {
@@ -230,15 +230,15 @@ func StartupKafka(t *testing.T) KafkaServer {
 
 	kafkaUrl := fmt.Sprintf("%s:", GetDockerHost()) + kafkaResource.GetPort("29092/tcp")
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
-	var producer sarama.SyncProducer
+	var producer *confluence_kafka.Producer
 	err = pool.Retry(func() error {
-		cfg := sarama.NewConfig()
-		cfg.Producer.Retry.Max = 3
-		cfg.Producer.RequiredAcks = sarama.WaitForAll
-		cfg.Producer.Return.Successes = true
-		cfg.Version = sarama.V2_1_0_0
-
-		producer, err = sarama.NewSyncProducer([]string{kafkaUrl}, cfg)
+		producer, err = confluence_kafka.NewProducer(&confluence_kafka.ConfigMap{
+			"bootstrap.servers":            kafkaUrl,
+			"linger.ms":                    100,
+			"compression.type":             "lz4",
+			"message.timeout.ms":           10000,
+			"queue.buffering.max.messages": 100000,
+		})
 		if err != nil {
 			return err
 		}
