@@ -64,11 +64,16 @@ message DeliverResultRequest {
   string errorCode = 7;
 }
 
+message SetInProgressRequest {
+  uint32 job_id = 1;
+}
+
 message ResponseOK {
 }
 
 service DescribeService {
   rpc DeliverResult(DeliverResultRequest) returns (ResponseOK) {}
+  rpc SetInProgress(SetInProgressRequest) returns (ResponseOK) {}
   rpc DeliverAWSResources(AWSResources) returns (ResponseOK) {}
   rpc DeliverAzureResources(AzureResources) returns (ResponseOK) {}
 }
