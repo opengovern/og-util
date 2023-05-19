@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/Shopify/sarama.v1"
 
+	confluence_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +41,7 @@ func trimJsonFromEmptyObjects(input []byte) ([]byte, error) {
 	return json.Marshal(unknownData)
 }
 
-func asProducerMessage(r Doc) (*sarama.ProducerMessage, error) {
+func asProducerMessage(r Doc) (*confluence_kafka.Message, error) {
 	keys, index := r.KeysAndIndex()
 	value, err := json.Marshal(r)
 	if err != nil {
@@ -69,21 +69,16 @@ func HashOf(strings ...string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func Msg(key string, value []byte, index string) *sarama.ProducerMessage {
-	return &sarama.ProducerMessage{
-		Key: sarama.StringEncoder(key),
-		Headers: []sarama.RecordHeader{
-			{
-				Key:   []byte(EsIndexHeader),
-				Value: []byte(index),
-			},
-		},
-		Value: sarama.ByteEncoder(value),
+func Msg(key string, value []byte, index string) *confluence_kafka.Message {
+	return &confluence_kafka.Message{
+		Value:   value,
+		Key:     []byte(key),
+		Headers: []confluence_kafka.Header{{Key: EsIndexHeader, Value: []byte(index)}},
 	}
 }
 
-func DoSend(producer sarama.SyncProducer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
-	var msgs []*sarama.ProducerMessage
+func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
+	var msgs []*confluence_kafka.Message
 	for _, v := range docs {
 		msg, err := asProducerMessage(v)
 		if err != nil {
@@ -91,25 +86,34 @@ func DoSend(producer sarama.SyncProducer, topic string, partition int32, docs []
 			continue
 		}
 
-		// Override the topic
-		msg.Topic = topic
-		msg.Partition = partition
+		// Override the topic and partition if provided
+		if partition == -1 {
+			partition = confluence_kafka.PartitionAny
+		}
+		msg.TopicPartition = confluence_kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: partition,
+		}
 
-		msgs = append(msgs, msg)
+		err = producer.Produce(msg, nil)
+		if err != nil {
+			logger.Error("Failed calling Produce", zap.Error(fmt.Errorf("Failed to persist resource[%s] in kafka topic[%s]: %s\nMessage: %v\n", messageID(v), topic, err, msg)))
+			continue
+		}
 	}
 
 	if len(msgs) == 0 {
 		return nil
 	}
 
-	if err := producer.SendMessages(msgs); err != nil {
-		if errs, ok := err.(sarama.ProducerErrors); ok {
-			for _, e := range errs {
-				logger.Error("Falied calling SendMessages", zap.Error(fmt.Errorf("Failed to persist resource[%s] in kafka topic[%s]: %s\nMessage: %v\n", e.Msg.Key, e.Msg.Topic, e.Error(), e.Msg)))
-			}
+	for r := 0; r < 10; r++ {
+		if producer.Flush(6000) == 0 {
+			break
+		} else if r == 9 {
+			err := fmt.Errorf("failed to flush messages to kafka topic[%s]", topic)
+			logger.Error("Failed calling Flush", zap.Error(err))
+			return err
 		}
-
-		return err
 	}
 
 	return nil
