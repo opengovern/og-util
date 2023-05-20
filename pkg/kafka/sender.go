@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	confluence_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	confluent_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/zap"
 )
 
@@ -42,7 +42,7 @@ func trimJsonFromEmptyObjects(input []byte) ([]byte, error) {
 	return json.Marshal(unknownData)
 }
 
-func asProducerMessage(r Doc, topic string, partition int32) (*confluence_kafka.Message, error) {
+func asProducerMessage(r Doc, topic string, partition int32) (*confluent_kafka.Message, error) {
 	keys, index := r.KeysAndIndex()
 	value, err := json.Marshal(r)
 	if err != nil {
@@ -70,22 +70,22 @@ func HashOf(strings ...string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func Msg(key string, value []byte, index string, topic string, partition int32) *confluence_kafka.Message {
-	return &confluence_kafka.Message{
-		TopicPartition: confluence_kafka.TopicPartition{
+func Msg(key string, value []byte, index string, topic string, partition int32) *confluent_kafka.Message {
+	return &confluent_kafka.Message{
+		TopicPartition: confluent_kafka.TopicPartition{
 			Topic:     &topic,
 			Partition: partition,
 		},
 		Value:   value,
 		Key:     []byte(key),
-		Headers: []confluence_kafka.Header{{Key: EsIndexHeader, Value: []byte(index)}},
+		Headers: []confluent_kafka.Header{{Key: EsIndexHeader, Value: []byte(index)}},
 	}
 }
 
-func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
-	var msgs []*confluence_kafka.Message
+func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
+	var msgs []*confluent_kafka.Message
 	if partition == -1 {
-		partition = confluence_kafka.PartitionAny
+		partition = confluent_kafka.PartitionAny
 	}
 	for _, v := range docs {
 		msg, err := asProducerMessage(v, topic, partition)
@@ -99,8 +99,8 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 	return SyncSend(logger, producer, msgs)
 }
 
-func SyncSend(logger *zap.Logger, producer *confluence_kafka.Producer, msgs []*confluence_kafka.Message) error {
-	deliverChan := make(chan confluence_kafka.Event, len(msgs))
+func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*confluent_kafka.Message) error {
+	deliverChan := make(chan confluent_kafka.Event, len(msgs))
 	for _, msg := range msgs {
 		err := producer.Produce(msg, deliverChan)
 		if err != nil {
@@ -117,8 +117,8 @@ func SyncSend(logger *zap.Logger, producer *confluence_kafka.Producer, msgs []*c
 				break
 			}
 			switch e.(type) {
-			case *confluence_kafka.Message:
-				m := e.(*confluence_kafka.Message)
+			case *confluent_kafka.Message:
+				m := e.(*confluent_kafka.Message)
 				if m.TopicPartition.Error != nil {
 					logger.Error("Delivery failed", zap.Error(m.TopicPartition.Error))
 					errList = append(errList, m.TopicPartition.Error)
@@ -126,8 +126,8 @@ func SyncSend(logger *zap.Logger, producer *confluence_kafka.Producer, msgs []*c
 					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
 				}
 				ackedMessageCount++
-			case confluence_kafka.Error:
-				err := e.(confluence_kafka.Error)
+			case confluent_kafka.Error:
+				err := e.(confluent_kafka.Error)
 				logger.Error("Delivery failed at client level", zap.Error(err))
 				errList = append(errList, err)
 			default:

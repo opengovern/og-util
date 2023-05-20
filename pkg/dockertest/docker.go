@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	confluence_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	confluent_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
 	"github.com/kaytu-io/kaytu-util/pkg/postgres"
 	"github.com/ory/dockertest/v3"
@@ -164,7 +164,7 @@ func StartupRabbitMQ(t *testing.T) RabbitMQServer {
 
 type KafkaServer struct {
 	Address  string
-	Producer *confluence_kafka.Producer
+	Producer *confluent_kafka.Producer
 }
 
 func StartupKafka(t *testing.T) KafkaServer {
@@ -230,9 +230,9 @@ func StartupKafka(t *testing.T) KafkaServer {
 
 	kafkaUrl := fmt.Sprintf("%s:", GetDockerHost()) + kafkaResource.GetPort("29092/tcp")
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
-	var producer *confluence_kafka.Producer
+	var producer *confluent_kafka.Producer
 	err = pool.Retry(func() error {
-		producer, err = confluence_kafka.NewProducer(&confluence_kafka.ConfigMap{
+		producer, err = confluent_kafka.NewProducer(&confluent_kafka.ConfigMap{
 			"bootstrap.servers":            kafkaUrl,
 			"linger.ms":                    100,
 			"compression.type":             "lz4",
