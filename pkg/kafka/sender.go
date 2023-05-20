@@ -120,6 +120,12 @@ func SyncSend(logger *zap.Logger, producer *confluence_kafka.Producer, msgs []*c
 					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
 				}
 				ackedMessageCount++
+			case confluence_kafka.Error:
+				err := e.(confluence_kafka.Error)
+				logger.Error("Delivery failed at client level", zap.Error(err))
+				errChan <- err
+			default:
+				logger.Error("received unknown event type", zap.Any("event", e), zap.String("event sting", e.String()))
 			}
 		}
 		close(errChan)
