@@ -83,9 +83,13 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 	errChan := make(chan error, len(docs))
 	wg := &sync.WaitGroup{}
 	go func() {
-		for e := range deliverChan {
+		for {
+			e, isOpen := <-deliverChan
+			if !isOpen {
+				return
+			}
 			switch e.(type) {
-			case *confluence_kafka.Error:
+			case *confluence_kafka.Message:
 				m := e.(*confluence_kafka.Message)
 				if m.TopicPartition.Error != nil {
 					logger.Error("Delivery failed", zap.Error(m.TopicPartition.Error))
