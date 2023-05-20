@@ -122,8 +122,8 @@ func SyncSend(logger *zap.Logger, producer *confluence_kafka.Producer, msgs []*c
 				ackedMessageCount++
 			}
 		}
-		wg.Done()
 		close(errChan)
+		wg.Done()
 	}(logger, wg, deliverChan, errChan, len(msgs))
 
 	for _, msg := range msgs {
