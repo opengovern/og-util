@@ -97,8 +97,8 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 				} else {
 					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
 				}
+				wg.Done()
 			}
-			wg.Done()
 		}
 	}()
 
