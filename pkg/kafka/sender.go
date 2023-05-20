@@ -85,7 +85,7 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 	go func() {
 		for {
 			e, isOpen := <-deliverChan
-			if !isOpen {
+			if !isOpen || e == nil {
 				return
 			}
 			switch e.(type) {
