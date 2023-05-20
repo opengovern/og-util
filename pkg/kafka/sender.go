@@ -42,7 +42,7 @@ func trimJsonFromEmptyObjects(input []byte) ([]byte, error) {
 	return json.Marshal(unknownData)
 }
 
-func asProducerMessage(r Doc) (*confluence_kafka.Message, error) {
+func asProducerMessage(r Doc, topic string, partition int32) (*confluence_kafka.Message, error) {
 	keys, index := r.KeysAndIndex()
 	value, err := json.Marshal(r)
 	if err != nil {
@@ -54,7 +54,7 @@ func asProducerMessage(r Doc) (*confluence_kafka.Message, error) {
 		return nil, err
 	}
 
-	return Msg(HashOf(keys...), value, index), nil
+	return Msg(HashOf(keys...), value, index, topic, partition), nil
 }
 
 func messageID(r Doc) string {
@@ -70,8 +70,12 @@ func HashOf(strings ...string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func Msg(key string, value []byte, index string) *confluence_kafka.Message {
+func Msg(key string, value []byte, index string, topic string, partition int32) *confluence_kafka.Message {
 	return &confluence_kafka.Message{
+		TopicPartition: confluence_kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: partition,
+		},
 		Value:   value,
 		Key:     []byte(key),
 		Headers: []confluence_kafka.Header{{Key: EsIndexHeader, Value: []byte(index)}},
@@ -79,15 +83,32 @@ func Msg(key string, value []byte, index string) *confluence_kafka.Message {
 }
 
 func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
-	deliverChan := make(chan confluence_kafka.Event, len(docs))
-	errChan := make(chan error, len(docs))
+	var msgs []*confluence_kafka.Message
+	if partition == -1 {
+		partition = confluence_kafka.PartitionAny
+	}
+	for _, v := range docs {
+		msg, err := asProducerMessage(v, topic, partition)
+		if err != nil {
+			logger.Error("Failed calling AsProducerMessage", zap.Error(fmt.Errorf("Failed to convert msg[%s] to Kafka ProducerMessage, ignoring...", messageID(v))))
+			continue
+		}
+		msgs = append(msgs, msg)
+	}
+
+	return SyncSend(logger, producer, msgs)
+}
+
+func SyncSend(logger *zap.Logger, producer *confluence_kafka.Producer, msgs []*confluence_kafka.Message) error {
+	deliverChan := make(chan confluence_kafka.Event, len(msgs))
+	errChan := make(chan error, len(msgs))
 	wg := &sync.WaitGroup{}
-	go func() {
-		for {
+	go func(logger *zap.Logger, wg *sync.WaitGroup, deliverChan <-chan confluence_kafka.Event, errChan chan<- error, msgCount int) {
+		wg.Add(1)
+		for ackedMessageCount := 0; ackedMessageCount < msgCount; {
 			e, isOpen := <-deliverChan
 			if !isOpen || e == nil {
-				close(errChan)
-				return
+				break
 			}
 			switch e.(type) {
 			case *confluence_kafka.Message:
@@ -97,45 +118,30 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 					errChan <- m.TopicPartition.Error
 				} else {
 					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
-					wg.Done()
 				}
+				ackedMessageCount++
 			}
 		}
-	}()
+		wg.Done()
+		close(errChan)
+	}(logger, wg, deliverChan, errChan, len(msgs))
 
-	for _, v := range docs {
-		msg, err := asProducerMessage(v)
+	for _, msg := range msgs {
+		err := producer.Produce(msg, deliverChan)
 		if err != nil {
-			logger.Error("Failed calling AsProducerMessage", zap.Error(fmt.Errorf("Failed to convert msg[%s] to Kafka ProducerMessage, ignoring...", messageID(v))))
-			continue
+			logger.Error("Failed calling Produce", zap.Error(err))
+			return err
 		}
-
-		// Override the topic and partition if provided
-		if partition == -1 {
-			partition = confluence_kafka.PartitionAny
-		}
-		msg.TopicPartition = confluence_kafka.TopicPartition{
-			Topic:     &topic,
-			Partition: partition,
-		}
-
-		err = producer.Produce(msg, deliverChan)
-		if err != nil {
-			logger.Error("Failed calling Produce", zap.Error(fmt.Errorf("Failed to persist resource[%s] in kafka topic[%s]: %s\nMessage: %v\n", messageID(v), topic, err, msg)))
-			continue
-		}
-		wg.Add(1)
 	}
-	close(deliverChan)
-	
+
 	wg.Wait()
+	close(deliverChan)
 	errList := make([]error, 0)
 	for err := range errChan {
 		errList = append(errList, err)
 	}
 	if len(errList) > 0 {
-		return fmt.Errorf("failed to persist %d resources in kafka topic[%s]: %v", len(errList), topic, errList)
+		return fmt.Errorf("failed to persist %d resources in kafka with sync send: %v", len(errList), errList)
 	}
-
 	return nil
 }
