@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	confluence_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/zap"
@@ -78,7 +79,25 @@ func Msg(key string, value []byte, index string) *confluence_kafka.Message {
 }
 
 func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
-	var msgs []*confluence_kafka.Message
+	deliverChan := make(chan confluence_kafka.Event, len(docs))
+	errChan := make(chan error, len(docs))
+	wg := &sync.WaitGroup{}
+	go func() {
+		for e := range deliverChan {
+			switch e.(type) {
+			case *confluence_kafka.Error:
+				m := e.(*confluence_kafka.Message)
+				if m.TopicPartition.Error != nil {
+					logger.Error("Delivery failed", zap.Error(m.TopicPartition.Error))
+					errChan <- m.TopicPartition.Error
+				} else {
+					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
+				}
+			}
+			wg.Done()
+		}
+	}()
+
 	for _, v := range docs {
 		msg, err := asProducerMessage(v)
 		if err != nil {
@@ -95,26 +114,24 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 			Partition: partition,
 		}
 
-		err = producer.Produce(msg, nil)
+		err = producer.Produce(msg, deliverChan)
 		if err != nil {
 			logger.Error("Failed calling Produce", zap.Error(fmt.Errorf("Failed to persist resource[%s] in kafka topic[%s]: %s\nMessage: %v\n", messageID(v), topic, err, msg)))
 			continue
 		}
+		wg.Add(1)
 	}
 
-	if len(msgs) == 0 {
-		return nil
+	wg.Wait()
+	close(deliverChan)
+	errList := make([]error, 0)
+	for err := range errChan {
+		errList = append(errList, err)
 	}
-
-	for r := 0; r < 10; r++ {
-		if producer.Flush(6000) == 0 {
-			break
-		} else if r == 9 {
-			err := fmt.Errorf("failed to flush messages to kafka topic[%s]", topic)
-			logger.Error("Failed calling Flush", zap.Error(err))
-			return err
-		}
+	if len(errList) > 0 {
+		return fmt.Errorf("failed to persist %d resources in kafka topic[%s]: %v", len(errList), topic, errList)
 	}
+	close(errChan)
 
 	return nil
 }
