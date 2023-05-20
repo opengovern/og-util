@@ -86,6 +86,7 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 		for {
 			e, isOpen := <-deliverChan
 			if !isOpen || e == nil {
+				close(errChan)
 				return
 			}
 			switch e.(type) {
@@ -96,8 +97,8 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 					errChan <- m.TopicPartition.Error
 				} else {
 					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
+					wg.Done()
 				}
-				wg.Done()
 			}
 		}
 	}()
@@ -125,9 +126,9 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 		}
 		wg.Add(1)
 	}
-
-	wg.Wait()
 	close(deliverChan)
+	
+	wg.Wait()
 	errList := make([]error, 0)
 	for err := range errChan {
 		errList = append(errList, err)
@@ -135,7 +136,6 @@ func DoSend(producer *confluence_kafka.Producer, topic string, partition int32, 
 	if len(errList) > 0 {
 		return fmt.Errorf("failed to persist %d resources in kafka topic[%s]: %v", len(errList), topic, errList)
 	}
-	close(errChan)
 
 	return nil
 }
