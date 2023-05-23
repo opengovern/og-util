@@ -74,7 +74,16 @@ func NewClientCached(c ClientConfig, cache *connection.Cache, ctx context.Contex
 
 func NewClient(c ClientConfig) (Client, error) {
 	if c.AccountID == nil || len(*c.AccountID) == 0 {
-		return Client{}, fmt.Errorf("accountID is either null or empty: %v", c.AccountID)
+		accountID := os.Getenv("STEAMPIPE_ACCOUNT_ID")
+		if len(accountID) == 0 {
+			return Client{}, fmt.Errorf("accountID is either null or empty: %v", c.AccountID)
+		}
+		c.AccountID = &accountID
+	}
+
+	if c.Addresses == nil || len(c.Addresses) == 0 {
+		address := os.Getenv("ES_ADDRESS")
+		c.Addresses = []string{address}
 	}
 
 	if c.Username == nil || len(*c.Username) == 0 {
