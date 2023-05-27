@@ -209,52 +209,30 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 
 }
 
-func ConvertToDescription(resourceType string, data interface{}, descriptionMap map[string]interface{}) (interface{}, error) {
+func ConvertToDescription(resourceType string, data interface{}, descriptionMap map[string]interface{}) (d interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("paniced: %v\ndata: %v", err, data)
+		}
+	}()
+
 	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
 
-	bs := string(b)
-	for {
-		idx := strings.Index(bs, ":{\"Time\":{}}")
-		if idx < 0 {
-			idx = strings.Index(bs, ":{\"TIME\":{}}")
-			if idx < 0 {
-				break
-			}
-		}
-
-		startIdx := idx - 1
-		q := 0
-		for i := idx - 1; i >= 0; i-- {
-			if bs[i] == '"' {
-				q++
-				if q == 2 {
-					startIdx = i
-				}
-			}
-		}
-		endIdx := idx + len(":{\"Time\":{}}")
-		if bs[startIdx-1] == ',' {
-			startIdx--
-		} else if bs[endIdx] == ',' {
-			endIdx++
-		}
-		bs = bs[:startIdx] + bs[endIdx:]
-	}
-
-	var d interface{}
 	for k, v := range descriptionMap {
 		if strings.ToLower(resourceType) == strings.ToLower(k) {
 			d = v
 		}
 	}
-	err = json.Unmarshal([]byte(bs), &d)
+
+	err = json.Unmarshal(b, &d)
 	if err != nil {
-		log.Println("failed to unmarshal to description: ", bs)
+		log.Println("failed to unmarshal to description: ", string(b))
 		return nil, fmt.Errorf("unmarshalling: %v", err)
 	}
+
 	d = helpers.DereferencePointer(d)
 	return d, nil
 }
