@@ -219,7 +219,10 @@ func ConvertToDescription(resourceType string, data interface{}, descriptionMap 
 	for {
 		idx := strings.Index(bs, ":{\"Time\":{}}")
 		if idx < 0 {
-			break
+			idx = strings.Index(bs, ":{\"TIME\":{}}")
+			if idx < 0 {
+				break
+			}
 		}
 
 		startIdx := idx - 1
