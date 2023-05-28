@@ -210,13 +210,14 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 }
 
 func ConvertToDescription(resourceType string, data interface{}, descriptionMap map[string]interface{}) (d interface{}, err error) {
+	var b []byte
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("paniced: %v\ndata: %v", err, data)
+			err = fmt.Errorf("paniced: %v\nresource_type: %s, json: %s", r, resourceType, string(b))
 		}
 	}()
 
-	b, err := json.Marshal(data)
+	b, err = json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
