@@ -30,6 +30,18 @@ func ParseType(str string) (Type, error) {
 	}
 }
 
+func ParseTypes(str []string) []Type {
+	result := make([]Type, 0, len(str))
+	for _, s := range str {
+		t, err := ParseType(s)
+		if err != nil || t == Nil {
+			continue
+		}
+		result = append(result, t)
+	}
+	return result
+}
+
 func (t Type) AsStringPtr() *string {
 	if t == "" {
 		return nil
