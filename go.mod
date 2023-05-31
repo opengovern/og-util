@@ -16,6 +16,7 @@ require (
 	github.com/hashicorp/go-hclog v1.2.2
 	github.com/jackc/pgx/v4 v4.17.2
 	github.com/labstack/echo/v4 v4.10.2
+	github.com/lib/pq v1.10.2
 	github.com/neo4j/neo4j-go-driver/v5 v5.8.1
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/prometheus/client_golang v1.15.0
