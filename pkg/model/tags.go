@@ -97,5 +97,5 @@ func TagStringsToTagMap(tags []string) map[string][]string {
 		}
 	}
 
-	return tagMap
+	return TrimPrivateTags(tagMap)
 }
