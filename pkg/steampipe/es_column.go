@@ -166,6 +166,10 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 		}
 	case proto.ColumnType_DATETIME, proto.ColumnType_TIMESTAMP:
 		// cast val to time
+		if s, ok := val.(string); ok && s == "" {
+			columnValue = &proto.Column{Value: &proto.Column_NullValue{}}
+			break
+		}
 		var timeVal, err = types.ToTime(val)
 		if err != nil {
 			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s' with value '%v': %v", column.Name, val, err)
