@@ -129,14 +129,14 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 	case proto.ColumnType_BOOL:
 		b, err := types.ToBool(val)
 		if err != nil {
-			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s': %v", column.Name, err)
+			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s' with value '%v': %v", column.Name, val, err)
 		}
 		columnValue = &proto.Column{Value: &proto.Column_BoolValue{BoolValue: b}}
 		break
 	case proto.ColumnType_INT:
 		i, err := types.ToInt64(val)
 		if err != nil {
-			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s': %v", column.Name, err)
+			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s' with value '%v': %v", column.Name, val, err)
 		}
 
 		columnValue = &proto.Column{Value: &proto.Column_IntValue{IntValue: i}}
@@ -144,7 +144,7 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 	case proto.ColumnType_DOUBLE:
 		d, err := types.ToFloat64(val)
 		if err != nil {
-			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s': %v", column.Name, err)
+			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s' with value '%v': %v", column.Name, val, err)
 		}
 		columnValue = &proto.Column{Value: &proto.Column_DoubleValue{DoubleValue: d}}
 		break
@@ -168,7 +168,7 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 		// cast val to time
 		var timeVal, err = types.ToTime(val)
 		if err != nil {
-			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s': %v", column.Name, err)
+			return nil, fmt.Errorf("interfaceToColumnValue failed for column '%s' with value '%v': %v", column.Name, val, err)
 		}
 		// now convert time to protobuf timestamp
 		timestamp, err := ptypes.TimestampProto(timeVal)
@@ -196,7 +196,7 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 			columnValue = &proto.Column{Value: &proto.Column_NullValue{}}
 		} else {
 			if _, _, err := net.ParseCIDR(cidrRangeString); err != nil {
-				return nil, fmt.Errorf("%s: invalid ip address %s", column.Name, cidrRangeString)
+				return nil, fmt.Errorf("%s: invalid cidr address %s", column.Name, cidrRangeString)
 			}
 			columnValue = &proto.Column{Value: &proto.Column_CidrRangeValue{CidrRangeValue: cidrRangeString}}
 		}
