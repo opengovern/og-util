@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kaytu.describe.v1;
 
-option go_package="gitlab.com/keibiengine/keibi-engine/pkg/describe/proto/src/golang";
+option go_package="github.com/kaytu-io/kaytu-engine/pkg/describe/proto/src/golang";
 
 message DescribeJob {
   uint32 job_id = 1;
