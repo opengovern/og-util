@@ -20,6 +20,7 @@ message DescribeJob {
 
 message AWSResources {
   repeated AWSResource resources = 1;
+  string kafka_topic = 2;
 }
 
 message AWSResource {
@@ -39,6 +40,7 @@ message AWSResource {
 
 message AzureResources {
   repeated AzureResource resources = 1;
+  string kafka_topic = 2;
 }
 message AzureResource {
   string id = 1;
