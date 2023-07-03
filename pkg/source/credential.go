@@ -3,10 +3,13 @@ package source
 import "time"
 
 type AWSCredentialMetadata struct {
-	AccountID             string    `json:"account_id"`
-	IamUserName           *string   `json:"iam_user_name"`
-	IamApiKeyCreationDate time.Time `json:"iam_api_key_creation_date"`
-	AttachedPolicies      []string  `json:"attached_policies"`
+	AccountID                      string    `json:"account_id"`
+	IamUserName                    *string   `json:"iam_user_name"`
+	IamApiKeyCreationDate          time.Time `json:"iam_api_key_creation_date"`
+	AttachedPolicies               []string  `json:"attached_policies"`
+	OrganizationID                 *string   `json:"organization_id"`
+	OrganizationMasterAccountEmail *string   `json:"organization_master_account_email"`
+	OrganizationMasterAccountId    *string   `json:"organization_master_account_id"`
 }
 
 type AzureCredentialMetadata struct {
