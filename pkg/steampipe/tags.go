@@ -3,8 +3,9 @@ package steampipe
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/turbot/steampipe-plugin-sdk/v4/plugin"
 	"reflect"
+
+	"github.com/turbot/steampipe-plugin-sdk/v4/plugin"
 
 	"github.com/turbot/steampipe-plugin-sdk/v4/grpc/proto"
 )
@@ -29,7 +30,9 @@ func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType strin
 			name = v.GetStringValue()
 		}
 		if k == "tags" {
-			if jsonBytes := v.GetJsonValue(); jsonBytes != nil && len(jsonBytes) > 0 && string(jsonBytes) != "null" {
+			if jsonBytes := v.GetJsonValue(); jsonBytes != nil && len(jsonBytes) > 0 &&
+				string(jsonBytes) != "null" && string(jsonBytes) != "[]" &&
+				string(jsonBytes) != "{}" && string(jsonBytes) != "\"\"" {
 				var t interface{}
 				err := json.Unmarshal(jsonBytes, &t)
 				if err != nil {
@@ -76,7 +79,7 @@ func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType strin
 					}
 				} else {
 					fmt.Printf("invalid tag type for: %s\n", string(jsonBytes))
-					return nil, "", fmt.Errorf("invalid tags type: %s", reflect.TypeOf(t))
+					//return nil, "", fmt.Errorf("invalid tags type: %s", reflect.TypeOf(t))
 				}
 			}
 		}
