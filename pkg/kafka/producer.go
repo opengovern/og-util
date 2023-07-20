@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func newKafkaProducer(kafkaServers []string) (*confluent_kafka.Producer, error) {
+func NewKafkaProducer(kafkaServers []string) (*confluent_kafka.Producer, error) {
 	return confluent_kafka.NewProducer(&confluent_kafka.ConfigMap{
 		"bootstrap.servers": strings.Join(kafkaServers, ","),
 		"acks":              "all",
