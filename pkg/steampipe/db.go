@@ -58,7 +58,7 @@ func (s *Database) Conn() *pgxpool.Pool {
 	return s.conn
 }
 
-func (s *Database) Query(query string, from, size int, orderBy string,
+func (s *Database) Query(ctx context.Context, query string, from, size int, orderBy string,
 	orderDir DirectionType) (*Result, error) {
 
 	// parameterize order by is not supported by steampipe.
@@ -87,8 +87,7 @@ func (s *Database) Query(query string, from, size int, orderBy string,
 	fmt.Println("query is: ", query)
 	fmt.Println("size: ", size, "from:", from)
 
-	r, err := s.conn.Query(context.Background(),
-		query, size, from)
+	r, err := s.conn.Query(ctx, query, size, from)
 	if err != nil {
 		return nil, err
 	}
