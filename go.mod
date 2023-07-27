@@ -19,6 +19,7 @@ require (
 	github.com/lib/pq v1.10.2
 	github.com/neo4j/neo4j-go-driver/v5 v5.8.1
 	github.com/ory/dockertest/v3 v3.10.0
+	github.com/pganalyze/pg_query_go/v4 v4.2.1
 	github.com/prometheus/client_golang v1.15.0
 	github.com/sendgrid/sendgrid-go v3.12.0+incompatible
 	github.com/streadway/amqp v1.0.0

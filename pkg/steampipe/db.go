@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	pg_query_go "github.com/pganalyze/pg_query_go/v4"
 )
 
 type DirectionType string
@@ -58,9 +59,8 @@ func (s *Database) Conn() *pgxpool.Pool {
 	return s.conn
 }
 
-func (s *Database) Query(ctx context.Context, query string, from, size int, orderBy string,
+func (s *Database) Query(ctx context.Context, query string, from, size *int, orderBy string,
 	orderDir DirectionType) (*Result, error) {
-
 	// parameterize order by is not supported by steampipe.
 	// in order to prevent SQL Injection, we ensure that orderby field is only consists of
 	// characters and underline.
@@ -70,19 +70,52 @@ func (s *Database) Query(ctx context.Context, query string, from, size int, orde
 		}
 		return nil, errors.New("invalid orderby field:" + orderBy)
 	}
-
-	orderStr := ""
-	if orderBy != "" {
-		if orderDir == DirectionAscending {
-			orderStr = " order by " + orderBy + " asc"
-		} else if orderDir == DirectionDescending {
-			orderStr = " order by " + orderBy + " desc"
-		} else {
-			return nil, errors.New("invalid order direction:" + string(orderDir))
+	statements, err := pg_query_go.Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse query: %w", err)
+	}
+	if len(statements.GetStmts()) != 1 {
+		return nil, errors.New("only one statement is supported")
+	}
+	statement := statements.GetStmts()[0].GetStmt().GetSelectStmt()
+	if statement == nil {
+		return nil, errors.New("only select statement is supported")
+	}
+	if (statement.GetSortClause() == nil || len(statement.GetSortClause()) == 0) && orderBy != "" {
+		direction := pg_query_go.SortByDir_SORTBY_DEFAULT
+		switch orderDir {
+		case DirectionAscending:
+			direction = pg_query_go.SortByDir_SORTBY_ASC
+		case DirectionDescending:
+			direction = pg_query_go.SortByDir_SORTBY_DESC
+		default:
+			direction = pg_query_go.SortByDir_SORTBY_DEFAULT
+		}
+		statement.SortClause = append(statement.SortClause,
+			pg_query_go.MakeSortByNode(
+				pg_query_go.MakeColumnRefNode(
+					[]*pg_query_go.Node{
+						pg_query_go.MakeStrNode(orderBy),
+					},
+					0,
+				),
+				direction,
+				pg_query_go.SortByNulls_SORTBY_NULLS_LAST,
+				0,
+			),
+		)
+	}
+	if statement.GetLimitCount() == nil && size != nil {
+		statement.LimitCount = pg_query_go.MakeAConstIntNode(int64(*size), 0)
+		if from != nil {
+			statement.LimitOffset = pg_query_go.MakeAConstIntNode(int64(*from), 0)
 		}
 	}
 
-	query = query + orderStr + " LIMIT $1 OFFSET $2;"
+	query, err = pg_query_go.Deparse(statements)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deparse query: %w", err)
+	}
 
 	fmt.Println("query is: ", query)
 	fmt.Println("size: ", size, "from:", from)
@@ -113,9 +146,8 @@ func (s *Database) Query(ctx context.Context, query string, from, size int, orde
 	}, nil
 }
 
-func (s *Database) QueryAll(query string) (*Result, error) {
-	r, err := s.conn.Query(context.Background(),
-		query)
+func (s *Database) QueryAll(ctx context.Context, query string) (*Result, error) {
+	r, err := s.conn.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
