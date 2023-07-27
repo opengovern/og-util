@@ -107,12 +107,7 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 	} else if statement.GetSortClause() == nil || len(statement.GetSortClause()) == 0 {
 		statement.SortClause = append(statement.SortClause,
 			pg_query_go.MakeSortByNode(
-				pg_query_go.MakeColumnRefNode(
-					[]*pg_query_go.Node{
-						pg_query_go.MakeIntNode(1),
-					},
-					0,
-				),
+				pg_query_go.MakeAConstIntNode(1, 0),
 				pg_query_go.SortByDir_SORTBY_ASC,
 				pg_query_go.SortByNulls_SORTBY_NULLS_DEFAULT,
 				0,
