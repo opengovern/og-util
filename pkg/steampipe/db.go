@@ -64,7 +64,7 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 	// parameterize order by is not supported by steampipe.
 	// in order to prevent SQL Injection, we ensure that orderby field is only consists of
 	// characters and underline.
-	if ok, err := regexp.Match("(\\w|_)+", []byte(orderBy)); err != nil || !ok {
+	if ok, err := regexp.Match("(\\w|_)+", []byte(orderBy)); err != nil || orderBy != "" && !ok {
 		if err != nil {
 			return nil, err
 		}
