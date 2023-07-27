@@ -100,7 +100,7 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 					0,
 				),
 				direction,
-				pg_query_go.SortByNulls_SORTBY_NULLS_LAST,
+				pg_query_go.SortByNulls_SORTBY_NULLS_DEFAULT,
 				0,
 			),
 		)
