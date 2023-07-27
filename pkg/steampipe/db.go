@@ -106,6 +106,7 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 		)
 	}
 	if statement.GetLimitCount() == nil && size != nil {
+		statement.LimitOption = pg_query_go.LimitOption_LIMIT_OPTION_COUNT
 		statement.LimitCount = pg_query_go.MakeAConstIntNode(int64(*size), 0)
 		if from != nil {
 			statement.LimitOffset = pg_query_go.MakeAConstIntNode(int64(*from), 0)
