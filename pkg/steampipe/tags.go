@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/turbot/steampipe-plugin-sdk/v4/plugin"
+	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 
-	"github.com/turbot/steampipe-plugin-sdk/v4/grpc/proto"
+	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 )
 
 func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType string, source interface{}, descriptionMap map[string]interface{}) (map[string]string, string, error) {
