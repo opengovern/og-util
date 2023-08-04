@@ -54,8 +54,8 @@ func GetConfig(connection *plugin.Connection) ClientConfig {
 	return config
 }
 
-func NewClientCached(c ClientConfig, cache *connection.Cache, ctx context.Context) (Client, error) {
-	value, ok := cache.Get("keibi-client")
+func NewClientCached(c ClientConfig, cache *connection.ConnectionCache, ctx context.Context) (Client, error) {
+	value, ok := cache.Get(ctx, "kaytu-es-client")
 	if ok {
 		return value.(Client), nil
 	}
@@ -67,7 +67,7 @@ func NewClientCached(c ClientConfig, cache *connection.Cache, ctx context.Contex
 		return Client{}, err
 	}
 
-	cache.Set("keibi-client", client)
+	cache.Set(ctx, "kaytu-es-client", client)
 
 	return client, nil
 }
