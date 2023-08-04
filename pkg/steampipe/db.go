@@ -104,7 +104,7 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 				0,
 			),
 		)
-	} else if statement.GetSortClause() == nil || len(statement.GetSortClause()) == 0 {
+	} /* else if statement.GetSortClause() == nil || len(statement.GetSortClause()) == 0 {
 		statement.SortClause = append(statement.SortClause,
 			pg_query_go.MakeSortByNode(
 				pg_query_go.MakeAConstIntNode(1, 0),
@@ -113,7 +113,7 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 				0,
 			),
 		)
-	}
+	} */
 	if statement.GetLimitCount() == nil && size != nil {
 		statement.LimitOption = pg_query_go.LimitOption_LIMIT_OPTION_COUNT
 		statement.LimitCount = pg_query_go.MakeAConstIntNode(int64(*size), 0)
