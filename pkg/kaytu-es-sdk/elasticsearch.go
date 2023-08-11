@@ -233,11 +233,15 @@ func (p *BaseESPaginator) Search(ctx context.Context, response interface{}) erro
 	res, err := p.client.Search(opts...)
 	defer CloseSafe(res)
 	if err != nil {
+		b, _ := ioutil.ReadAll(res.Body)
+		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
 			return nil
 		}
+		b, _ := ioutil.ReadAll(res.Body)
+		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	}
 
