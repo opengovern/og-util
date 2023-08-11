@@ -101,7 +101,7 @@ func StartupRabbitMQ(t *testing.T) RabbitMQServer {
 	pool, err := dockertest.NewPool("")
 	require.NoError(err, "connect to docker")
 
-	name := "keibi-rabbitmq-" + uuid.NewString()
+	name := "kaytu-rabbitmq-" + uuid.NewString()
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 		Name:       name,
 		Hostname:   name,
@@ -183,7 +183,7 @@ func StartupKafka(t *testing.T) KafkaServer {
 	})
 
 	zookeeperResource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Name:       "keibi_test_zookeeper",
+		Name:       "kaytu_test_zookeeper",
 		Repository: "confluentinc/cp-zookeeper",
 		Tag:        "latest",
 		Env: []string{
@@ -200,13 +200,13 @@ func StartupKafka(t *testing.T) KafkaServer {
 	require.NoError(err, "status zookeeper")
 
 	kafkaResource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Name:       "keibi_test_kafka",
+		Name:       "kaytu_test_kafka",
 		Repository: "confluentinc/cp-kafka",
 		Tag:        "latest",
 		Env: []string{
 			"KAFKA_BROKER_ID=1",
-			"KAFKA_ZOOKEEPER_CONNECT=keibi_test_zookeeper:2181",
-			fmt.Sprintf("KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://keibi_test_kafka:9092,PLAINTEXT_HOST://%s:29092", GetDockerHost()),
+			"KAFKA_ZOOKEEPER_CONNECT=kaytu_test_zookeeper:2181",
+			fmt.Sprintf("KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kaytu_test_kafka:9092,PLAINTEXT_HOST://%s:29092", GetDockerHost()),
 			"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT",
 			"KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT",
 			"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1",
@@ -265,7 +265,7 @@ func StartupElasticSearch(t *testing.T) ElasticSearchServer {
 	require.NoError(err, "connect to docker")
 
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Name:         "keibi_test_es",
+		Name:         "kaytu_test_es",
 		Repository:   "docker.elastic.co/elasticsearch/elasticsearch",
 		Tag:          "7.15.1",
 		ExposedPorts: []string{"9200"},

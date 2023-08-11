@@ -1,10 +1,11 @@
 package postgres
 
 import (
-	"github.com/ory/dockertest/v3"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/ory/dockertest/v3"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,7 @@ func TestNewClient(t *testing.T) {
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err, "connect to docker")
 
-	net, err := pool.CreateNetwork("keibi")
+	net, err := pool.CreateNetwork("kaytu")
 	require.NoError(t, err, "create network")
 	t.Cleanup(func() {
 		require.NoError(t, pool.RemoveNetwork(net), "remove network")
@@ -47,7 +48,7 @@ func TestNewClient(t *testing.T) {
 
 	user, pass, name, port := "postgres", "123456", "workspace", "5432"
 	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Name:         "keibi",
+		Name:         "kaytu",
 		Repository:   "postgres",
 		Tag:          "12.2-alpine",
 		ExposedPorts: []string{port},

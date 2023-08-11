@@ -1,9 +1,10 @@
 package metrics
 
 import (
-	"github.com/labstack/echo/v4"
 	"reflect"
 	"strconv"
+
+	"github.com/labstack/echo/v4"
 
 	echoPrometheus "github.com/globocom/echo-prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,7 +37,7 @@ func isNotFoundHandler(handler echo.HandlerFunc) bool {
 
 func AddEchoMiddleware(e *echo.Echo) {
 	config := echoPrometheus.Config{
-		Namespace: "keibi",
+		Namespace: "kaytu",
 		Subsystem: "http",
 		Buckets: []float64{
 			0.001, // 1ms

@@ -1,4 +1,4 @@
-package keibi
+package kaytu
 
 type PointInTime struct {
 	ID        string `json:"id"`
