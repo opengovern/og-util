@@ -43,13 +43,13 @@ type KMSVaultSourceConfig struct {
 
 func NewKMSVaultSourceConfig(ctx context.Context, accessKey, secretKey, region string) (*KMSVaultSourceConfig, error) {
 	var err error
-	cfg := aws.Config{}
+	cfg, err := config.LoadDefaultConfig(ctx)
 	// if the keys are not provided, the default credentials from service account will be used
 	if accessKey != "" && secretKey != "" {
 		cfg, err = getAWSConfig(ctx, accessKey, secretKey, "", "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to load SDK configuration: %v", err)
-		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load SDK configuration: %v", err)
 	}
 	cfg.Region = region
 	// Create KMS client with loaded configuration
