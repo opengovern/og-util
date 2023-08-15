@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"strings"
 
@@ -18,7 +17,7 @@ import (
 
 func CloseSafe(resp *esapi.Response) {
 	if resp != nil && resp.Body != nil {
-		_, _ = ioutil.ReadAll(resp.Body)
+		_, _ = io.ReadAll(resp.Body)
 		resp.Body.Close() //nolint,gosec
 	}
 }
@@ -28,7 +27,7 @@ func CheckError(resp *esapi.Response) error {
 		return nil
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read error: %w", err)
 	}
@@ -101,7 +100,7 @@ func NewTermFilter(field, value string) BoolFilter {
 }
 
 func (t TermFilter) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
+	return json.Marshal(map[string]any{
 		"term": map[string]string{
 			t.field: t.value,
 		},
@@ -123,7 +122,7 @@ func TermsFilter(field string, values []string) BoolFilter {
 }
 
 func (t termsFilter) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
+	return json.Marshal(map[string]any{
 		"terms": map[string][]string{
 			t.field: t.values,
 		},
@@ -135,29 +134,29 @@ func (t termsFilter) IsBoolFilter() {}
 type BaseESPaginator struct {
 	client *elasticsearchv7.Client
 
-	index    string                 // Query index
-	query    map[string]interface{} // Query filters
-	pageSize int64                  // Query page size
-	pitID    string                 // Query point in time id (Only set if max is greater than size)
+	index    string         // Query index
+	query    map[string]any // Query filters
+	pageSize int64          // Query page size
+	pitID    string         // Query point in time id (Only set if max is greater than size)
 
 	limit   int64 // Maximum documents to query
 	queried int64 // Current count of queried documents
 
-	searchAfter []interface{}
+	searchAfter []any
 	done        bool
 }
 
 func NewPaginator(client *elasticsearchv7.Client, index string, filters []BoolFilter, limit *int64) (*BaseESPaginator, error) {
-	var query map[string]interface{}
+	var query map[string]any
 	if len(filters) > 0 {
-		query = map[string]interface{}{
-			"bool": map[string]interface{}{
+		query = map[string]any{
+			"bool": map[string]any{
 				"filter": filters,
 			},
 		}
 	} else {
-		query = map[string]interface{}{
-			"match_all": map[string]interface{}{},
+		query = map[string]any{
+			"match_all": map[string]any{},
 		}
 	}
 
@@ -187,7 +186,7 @@ func (p *BaseESPaginator) Done() bool {
 }
 
 // The response will be marshalled if the search was successfull
-func (p *BaseESPaginator) Search(ctx context.Context, response interface{}) error {
+func (p *BaseESPaginator) Search(ctx context.Context, response any) error {
 	if p.done {
 		return errors.New("no more page to query")
 	}
@@ -210,7 +209,7 @@ func (p *BaseESPaginator) Search(ctx context.Context, response interface{}) erro
 			KeepAlive: "1m",
 		}
 
-		sa.Sort = []map[string]interface{}{
+		sa.Sort = []map[string]any{
 			{
 				"_shard_doc": "desc",
 			},
@@ -233,19 +232,19 @@ func (p *BaseESPaginator) Search(ctx context.Context, response interface{}) erro
 	res, err := p.client.Search(opts...)
 	defer CloseSafe(res)
 	if err != nil {
-		b, _ := ioutil.ReadAll(res.Body)
+		b, _ := io.ReadAll(res.Body)
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
 			return nil
 		}
-		b, _ := ioutil.ReadAll(res.Body)
+		b, _ := io.ReadAll(res.Body)
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	}
 
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
@@ -275,7 +274,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		return err
 	}
 
-	data, err := ioutil.ReadAll(resPit.Body)
+	data, err := io.ReadAll(resPit.Body)
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
@@ -289,7 +288,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 	return nil
 }
 
-func (p *BaseESPaginator) UpdateState(numHits int64, searchAfter []interface{}, pitID string) {
+func (p *BaseESPaginator) UpdateState(numHits int64, searchAfter []any, pitID string) {
 	p.queried += numHits
 	if p.queried > p.limit {
 		// Have found enough documents
@@ -305,8 +304,12 @@ func (p *BaseESPaginator) UpdateState(numHits int64, searchAfter []interface{}, 
 	}
 }
 
-func (c Client) Search(ctx context.Context, index string, query string, response interface{}) error {
-	return c.SearchWithTrackTotalHits(ctx, index, query, response, false)
+func (c Client) Search(ctx context.Context, index string, query string, response any) error {
+	return c.SearchWithTrackTotalHits(ctx, index, query, nil, response, false)
+}
+
+func (c Client) SearchWithFilterPath(ctx context.Context, index string, query string, filterPath []string, response any) error {
+	return c.SearchWithTrackTotalHits(ctx, index, query, filterPath, response, false)
 }
 
 type CountResponse struct {
@@ -330,7 +333,7 @@ func (c Client) Count(ctx context.Context, index string) (int64, error) {
 		return 0, err
 	}
 
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return 0, fmt.Errorf("read response: %w", err)
 	}
@@ -342,30 +345,31 @@ func (c Client) Count(ctx context.Context, index string) (int64, error) {
 	return response.Count, nil
 }
 
-func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, query string, response interface{}, trackTotalHits interface{}) error {
+func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, query string, filterPath []string, response any, trackTotalHits any) error {
 	opts := []func(*esapi.SearchRequest){
 		c.es.Search.WithContext(ctx),
 		c.es.Search.WithBody(strings.NewReader(query)),
 		c.es.Search.WithTrackTotalHits(trackTotalHits),
 		c.es.Search.WithIndex(index),
+		c.es.Search.WithFilterPath(filterPath...),
 	}
 
 	res, err := c.es.Search(opts...)
 	defer CloseSafe(res)
 	if err != nil {
-		b, _ := ioutil.ReadAll(res.Body)
+		b, _ := io.ReadAll(res.Body)
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
 			return nil
 		}
-		b, _ := ioutil.ReadAll(res.Body)
+		b, _ := io.ReadAll(res.Body)
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	}
 
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
@@ -376,7 +380,7 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 	return nil
 }
 
-func (c Client) GetByID(ctx context.Context, index string, id string, response interface{}) error {
+func (c Client) GetByID(ctx context.Context, index string, id string, response any) error {
 	opts := []func(request *esapi.GetRequest){
 		c.es.Get.WithContext(ctx),
 	}
@@ -415,13 +419,13 @@ type DeleteByQueryResponse struct {
 		Bulk   int `json:"bulk"`
 		Search int `json:"search"`
 	} `json:"retries"`
-	ThrottledMillis      int           `json:"throttled_millis"`
-	RequestsPerSecond    float64       `json:"requests_per_second"`
-	ThrottledUntilMillis int           `json:"throttled_until_millis"`
-	Failures             []interface{} `json:"failures"`
+	ThrottledMillis      int     `json:"throttled_millis"`
+	RequestsPerSecond    float64 `json:"requests_per_second"`
+	ThrottledUntilMillis int     `json:"throttled_until_millis"`
+	Failures             []any   `json:"failures"`
 }
 
-func DeleteByQuery(ctx context.Context, es *elasticsearchv7.Client, indices []string, query interface{}, opts ...func(*esapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+func DeleteByQuery(ctx context.Context, es *elasticsearchv7.Client, indices []string, query any, opts ...func(*esapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
 	defaultOpts := []func(*esapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
@@ -442,7 +446,7 @@ func DeleteByQuery(ctx context.Context, es *elasticsearchv7.Client, indices []st
 		return DeleteByQueryResponse{}, err
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return DeleteByQueryResponse{}, fmt.Errorf("read response: %w", err)
 	}
