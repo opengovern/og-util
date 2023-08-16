@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"io"
 	"math"
 	"strings"
@@ -50,28 +51,55 @@ type BoolFilter interface {
 	IsBoolFilter()
 }
 
-func BuildFilter(equalQuals plugin.KeyColumnEqualsQualMap, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
+func BuildFilter(queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
 	var filters []BoolFilter
-	for columnName, filterName := range filtersQuals {
-		if equalQuals[columnName] == nil {
+	if queryContext.UnsafeQuals == nil {
+		return filters
+	}
+
+	for _, quals := range queryContext.UnsafeQuals {
+		if quals == nil {
 			continue
 		}
 
-		var filter BoolFilter
-		value := equalQuals[columnName]
-		if value.GetStringValue() != "" {
-			filter = NewTermFilter(filterName, equalQuals[columnName].GetStringValue())
-		} else if value.GetListValue() != nil {
-			list := value.GetListValue()
-			values := make([]string, 0, len(list.Values))
-			for _, value := range list.Values {
-				values = append(values, value.GetStringValue())
+		for _, qual := range quals.GetQuals() {
+			fn := qual.GetFieldName()
+			fieldName := fn
+			if mfn, ok := filtersQuals[fn]; ok {
+				fieldName = mfn
 			}
 
-			filter = TermsFilter(filterName, values)
-		}
+			var oprStr string
+			opr := qual.GetOperator()
+			if strOpr, ok := opr.(*proto.Qual_StringValue); ok {
+				oprStr = strOpr.StringValue
+			}
+			if oprStr == "=" {
+				if qual.GetValue().GetListValue() != nil {
+					vals := qual.GetValue().GetListValue().GetValues()
+					values := make([]string, 0, len(vals))
+					for _, value := range vals {
+						values = append(values, qualValue(value))
+					}
 
-		filters = append(filters, filter)
+					filters = append(filters, TermsFilter(fieldName, values))
+				} else {
+					filters = append(filters, NewTermFilter(fieldName, qualValue(qual.GetValue())))
+				}
+			}
+			if oprStr == ">" {
+				filters = append(filters, NewRangeFilter(fieldName, qualValue(qual.GetValue()), "", "", ""))
+			}
+			if oprStr == ">=" {
+				filters = append(filters, NewRangeFilter(fieldName, "", qualValue(qual.GetValue()), "", ""))
+			}
+			if oprStr == "<" {
+				filters = append(filters, NewRangeFilter(fieldName, "", "", qualValue(qual.GetValue()), ""))
+			}
+			if oprStr == "<=" {
+				filters = append(filters, NewRangeFilter(fieldName, "", "", "", qualValue(qual.GetValue())))
+			}
+		}
 	}
 
 	if len(accountID) > 0 && accountID != "all" {
@@ -85,6 +113,24 @@ func BuildFilter(equalQuals plugin.KeyColumnEqualsQualMap, filtersQuals map[stri
 		filters = append(filters, NewTermFilter("metadata."+accountFieldName, accountID))
 	}
 	return filters
+}
+
+func qualValue(qual *proto.QualValue) string {
+	var valStr string
+	val := qual.Value
+	switch v := val.(type) {
+	case *proto.QualValue_StringValue:
+		valStr = v.StringValue
+	case *proto.QualValue_Int64Value:
+		valStr = fmt.Sprintf("%v", v.Int64Value)
+	case *proto.QualValue_DoubleValue:
+		valStr = fmt.Sprintf("%v", v.DoubleValue)
+	case *proto.QualValue_BoolValue:
+		valStr = fmt.Sprintf("%v", v.BoolValue)
+	default:
+		valStr = qual.String()
+	}
+	return valStr
 }
 
 type TermFilter struct {
@@ -130,6 +176,48 @@ func (t termsFilter) MarshalJSON() ([]byte, error) {
 }
 
 func (t termsFilter) IsBoolFilter() {}
+
+type RangeFilter struct {
+	field string
+	gt    string
+	gte   string
+	lt    string
+	lte   string
+}
+
+func NewRangeFilter(field, gt, gte, lt, lte string) BoolFilter {
+	return RangeFilter{
+		field: field,
+		gt:    gt,
+		gte:   gte,
+		lt:    lt,
+		lte:   lte,
+	}
+}
+
+func (t RangeFilter) MarshalJSON() ([]byte, error) {
+	fieldMap := map[string]interface{}{}
+	if len(t.gt) > 0 {
+		fieldMap["gt"] = t.gt
+	}
+	if len(t.gt) > 0 {
+		fieldMap["gte"] = t.gt
+	}
+	if len(t.gt) > 0 {
+		fieldMap["lt"] = t.lt
+	}
+	if len(t.gt) > 0 {
+		fieldMap["lte"] = t.lt
+	}
+
+	return json.Marshal(map[string]interface{}{
+		"range": map[string]interface{}{
+			t.field: fieldMap,
+		},
+	})
+}
+
+func (t RangeFilter) IsBoolFilter() {}
 
 type BaseESPaginator struct {
 	client *elasticsearchv7.Client
@@ -183,6 +271,10 @@ func NewPaginator(client *elasticsearchv7.Client, index string, filters []BoolFi
 
 func (p *BaseESPaginator) Done() bool {
 	return p.done
+}
+
+func (p *BaseESPaginator) UpdatePageSize(i int64) {
+	p.pageSize = i
 }
 
 // The response will be marshalled if the search was successfull
