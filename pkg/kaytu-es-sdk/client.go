@@ -118,3 +118,7 @@ func NewClient(c ClientConfig) (Client, error) {
 func (c Client) ES() *elasticsearchv7.Client {
 	return c.es
 }
+
+func (c *Client) SetES(es *elasticsearchv7.Client) {
+	c.es = es
+}
