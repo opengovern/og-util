@@ -96,20 +96,37 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 		msgs = append(msgs, msg)
 	}
 
-	return SyncSend(logger, producer, msgs)
+	var err error
+	var failedMessages []*confluent_kafka.Message
+	for retry := 0; retry < 10; retry++ {
+		failedMessages, err = SyncSend(logger, producer, msgs)
+		if err != nil {
+			logger.Error("Failed calling SyncSend", zap.Error(err))
+			if len(failedMessages) == 0 {
+				return err
+			}
+			msgs = failedMessages
+			time.Sleep(15 * time.Second)
+			continue
+		}
+		return nil
+	}
+	return err
 }
 
-func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*confluent_kafka.Message) error {
+func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*confluent_kafka.Message) ([]*confluent_kafka.Message, error) {
 	deliverChan := make(chan confluent_kafka.Event, len(msgs))
 	for _, msg := range msgs {
 		err := producer.Produce(msg, deliverChan)
 		if err != nil {
 			logger.Error("Failed calling Produce", zap.Error(err))
-			return err
+			return msgs, err
 		}
 	}
 
 	errList := make([]error, 0)
+
+	failedMessages := make([]*confluent_kafka.Message, 0)
 	for ackedMessageCount := 0; ackedMessageCount < len(msgs); {
 		select {
 		case e, isOpen := <-deliverChan:
@@ -122,6 +139,7 @@ func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*co
 				if m.TopicPartition.Error != nil {
 					logger.Error("Delivery failed", zap.Error(m.TopicPartition.Error))
 					errList = append(errList, m.TopicPartition.Error)
+					failedMessages = append(failedMessages, m)
 				} else {
 					logger.Debug("Delivered message to topic", zap.String("topic", *m.TopicPartition.Topic))
 				}
@@ -135,12 +153,12 @@ func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*co
 			}
 		case <-time.After(time.Minute):
 			logger.Error("Delivery failed due to timeout")
-			return fmt.Errorf("delivery failed due to timeout")
+			return nil, fmt.Errorf("delivery failed due to timeout")
 		}
 	}
 	close(deliverChan)
 	if len(errList) > 0 {
-		return fmt.Errorf("failed to persist %d resources in kafka with sync send: %v", len(errList), errList)
+		return failedMessages, fmt.Errorf("failed to persist %d resources in kafka with sync send: %v", len(errList), errList)
 	}
-	return nil
+	return nil, nil
 }
