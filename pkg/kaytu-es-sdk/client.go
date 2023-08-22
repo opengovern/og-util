@@ -97,9 +97,10 @@ func NewClient(c ClientConfig) (Client, error) {
 	}
 
 	cfg := elasticsearchv7.Config{
-		Addresses: c.Addresses,
-		Username:  *c.Username,
-		Password:  *c.Password,
+		Addresses:           c.Addresses,
+		Username:            *c.Username,
+		Password:            *c.Password,
+		CompressRequestBody: true,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true, //nolint,gosec
