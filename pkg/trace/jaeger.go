@@ -6,11 +6,8 @@ import (
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"os"
 	"runtime"
 )
-
-var agentHost = os.Getenv("JAEGER_AGENT_HOST")
 
 type TraceName string
 
@@ -24,7 +21,7 @@ func GetCurrentFuncName() string {
 	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
 }
 
-func InitTracer() (*sdktrace.TracerProvider, error) {
+func InitTracer(agentHost string) (*sdktrace.TracerProvider, error) {
 	exporter, err := jaeger.New(jaeger.WithAgentEndpoint(jaeger.WithAgentHost(agentHost)))
 	if err != nil {
 		return nil, err
