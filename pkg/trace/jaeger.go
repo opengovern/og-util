@@ -2,8 +2,15 @@ package trace
 
 import (
 	"fmt"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"os"
 	"runtime"
 )
+
+var agentHost = os.Getenv("JAEGER_AGENT_HOST")
 
 type TraceName string
 
@@ -15,4 +22,18 @@ const (
 func GetCurrentFuncName() string {
 	pc, _, _, _ := runtime.Caller(1)
 	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
+}
+
+func InitTracer() (*sdktrace.TracerProvider, error) {
+	exporter, err := jaeger.New(jaeger.WithAgentEndpoint(jaeger.WithAgentHost(agentHost)))
+	if err != nil {
+		return nil, err
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithBatcher(exporter),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+	return tp, nil
 }
