@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"reflect"
 	"strings"
 
 	"github.com/golang/protobuf/ptypes"
@@ -232,8 +233,7 @@ func ConvertToDescription(resourceType string, data interface{}, descriptionMap 
 			dd = v
 		}
 	}
-	dd = helpers.DereferencePointer(dd)
-	d = dd
+	d = reflect.New(reflect.ValueOf(dd).Elem().Type()).Interface()
 	err = json.Unmarshal(b, &d)
 	if err != nil {
 		log.Println("failed to unmarshal to description: ", string(b))
