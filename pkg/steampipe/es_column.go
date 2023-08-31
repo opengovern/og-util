@@ -226,11 +226,13 @@ func ConvertToDescription(resourceType string, data interface{}, descriptionMap 
 		return nil, err
 	}
 
+	var dd any
 	for k, v := range descriptionMap {
 		if strings.ToLower(resourceType) == strings.ToLower(k) {
-			d = v
+			dd = v
 		}
 	}
+	d = &dd
 
 	err = json.Unmarshal(b, &d)
 	if err != nil {
