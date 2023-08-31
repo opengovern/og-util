@@ -232,8 +232,8 @@ func ConvertToDescription(resourceType string, data interface{}, descriptionMap 
 			dd = v
 		}
 	}
-	d = &dd
-
+	dd = helpers.DereferencePointer(dd)
+	d = dd
 	err = json.Unmarshal(b, &d)
 	if err != nil {
 		log.Println("failed to unmarshal to description: ", string(b))
