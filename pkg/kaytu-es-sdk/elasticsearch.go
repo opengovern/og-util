@@ -51,7 +51,7 @@ type BoolFilter interface {
 	IsBoolFilter()
 }
 
-func BuildFilter(queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
+func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
 	var filters []BoolFilter
 	if queryContext.UnsafeQuals == nil {
 		return filters
@@ -64,9 +64,9 @@ func BuildFilter(queryContext *plugin.QueryContext, filtersQuals map[string]stri
 
 		for _, qual := range quals.GetQuals() {
 			fn := qual.GetFieldName()
-			fieldName := fn
-			if mfn, ok := filtersQuals[fn]; ok {
-				fieldName = mfn
+			fieldName, ok := filtersQuals[fn]
+			if !ok {
+				continue
 			}
 
 			var oprStr string
@@ -112,6 +112,9 @@ func BuildFilter(queryContext *plugin.QueryContext, filtersQuals map[string]stri
 		}
 		filters = append(filters, NewTermFilter("metadata."+accountFieldName, accountID))
 	}
+
+	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters)
+
 	return filters
 }
 
