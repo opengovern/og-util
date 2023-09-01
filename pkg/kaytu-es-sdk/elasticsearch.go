@@ -57,6 +57,8 @@ func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext, filters
 		return filters
 	}
 
+	plugin.Logger(ctx).Trace("BuildFilter", "queryContext.UnsafeQuals", queryContext.UnsafeQuals)
+
 	for _, quals := range queryContext.UnsafeQuals {
 		if quals == nil {
 			continue
