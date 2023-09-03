@@ -104,12 +104,12 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 		for retry := 0; retry < 10; retry++ {
 			failedMessages, err = SyncSend(logger, producer, msgsToSend)
 			if err != nil {
-				logger.Error("Failed calling SyncSend", zap.Error(err))
+				logger.Error("Failed calling SyncSend", zap.Error(fmt.Errorf("failed Messages: %v, error message: %v", failedMessages, err.Error()))
 				if len(failedMessages) == 0 {
-					return err
+					return fmt.Errorf("failed Messages: %v, error message: %v", failedMessages, err.Error())
 				}
 				if retry == 9 {
-					return err
+					return fmt.Errorf("failed Messages: %v, error message: %v", failedMessages, err.Error())
 				}
 				msgs = failedMessages
 				time.Sleep(15 * time.Second)
