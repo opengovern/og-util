@@ -12,6 +12,7 @@ import (
 
 const (
 	EsIndexHeader = "elasticsearch_index"
+	KafkaPageSize = 5000
 )
 
 type Doc interface {
@@ -96,22 +97,28 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 		msgs = append(msgs, msg)
 	}
 
-	var err error
-	var failedMessages []*confluent_kafka.Message
-	for retry := 0; retry < 10; retry++ {
-		failedMessages, err = SyncSend(logger, producer, msgs)
-		if err != nil {
-			logger.Error("Failed calling SyncSend", zap.Error(err))
-			if len(failedMessages) == 0 {
-				return err
+	for startPageIdx := 0; startPageIdx < len(msgs); startPageIdx += KafkaPageSize {
+		msgsToSend := msgs[startPageIdx:min(startPageIdx+KafkaPageSize, len(msgs))]
+		var err error
+		var failedMessages []*confluent_kafka.Message
+		for retry := 0; retry < 10; retry++ {
+			failedMessages, err = SyncSend(logger, producer, msgsToSend)
+			if err != nil {
+				logger.Error("Failed calling SyncSend", zap.Error(err))
+				if len(failedMessages) == 0 {
+					return err
+				}
+				if retry == 9 {
+					return err
+				}
+				msgs = failedMessages
+				time.Sleep(15 * time.Second)
+				continue
 			}
-			msgs = failedMessages
-			time.Sleep(15 * time.Second)
-			continue
+			break
 		}
-		return nil
 	}
-	return err
+	return nil
 }
 
 func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*confluent_kafka.Message) ([]*confluent_kafka.Message, error) {
