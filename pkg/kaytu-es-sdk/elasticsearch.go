@@ -52,6 +52,10 @@ type BoolFilter interface {
 }
 
 func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
+	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals, accountProvider, accountID, false)
+}
+
+func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string, useDefaultFieldName bool) []BoolFilter {
 	var filters []BoolFilter
 	if queryContext.UnsafeQuals == nil {
 		return filters
@@ -68,7 +72,11 @@ func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext, filters
 			fn := qual.GetFieldName()
 			fieldName, ok := filtersQuals[fn]
 			if !ok {
-				fieldName = fn
+				if useDefaultFieldName {
+					fieldName = fn
+				} else {
+					continue
+				}
 			}
 
 			var oprStr string
