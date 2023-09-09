@@ -284,6 +284,10 @@ func (p *BaseESPaginator) UpdatePageSize(i int64) {
 
 // The response will be marshalled if the search was successfull
 func (p *BaseESPaginator) Search(ctx context.Context, response any) error {
+	return p.SearchWithLog(ctx, response, false)
+}
+
+func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog bool) error {
 	if p.done {
 		return errors.New("no more page to query")
 	}
@@ -324,6 +328,11 @@ func (p *BaseESPaginator) Search(ctx context.Context, response any) error {
 	}
 	if sa.PIT == nil {
 		opts = append(opts, p.client.Search.WithIndex(p.index))
+	}
+
+	if doLog {
+		m, _ := json.Marshal(sa)
+		plugin.Logger(ctx).Trace("SearchWithLog", string(m))
 	}
 
 	res, err := p.client.Search(opts...)
