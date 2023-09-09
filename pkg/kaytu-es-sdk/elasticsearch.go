@@ -68,7 +68,7 @@ func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext, filters
 			fn := qual.GetFieldName()
 			fieldName, ok := filtersQuals[fn]
 			if !ok {
-				continue
+				fieldName = fn
 			}
 
 			var oprStr string
