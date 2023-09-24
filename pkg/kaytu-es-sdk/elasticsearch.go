@@ -213,14 +213,14 @@ func (t RangeFilter) MarshalJSON() ([]byte, error) {
 	if len(t.gt) > 0 {
 		fieldMap["gt"] = t.gt
 	}
-	if len(t.gt) > 0 {
-		fieldMap["gte"] = t.gt
+	if len(t.gte) > 0 {
+		fieldMap["gte"] = t.gte
 	}
-	if len(t.gt) > 0 {
+	if len(t.lt) > 0 {
 		fieldMap["lt"] = t.lt
 	}
-	if len(t.gt) > 0 {
-		fieldMap["lte"] = t.lt
+	if len(t.lte) > 0 {
+		fieldMap["lte"] = t.lte
 	}
 
 	return json.Marshal(map[string]interface{}{
