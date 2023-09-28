@@ -17,11 +17,19 @@ type Client struct {
 	es *elasticsearchv7.Client
 }
 
+type ResourceGroupFilter struct {
+	AccountIDs    []string          `json:"account_ids"`
+	Regions       []string          `json:"regions"`
+	ResourceTypes []string          `json:"resource_types"`
+	Tags          map[string]string `json:"tags"`
+}
+
 type ClientConfig struct {
-	Addresses []string `cty:"addresses"`
-	Username  *string  `cty:"username"`
-	Password  *string  `cty:"password"`
-	AccountID *string  `cty:"accountID"`
+	Addresses                   []string `cty:"addresses"`
+	Username                    *string  `cty:"username"`
+	Password                    *string  `cty:"password"`
+	AccountID                   *string  `cty:"accountID"`
+	EncodedResourceGroupFilters *string  `cty:"encoded_resource_group_filters"`
 }
 
 func ConfigSchema() map[string]*schema.Attribute {
@@ -37,6 +45,9 @@ func ConfigSchema() map[string]*schema.Attribute {
 			Type: schema.TypeString,
 		},
 		"accountID": {
+			Type: schema.TypeString,
+		},
+		"encoded_resource_group_filters": {
 			Type: schema.TypeString,
 		},
 	}

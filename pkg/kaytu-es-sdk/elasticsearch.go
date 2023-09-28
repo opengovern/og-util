@@ -2,6 +2,7 @@ package kaytu
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,11 +52,17 @@ type BoolFilter interface {
 	IsBoolFilter()
 }
 
-func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string) []BoolFilter {
-	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals, accountProvider, accountID, false)
+func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
+	filtersQuals map[string]string,
+	accountProvider, accountID string, encodedResourceGroupFilters *string) []BoolFilter {
+	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals,
+		accountProvider, accountID, encodedResourceGroupFilters, false)
 }
 
-func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext, filtersQuals map[string]string, accountProvider, accountID string, useDefaultFieldName bool) []BoolFilter {
+func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext,
+	filtersQuals map[string]string,
+	accountProvider, accountID string, encodedResourceGroupFilters *string,
+	useDefaultFieldName bool) []BoolFilter {
 	var filters []BoolFilter
 	if queryContext.UnsafeQuals == nil {
 		return filters
@@ -92,7 +99,7 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 						values = append(values, qualValue(value))
 					}
 
-					filters = append(filters, TermsFilter(fieldName, values))
+					filters = append(filters, NewTermsFilter(fieldName, values))
 				} else {
 					filters = append(filters, NewTermFilter(fieldName, qualValue(qual.GetValue())))
 				}
@@ -123,7 +130,57 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		filters = append(filters, NewTermFilter("metadata."+accountFieldName, accountID))
 	}
 
-	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters)
+	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
+		resourceGroupFiltersJson, err := base64.StdEncoding.DecodeString(*encodedResourceGroupFilters)
+		if err != nil {
+			plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
+		} else {
+			var resourceGroupFilters []ResourceGroupFilter
+			err = json.Unmarshal(resourceGroupFiltersJson, &resourceGroupFilters)
+			if err != nil {
+				plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
+			} else {
+				esResourceGroupFilters := make([]BoolFilter, 0, len(resourceGroupFilters))
+				for _, resourceGroupFilter := range resourceGroupFilters {
+					andFilters := make([]BoolFilter, 0, 4)
+					if len(resourceGroupFilter.AccountIDs) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("metadata.AccountID", resourceGroupFilter.AccountIDs))
+					}
+					if len(resourceGroupFilter.ResourceTypes) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("metadata.ResourceType", resourceGroupFilter.ResourceTypes))
+					}
+					if len(resourceGroupFilter.Regions) > 0 {
+						andFilters = append(andFilters,
+							NewBoolShouldFilter( // OR
+								NewTermsFilter("metadata.Region", resourceGroupFilter.Regions),   // AWS
+								NewTermsFilter("metadata.Location", resourceGroupFilter.Regions), // Azure
+							),
+						)
+					}
+					if len(resourceGroupFilter.Tags) > 0 {
+						for k, v := range resourceGroupFilter.Tags {
+							andFilters = append(andFilters,
+								NewNestedFilter("canonical_tags",
+									NewBoolMustFilter(
+										NewTermFilter("canonical_tags.key", k),
+										NewTermFilter("canonical_tags.value", v),
+									),
+								),
+							)
+						}
+					}
+					if len(andFilters) > 0 {
+						esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(andFilters...))
+					}
+				}
+				if len(esResourceGroupFilters) > 0 {
+					filters = append(filters, NewBoolShouldFilter(esResourceGroupFilters...))
+				}
+			}
+		}
+	}
+	jsonFilters, _ := json.Marshal(filters)
+	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters, "jsonFilters", string(jsonFilters))
 
 	return filters
 }
@@ -168,19 +225,19 @@ func (t TermFilter) MarshalJSON() ([]byte, error) {
 
 func (t TermFilter) IsBoolFilter() {}
 
-type termsFilter struct {
+type TermsFilter struct {
 	field  string
 	values []string
 }
 
-func TermsFilter(field string, values []string) BoolFilter {
-	return termsFilter{
+func NewTermsFilter(field string, values []string) BoolFilter {
+	return TermsFilter{
 		field:  field,
 		values: values,
 	}
 }
 
-func (t termsFilter) MarshalJSON() ([]byte, error) {
+func (t TermsFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"terms": map[string][]string{
 			t.field: t.values,
@@ -188,7 +245,34 @@ func (t termsFilter) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (t termsFilter) IsBoolFilter() {}
+func (t TermsFilter) IsBoolFilter() {}
+
+type TermsSetMatchAllFilter struct {
+	field  string
+	values []string
+}
+
+func NewTermsSetMatchAllFilter(field string, values []string) BoolFilter {
+	return TermsSetMatchAllFilter{
+		field:  field,
+		values: values,
+	}
+}
+
+func (t TermsSetMatchAllFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"terms_set": map[string]any{
+			t.field: map[string]any{
+				"terms": t.values,
+				"minimum_should_match_script": map[string]string{
+					"source": "params.num_terms",
+				},
+			},
+		},
+	})
+}
+
+func (t TermsSetMatchAllFilter) IsBoolFilter() {}
 
 type RangeFilter struct {
 	field string
@@ -231,6 +315,69 @@ func (t RangeFilter) MarshalJSON() ([]byte, error) {
 }
 
 func (t RangeFilter) IsBoolFilter() {}
+
+type BoolShouldFilter struct {
+	filters []BoolFilter
+}
+
+func NewBoolShouldFilter(filters ...BoolFilter) BoolFilter {
+	return BoolShouldFilter{
+		filters: filters,
+	}
+}
+
+func (t BoolShouldFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"bool": map[string][]BoolFilter{
+			"should": t.filters,
+		},
+	})
+}
+
+func (t BoolShouldFilter) IsBoolFilter() {}
+
+type BoolMustFilter struct {
+	filters []BoolFilter
+}
+
+func NewBoolMustFilter(filters ...BoolFilter) BoolFilter {
+	return BoolMustFilter{
+		filters: filters,
+	}
+}
+
+func (t BoolMustFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"bool": map[string][]BoolFilter{
+			"must": t.filters,
+		},
+	})
+}
+
+func (t BoolMustFilter) IsBoolFilter() {}
+
+type NestedFilter struct {
+	path  string
+	query BoolFilter
+}
+
+func NewNestedFilter(path string, query BoolFilter) BoolFilter {
+	return NestedFilter{
+		path:  path,
+		query: query,
+	}
+}
+
+func (t NestedFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"nested": map[string]any{
+			"path":  t.path,
+			"query": t.query,
+		},
+	})
+}
+
+func (t NestedFilter) IsBoolFilter() {}
 
 type BaseESPaginator struct {
 	client *elasticsearchv7.Client
