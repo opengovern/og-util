@@ -64,10 +64,6 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 	accountProvider, accountID string, encodedResourceGroupFilters *string,
 	useDefaultFieldName bool) []BoolFilter {
 	var filters []BoolFilter
-	if queryContext.UnsafeQuals == nil {
-		return filters
-	}
-
 	plugin.Logger(ctx).Trace("BuildFilter", "queryContext.UnsafeQuals", queryContext.UnsafeQuals)
 
 	for _, quals := range queryContext.UnsafeQuals {
