@@ -130,7 +130,10 @@ func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*co
 	for _, msg := range msgs {
 		err := producer.Produce(msg, deliverChan)
 		if err != nil {
-			logger.Error("Failed calling Produce", zap.Error(err))
+			logger.Error("Failed calling Produce",
+				zap.Error(err),
+				zap.String("Kafka Message Key", string(msg.Key)),
+				zap.String("Kafka Message Value", string(msg.Value)))
 			return msgs, err
 		}
 	}
