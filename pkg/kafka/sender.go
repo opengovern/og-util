@@ -136,7 +136,9 @@ func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*co
 				zap.String("Kafka Message Index", string(msg.Headers[0].Value)),
 				zap.String("Kafka Message Value", string(msg.Value)))
 			if err.Error() == "Broker: Message size too large" {
-				LargeDescribeResourceMessage.WithLabelValues(string(msg.Headers[0].Value)).Inc()
+				if LargeDescribeResourceMessage != nil {
+					LargeDescribeResourceMessage.WithLabelValues(string(msg.Headers[0].Value)).Inc()
+				}
 			}
 			return msgs, err
 		}
