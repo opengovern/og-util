@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"time"
 
 	confluent_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -83,7 +84,7 @@ func Msg(key string, value []byte, index string, topic string, partition int32) 
 	}
 }
 
-func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger) error {
+func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, docs []Doc, logger *zap.Logger, LargeDescribeResourceMessage *prometheus.CounterVec) error {
 	var msgs []*confluent_kafka.Message
 	if partition == -1 {
 		partition = confluent_kafka.PartitionAny
@@ -103,7 +104,7 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 		var failedMessages []*confluent_kafka.Message
 		var failedMessagesValues [][]byte
 		for retry := 0; retry < 10; retry++ {
-			failedMessages, err = SyncSend(logger, producer, msgsToSend)
+			failedMessages, err = SyncSend(logger, producer, msgsToSend, LargeDescribeResourceMessage)
 			for _, fm := range failedMessages {
 				failedMessagesValues = append(failedMessagesValues, fm.Value)
 			}
@@ -125,15 +126,18 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 	return nil
 }
 
-func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*confluent_kafka.Message) ([]*confluent_kafka.Message, error) {
+func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*confluent_kafka.Message, LargeDescribeResourceMessage *prometheus.CounterVec) ([]*confluent_kafka.Message, error) {
 	deliverChan := make(chan confluent_kafka.Event, len(msgs))
 	for _, msg := range msgs {
 		err := producer.Produce(msg, deliverChan)
 		if err != nil {
 			logger.Error("Failed calling Produce",
 				zap.Error(err),
-				zap.String("Kafka Message Key", string(msg.Key)),
+				zap.String("Kafka Message Index", string(msg.Headers[0].Value)),
 				zap.String("Kafka Message Value", string(msg.Value)))
+			if err.Error() == "Broker: Message size too large" {
+				LargeDescribeResourceMessage.WithLabelValues(string(msg.Headers[0].Value)).Inc()
+			}
 			return msgs, err
 		}
 	}
