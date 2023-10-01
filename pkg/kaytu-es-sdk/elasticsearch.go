@@ -155,6 +155,8 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 					}
 					if len(resourceGroupFilter.Tags) > 0 {
 						for k, v := range resourceGroupFilter.Tags {
+							k := strings.ToLower(k)
+							v := strings.ToLower(v)
 							andFilters = append(andFilters,
 								NewNestedFilter("canonical_tags",
 									NewBoolMustFilter(
