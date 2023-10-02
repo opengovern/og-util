@@ -94,7 +94,7 @@ connection "` + plugin + `" {
   username = "` + config.Username + `"
   password = "` + config.Password + `"
   accountID = "` + accountID + `"
-  encodedResourceGroupFilter = "` + ergf + `"
+  encoded_resource_group_filters = "` + ergf + `"
 }
 `
 	dirname, err := os.UserHomeDir()
