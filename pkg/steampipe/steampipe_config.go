@@ -143,7 +143,7 @@ func GetStackElasticConfig(workspaceId string, stackId string) (config.ElasticSe
 }
 
 // StartSteampipeServiceAndGetConnection starts steampipe service and returns steampipe connection
-// NOTE: this function will only work on images that have steampipe installed
+// NOTE: this function will only work on images that have steampipe installed & the PopulateSteampipeConfig is called beforehand
 func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error) {
 	for retry := 0; retry < 5; retry++ {
 		cmd := exec.Command("steampipe", "plugin", "list")
