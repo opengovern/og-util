@@ -187,21 +187,6 @@ func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error
 
 	logger.Info("steampipe service started")
 
-	for retry := 0; retry < 5; retry++ {
-		cmd := exec.Command("steampipe", "plugin", "list")
-		cmdOut, err := cmd.Output()
-		if err != nil {
-			logger.Error("post service init plugin list failed", zap.Error(err), zap.String("body", string(cmdOut)))
-			time.Sleep(5 * time.Second)
-			if retry == 4 {
-				return nil, err
-			}
-			continue
-		}
-		logger.Info("post service init plugin list succeeded", zap.String("body", string(cmdOut)))
-		break
-	}
-
 	steampipeConn, err := NewSteampipeDatabase(Option{
 		Host: "localhost",
 		Port: "9193",
