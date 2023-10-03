@@ -66,6 +66,10 @@ func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch
 		ergf = *encodedResourceGroupFilter
 	}
 
+	if len(postgresConfig.SSLMode) == 0 {
+		postgresConfig.SSLMode = "disable"
+	}
+
 	content := `
 connection "kaytu" {
   plugin = "local/kaytu"
