@@ -59,7 +59,7 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
 }
 
 func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres,
-	accountID string, encodedResourceGroupFilter *string) error {
+	encodedResourceGroupFilter *string) error {
 
 	ergf := ""
 	if encodedResourceGroupFilter != nil {
@@ -76,7 +76,6 @@ connection "kaytu" {
   addresses = ["` + elasticSearchConfig.Address + `"]
   username = "` + elasticSearchConfig.Username + `"
   password = "` + elasticSearchConfig.Password + `"
-  accountID = "` + accountID + `"
   encoded_resource_group_filters = "` + ergf + `"
   pg_host = "` + postgresConfig.Host + `"
   pg_port = "` + postgresConfig.Port + `"
@@ -98,10 +97,6 @@ connection "kaytu" {
 		return err
 	}
 
-	err = os.Setenv("STEAMPIPE_ACCOUNT_ID", accountID)
-	if err != nil {
-		return err
-	}
 	err = os.Setenv("ES_ADDRESS", elasticSearchConfig.Address)
 	if err != nil {
 		return err
