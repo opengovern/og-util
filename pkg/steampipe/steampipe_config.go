@@ -68,7 +68,7 @@ func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch
 
 	content := `
 connection "kaytu" {
-  plugin = "kaytu"
+  plugin = "local/kaytu"
   addresses = ["` + elasticSearchConfig.Address + `"]
   username = "` + elasticSearchConfig.Username + `"
   password = "` + elasticSearchConfig.Password + `"
