@@ -24,37 +24,93 @@ import (
 )
 
 func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
-	connector source.Type, AccountID string,
+	connector source.Type, accountID string,
 	encodedResourceGroupFilter *string) error {
 	switch connector {
 	case source.CloudAWS:
-		err := BuildSpecFile("aws", elasticSearchConfig, AccountID, encodedResourceGroupFilter)
+		err := BuildSpecFile("aws", elasticSearchConfig, accountID, encodedResourceGroupFilter)
 		if err != nil {
 			return err
 		}
 
-		err = PopulateEnv(elasticSearchConfig, AccountID)
+		err = PopulateEnv(elasticSearchConfig, accountID)
 		if err != nil {
 			return err
 		}
 	case source.CloudAzure:
-		err := BuildSpecFile("azure", elasticSearchConfig, AccountID, encodedResourceGroupFilter)
+		err := BuildSpecFile("azure", elasticSearchConfig, accountID, encodedResourceGroupFilter)
 		if err != nil {
 			return err
 		}
 
-		err = BuildSpecFile("azuread", elasticSearchConfig, AccountID, encodedResourceGroupFilter)
+		err = BuildSpecFile("azuread", elasticSearchConfig, accountID, encodedResourceGroupFilter)
 		if err != nil {
 			return err
 		}
 
-		err = PopulateEnv(elasticSearchConfig, AccountID)
+		err = PopulateEnv(elasticSearchConfig, accountID)
 		if err != nil {
 			return err
 		}
 	default:
 		return errors.New("error: invalid source type")
 	}
+	return nil
+}
+
+func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres,
+	accountID string, encodedResourceGroupFilter *string) error {
+
+	ergf := ""
+	if encodedResourceGroupFilter != nil {
+		ergf = *encodedResourceGroupFilter
+	}
+
+	content := `
+connection "kaytu" {
+  plugin = "kaytu"
+  addresses = ["` + elasticSearchConfig.Address + `"]
+  username = "` + elasticSearchConfig.Username + `"
+  password = "` + elasticSearchConfig.Password + `"
+  accountID = "` + accountID + `"
+  encoded_resource_group_filters = "` + ergf + `"
+  pg_host = "` + postgresConfig.Host + `"
+  pg_port = "` + postgresConfig.Port + `"
+  pg_user = "` + postgresConfig.Username + `"
+  pg_password = "` + postgresConfig.Password + `"
+  pg_database = "` + postgresConfig.DB + `"
+  pg_ssl_mode = "` + postgresConfig.SSLMode + `"
+}
+`
+	dirname, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	filePath := path.Join(dirname, ".steampipe", "config", "kaytu.spc")
+	os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+	err = os.WriteFile(filePath, []byte(content), os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	err = os.Setenv("STEAMPIPE_ACCOUNT_ID", accountID)
+	if err != nil {
+		return err
+	}
+	err = os.Setenv("ES_ADDRESS", elasticSearchConfig.Address)
+	if err != nil {
+		return err
+	}
+	err = os.Setenv("ES_USERNAME", elasticSearchConfig.Username)
+	if err != nil {
+		return err
+	}
+	err = os.Setenv("ES_PASSWORD", elasticSearchConfig.Password)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
