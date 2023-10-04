@@ -195,6 +195,8 @@ func qualValue(qual *proto.QualValue) string {
 		valStr = fmt.Sprintf("%v", v.DoubleValue)
 	case *proto.QualValue_BoolValue:
 		valStr = fmt.Sprintf("%v", v.BoolValue)
+	case *proto.QualValue_InetValue:
+		valStr = fmt.Sprintf("%v", v.InetValue.GetCidr())
 	default:
 		valStr = qual.String()
 	}
