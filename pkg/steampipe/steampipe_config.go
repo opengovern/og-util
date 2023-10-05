@@ -97,6 +97,10 @@ connection "kaytu" {
 		return err
 	}
 
+	err = os.Setenv("STEAMPIPE_CACHE", "false")
+	if err != nil {
+		return err
+	}
 	err = os.Setenv("ES_ADDRESS", elasticSearchConfig.Address)
 	if err != nil {
 		return err
@@ -115,6 +119,10 @@ connection "kaytu" {
 
 func PopulateEnv(config config.ElasticSearch, accountID string) error {
 	err := os.Setenv("STEAMPIPE_ACCOUNT_ID", accountID)
+	if err != nil {
+		return err
+	}
+	err = os.Setenv("STEAMPIPE_CACHE", "false")
 	if err != nil {
 		return err
 	}
