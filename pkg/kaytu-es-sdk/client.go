@@ -17,7 +17,7 @@ type Client struct {
 	es *elasticsearchv7.Client
 }
 
-type ResourceGroupFilter struct {
+type ResourceCollectionFilter struct {
 	AccountIDs    []string          `json:"account_ids"`
 	Regions       []string          `json:"regions"`
 	ResourceTypes []string          `json:"resource_types"`

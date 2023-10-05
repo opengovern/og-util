@@ -131,7 +131,7 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		if err != nil {
 			plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
 		} else {
-			var resourceGroupFilters []ResourceGroupFilter
+			var resourceGroupFilters []ResourceCollectionFilter
 			err = json.Unmarshal(resourceGroupFiltersJson, &resourceGroupFilters)
 			if err != nil {
 				plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
