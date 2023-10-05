@@ -25,10 +25,10 @@ import (
 
 func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
 	connector source.Type, accountID string,
-	encodedResourceGroupFilter *string) error {
+	encodedResourceCollectionFilter *string) error {
 	switch connector {
 	case source.CloudAWS:
-		err := BuildSpecFile("aws", elasticSearchConfig, accountID, encodedResourceGroupFilter)
+		err := BuildSpecFile("aws", elasticSearchConfig, accountID, encodedResourceCollectionFilter)
 		if err != nil {
 			return err
 		}
@@ -38,12 +38,12 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
 			return err
 		}
 	case source.CloudAzure:
-		err := BuildSpecFile("azure", elasticSearchConfig, accountID, encodedResourceGroupFilter)
+		err := BuildSpecFile("azure", elasticSearchConfig, accountID, encodedResourceCollectionFilter)
 		if err != nil {
 			return err
 		}
 
-		err = BuildSpecFile("azuread", elasticSearchConfig, accountID, encodedResourceGroupFilter)
+		err = BuildSpecFile("azuread", elasticSearchConfig, accountID, encodedResourceCollectionFilter)
 		if err != nil {
 			return err
 		}
@@ -59,11 +59,11 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
 }
 
 func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres,
-	encodedResourceGroupFilter *string) error {
+	encodedResourceCollectionFilter *string) error {
 
 	ergf := ""
-	if encodedResourceGroupFilter != nil {
-		ergf = *encodedResourceGroupFilter
+	if encodedResourceCollectionFilter != nil {
+		ergf = *encodedResourceCollectionFilter
 	}
 
 	if len(postgresConfig.SSLMode) == 0 {
@@ -76,7 +76,7 @@ connection "kaytu" {
   addresses = ["` + elasticSearchConfig.Address + `"]
   username = "` + elasticSearchConfig.Username + `"
   password = "` + elasticSearchConfig.Password + `"
-  encoded_resource_group_filters = "` + ergf + `"
+  encoded_resource_collection_filters = "` + ergf + `"
   pg_host = "` + postgresConfig.Host + `"
   pg_port = "` + postgresConfig.Port + `"
   pg_user = "` + postgresConfig.Username + `"
@@ -157,7 +157,7 @@ connection "` + plugin + `" {
   username = "` + config.Username + `"
   password = "` + config.Password + `"
   accountID = "` + accountID + `"
-  encoded_resource_group_filters = "` + ergf + `"
+  encoded_resource_collection_filters = "` + ergf + `"
 }
 `
 	dirname, err := os.UserHomeDir()
