@@ -208,6 +208,27 @@ func GetStackElasticConfig(workspaceId string, stackId string) (config.ElasticSe
 // StartSteampipeServiceAndGetConnection starts steampipe service and returns steampipe connection
 // NOTE: this function will only work on images that have steampipe installed & the PopulateSteampipeConfig is called beforehand
 func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error) {
+	defaultSpc := `
+options "database" {
+  port               = 9193                  # any valid, open port number
+  listen             = "local"               # local (alias for localhost), network (alias for *), or a comma separated list of hosts and/or IP addresses , or any valid combination of hosts and/or IP addresses
+  start_timeout      = 30                    # maximum time (in seconds) to wait for the database to start up
+  cache              = false                  # true, false
+  cache_max_ttl      = 1                   # max expiration (TTL) in seconds
+  cache_max_size_mb  = 1                  # max total size of cache across all plugins
+}
+`
+	dirname, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	filePath := path.Join(dirname, ".steampipe", "config", "default.spc")
+	os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+	err = os.WriteFile(filePath, []byte(defaultSpc), os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
 	for retry := 0; retry < 5; retry++ {
 		cmd := exec.Command("steampipe", "plugin", "list")
 		cmdOut, err := cmd.Output()
@@ -224,7 +245,7 @@ func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error
 	}
 
 	cmd := exec.Command("steampipe", "service", "stop", "--force")
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		logger.Error("first stop failed", zap.Error(err))
 		return nil, err
@@ -239,8 +260,7 @@ func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error
 	}
 	time.Sleep(5 * time.Second)
 
-	cmd = exec.Command("steampipe", "service", "start", "--database-listen", "network", "--database-port",
-		"9193", "--database-password", "abcd")
+	cmd = exec.Command("steampipe", "service", "start", "--database-password", "abcd")
 	cmdOut, err := cmd.Output()
 	if err != nil {
 		logger.Error("start failed", zap.Error(err), zap.String("body", string(cmdOut)))
