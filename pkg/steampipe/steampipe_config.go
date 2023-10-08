@@ -122,10 +122,6 @@ func PopulateEnv(config config.ElasticSearch, accountID string) error {
 	if err != nil {
 		return err
 	}
-	err = os.Setenv("STEAMPIPE_CACHE", "false")
-	if err != nil {
-		return err
-	}
 	err = os.Setenv("ES_ADDRESS", config.Address)
 	if err != nil {
 		return err
@@ -208,6 +204,14 @@ func GetStackElasticConfig(workspaceId string, stackId string) (config.ElasticSe
 // StartSteampipeServiceAndGetConnection starts steampipe service and returns steampipe connection
 // NOTE: this function will only work on images that have steampipe installed & the PopulateSteampipeConfig is called beforehand
 func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error) {
+	err := os.Setenv("STEAMPIPE_CACHE", "false")
+	if err != nil {
+		return nil, err
+	}
+	err = os.Setenv("STEAMPIPE_UPDATE_CHECK", "false")
+	if err != nil {
+		return nil, err
+	}
 	defaultSpc := `
 options "database" {
   port               = 9193                  # any valid, open port number
