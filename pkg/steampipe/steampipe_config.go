@@ -288,3 +288,16 @@ options "database" {
 	logger.Info("steampipe database created")
 	return steampipeConn, nil
 }
+
+func StopSteampipeService(logger *zap.Logger) error {
+	for i := 0; i < 5; i++ {
+		cmd := exec.Command("steampipe", "service", "stop", "--force")
+		err := cmd.Start()
+		if err != nil {
+			logger.Error("first stop failed", zap.Error(err))
+			return err
+		}
+		time.Sleep(time.Second)
+	}
+	return nil
+}
