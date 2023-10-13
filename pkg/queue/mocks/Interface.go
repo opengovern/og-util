@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	amqp "github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	mock "github.com/stretchr/testify/mock"
 )
 

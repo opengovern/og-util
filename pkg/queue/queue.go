@@ -1,11 +1,12 @@
 package queue
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const (
@@ -26,9 +27,10 @@ type Interface interface {
 // queue is message queue based on the AMQP protocol. It uses RabbitMQ as the
 // distributed system for publishing and consuming messages.
 type queue struct {
-	cfg  Config
-	conn *amqp.Connection
-	ch   *amqp.Channel
+	cfg   Config
+	conn  *amqp.Connection
+	queue amqp.Queue
+	ch    *amqp.Channel
 }
 
 type Config struct {
@@ -124,12 +126,25 @@ func (q *queue) setup() error {
 
 	q.conn = conn
 	q.ch = ch
+
+	q.queue, err = q.ch.QueueDeclare(
+		q.cfg.Queue.Name, // name
+		false,            // durable
+		false,            // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		nil,              // arguments
+	)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (q *queue) Consume() (<-chan amqp.Delivery, error) {
 	return q.ch.Consume(
-		q.cfg.Queue.Name,  // queue
+		q.queue.Name,      // queue
 		q.cfg.Consumer.ID, // consumer
 		false,             // auto-ack
 		false,             // exclusive
@@ -152,11 +167,27 @@ func (q *queue) Publish(v interface{}) error {
 		Timestamp:   time.Now(),
 	}
 
-	return q.ch.Publish(
-		"",               // exchange
-		q.cfg.Queue.Name, // routing key
-		false,            // mandatory
-		false,            // immediate
+	queue, err := q.ch.QueueDeclare(
+		q.cfg.Queue.Name, // name
+		false,            // durable
+		false,            // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		nil,              // arguments
+	)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return q.ch.PublishWithContext(
+		ctx,
+		"",         // exchange
+		queue.Name, // routing key
+		false,      // mandatory
+		false,      // immediate
 		p)
 }
 
@@ -171,10 +202,18 @@ func (q *queue) Close() {
 }
 
 func (q *queue) Len() (int, error) {
-	queue, err := q.ch.QueueInspect(q.Name())
+	queue, err := q.ch.QueueDeclarePassive(
+		q.cfg.Queue.Name, // name
+		false,            // durable
+		false,            // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		nil,              // arguments
+	)
 	if err != nil {
 		return 0, err
 	}
+
 	return queue.Messages, nil
 }
 
