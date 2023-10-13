@@ -10,6 +10,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormprom "gorm.io/plugin/prometheus"
+	"moul.io/zapgorm2"
 )
 
 const (
@@ -97,10 +98,13 @@ func NewClient(cfg *Config, logger *zap.Logger) (*gorm.DB, error) {
 		cfg.SSLMode,
 	)
 
-	//orm, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-	//	Logger: zapgorm2.New(logger),
-	//})
-	orm, err := gorm.Open(postgres.Open(dsn))
+	gormlogger := zapgorm2.New(logger)
+	gormlogger.IgnoreRecordNotFoundError = true
+	gormlogger.SetAsDefault()
+
+	orm, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: gormlogger,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("gorm open: %w", err)
 	}
