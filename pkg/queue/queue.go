@@ -102,6 +102,22 @@ func New(cfg Config) (Interface, error) {
 	return q, nil
 }
 
+func (q *queue) declare() error {
+	var err error
+	q.queue, err = q.ch.QueueDeclare(
+		q.cfg.Queue.Name, // name
+		true,             // durable
+		false,            // delete when unused
+		false,            // exclusive
+		false,            // no-wait
+		nil,              // arguments
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (q *queue) setup() error {
 	url := fmt.Sprintf("amqp://%s:%s@%s:%d/",
 		q.cfg.Server.Username,
@@ -126,18 +142,6 @@ func (q *queue) setup() error {
 
 	q.conn = conn
 	q.ch = ch
-
-	q.queue, err = q.ch.QueueDeclare(
-		q.cfg.Queue.Name, // name
-		false,            // durable
-		false,            // delete when unused
-		false,            // exclusive
-		false,            // no-wait
-		nil,              // arguments
-	)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -169,7 +173,7 @@ func (q *queue) Publish(v interface{}) error {
 
 	queue, err := q.ch.QueueDeclare(
 		q.cfg.Queue.Name, // name
-		false,            // durable
+		true,             // durable
 		false,            // delete when unused
 		false,            // exclusive
 		false,            // no-wait
@@ -204,7 +208,7 @@ func (q *queue) Close() {
 func (q *queue) Len() (int, error) {
 	queue, err := q.ch.QueueDeclarePassive(
 		q.cfg.Queue.Name, // name
-		false,            // durable
+		true,             // durable
 		false,            // delete when unused
 		false,            // exclusive
 		false,            // no-wait
