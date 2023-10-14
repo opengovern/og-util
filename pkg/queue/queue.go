@@ -196,12 +196,11 @@ func (q *queue) Publish(v interface{}) error {
 }
 
 func (q *queue) Close() {
-	if q.conn != nil {
-		_ = q.conn.Close()
-	}
-
 	if q.ch != nil {
 		_ = q.ch.Close()
+	}
+	if q.conn != nil {
+		_ = q.conn.Close()
 	}
 }
 
