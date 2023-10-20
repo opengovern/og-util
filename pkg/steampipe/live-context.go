@@ -1,10 +1,9 @@
-package kaytu
+package steampipe
 
 import (
 	"context"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/kaytu-io/kaytu-util/pkg/steampipe"
 	"github.com/turbot/steampipe-plugin-sdk/v5/connection"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"strconv"
@@ -40,7 +39,7 @@ func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache)
 }
 
 func NewSelfClient(ctx context.Context) (*SelfClient, error) {
-	defaultOption := steampipe.GetDefaultSteampipeOption()
+	defaultOption := GetDefaultSteampipeOption()
 	uintPort, err := strconv.ParseUint(defaultOption.Port, 10, 16)
 	if err != nil {
 		return nil, err
