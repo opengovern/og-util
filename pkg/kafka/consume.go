@@ -3,7 +3,6 @@ package kafka
 import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/containerd/containerd/log"
 	"strings"
 )
 
@@ -46,15 +45,12 @@ func (tc *TopicConsumer) Commit(msg *kafka.Message) error {
 func (tc *TopicConsumer) Consume(ctx context.Context) <-chan *kafka.Message {
 	msgChan := make(chan *kafka.Message, 100)
 	go func() {
-		log.GetLogger(ctx).Infof("Consuming messages from topic %s", tc.topic)
 		for {
 			msg, err := tc.consumer.ReadMessage(-1)
 			if err != nil {
 				close(msgChan)
-				log.GetLogger(ctx).WithError(err).Error("Failed reading message")
 				return
 			}
-			log.GetLogger(ctx).Infof("Received message from topic %s, len(msg): %d", tc.topic, len(string(msg.Value)))
 			msgChan <- msg
 		}
 	}()

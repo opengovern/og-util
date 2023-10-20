@@ -274,13 +274,7 @@ options "database" {
 
 	logger.Info("steampipe service started")
 
-	steampipeConn, err := NewSteampipeDatabase(Option{
-		Host: "localhost",
-		Port: "9193",
-		User: "steampipe",
-		Pass: "abcd",
-		Db:   "steampipe",
-	})
+	steampipeConn, err := NewSteampipeDatabase(GetDefaultSteampipeOption())
 	if err != nil {
 		return nil, err
 	}

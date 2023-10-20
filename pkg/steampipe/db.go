@@ -34,6 +34,16 @@ type Result struct {
 	Data    [][]interface{}
 }
 
+func GetDefaultSteampipeOption() Option {
+	return Option{
+		Host: "localhost",
+		Port: "9193",
+		User: "steampipe",
+		Pass: "abcd",
+		Db:   "steampipe",
+	}
+}
+
 func NewSteampipeDatabase(option Option) (*Database, error) {
 	var err error
 	connString := fmt.Sprintf(`host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=GMT`,
