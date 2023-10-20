@@ -54,7 +54,7 @@ func (tc *TopicConsumer) Consume(ctx context.Context) <-chan *kafka.Message {
 				log.GetLogger(ctx).WithError(err).Error("Failed reading message")
 				return
 			}
-			log.GetLogger(ctx).Infof("Received message from topic %s, msg: %s", tc.topic, string(msg.Value))
+			log.GetLogger(ctx).Infof("Received message from topic %s, len(msg): %d", tc.topic, len(string(msg.Value)))
 			msgChan <- msg
 		}
 	}()
