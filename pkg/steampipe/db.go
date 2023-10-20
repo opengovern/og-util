@@ -219,3 +219,19 @@ func (s *Database) Count(query string) (*Result, error) {
 		Data:    result,
 	}, nil
 }
+
+func (s *Database) SetConfigTableValue(ctx context.Context, key KaytuConfigKey, value string) error {
+	// Create table if not exists
+	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
+	if err != nil {
+		return err
+	}
+
+	// Insert or update
+	_, err = s.conn.Exec(ctx, "INSERT INTO kaytu_configs(key, value) VALUES($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2", string(key), value)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
