@@ -20,11 +20,10 @@ type ResourceCollectionFilter struct {
 }
 
 type ClientConfig struct {
-	Addresses                        []string `cty:"addresses"`
-	Username                         *string  `cty:"username"`
-	Password                         *string  `cty:"password"`
-	AccountID                        *string  `cty:"accountID"`
-	EncodedResourceCollectionFilters *string  `cty:"encoded_resource_collection_filters"`
+	Addresses []string `cty:"addresses"`
+	Username  *string  `cty:"username"`
+	Password  *string  `cty:"password"`
+	AccountID *string  `cty:"accountID"`
 }
 
 func ConfigSchema() map[string]*schema.Attribute {
@@ -40,9 +39,6 @@ func ConfigSchema() map[string]*schema.Attribute {
 			Type: schema.TypeString,
 		},
 		"accountID": {
-			Type: schema.TypeString,
-		},
-		"encoded_resource_collection_filters": {
 			Type: schema.TypeString,
 		},
 	}

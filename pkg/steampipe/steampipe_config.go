@@ -23,32 +23,27 @@ import (
 	"github.com/kaytu-io/kaytu-util/pkg/source"
 )
 
-func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
-	connector source.Type, accountID string,
-	encodedResourceCollectionFilter *string) error {
+func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, connector source.Type) error {
 	switch connector {
 	case source.CloudAWS:
-		err := BuildSpecFile("aws", elasticSearchConfig, accountID, encodedResourceCollectionFilter)
+		err := BuildSpecFile("aws", elasticSearchConfig)
 		if err != nil {
 			return err
 		}
-
-		err = PopulateEnv(elasticSearchConfig, accountID)
+		err = PopulateEnv(elasticSearchConfig)
 		if err != nil {
 			return err
 		}
 	case source.CloudAzure:
-		err := BuildSpecFile("azure", elasticSearchConfig, accountID, encodedResourceCollectionFilter)
+		err := BuildSpecFile("azure", elasticSearchConfig)
 		if err != nil {
 			return err
 		}
-
-		err = BuildSpecFile("azuread", elasticSearchConfig, accountID, encodedResourceCollectionFilter)
+		err = BuildSpecFile("azuread", elasticSearchConfig)
 		if err != nil {
 			return err
 		}
-
-		err = PopulateEnv(elasticSearchConfig, accountID)
+		err = PopulateEnv(elasticSearchConfig)
 		if err != nil {
 			return err
 		}
@@ -58,14 +53,7 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch,
 	return nil
 }
 
-func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres,
-	encodedResourceCollectionFilter *string) error {
-
-	ergf := ""
-	if encodedResourceCollectionFilter != nil {
-		ergf = *encodedResourceCollectionFilter
-	}
-
+func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres) error {
 	if len(postgresConfig.SSLMode) == 0 {
 		postgresConfig.SSLMode = "disable"
 	}
@@ -76,7 +64,6 @@ connection "kaytu" {
   addresses = ["` + elasticSearchConfig.Address + `"]
   username = "` + elasticSearchConfig.Username + `"
   password = "` + elasticSearchConfig.Password + `"
-  encoded_resource_collection_filters = "` + ergf + `"
   pg_host = "` + postgresConfig.Host + `"
   pg_port = "` + postgresConfig.Port + `"
   pg_user = "` + postgresConfig.Username + `"
@@ -117,12 +104,8 @@ connection "kaytu" {
 	return nil
 }
 
-func PopulateEnv(config config.ElasticSearch, accountID string) error {
-	err := os.Setenv("STEAMPIPE_ACCOUNT_ID", accountID)
-	if err != nil {
-		return err
-	}
-	err = os.Setenv("ES_ADDRESS", config.Address)
+func PopulateEnv(config config.ElasticSearch) error {
+	err := os.Setenv("ES_ADDRESS", config.Address)
 	if err != nil {
 		return err
 	}
@@ -137,23 +120,13 @@ func PopulateEnv(config config.ElasticSearch, accountID string) error {
 	return nil
 }
 
-func BuildSpecFile(plugin string, config config.ElasticSearch,
-	accountID string,
-	encodedResourceGroupFilter *string) error {
-
-	ergf := ""
-	if encodedResourceGroupFilter != nil {
-		ergf = *encodedResourceGroupFilter
-	}
-
+func BuildSpecFile(plugin string, config config.ElasticSearch) error {
 	content := `
 connection "` + plugin + `" {
   plugin = "` + plugin + `"
   addresses = ["` + config.Address + `"]
   username = "` + config.Username + `"
   password = "` + config.Password + `"
-  accountID = "` + accountID + `"
-  encoded_resource_collection_filters = "` + ergf + `"
 }
 `
 	dirname, err := os.UserHomeDir()
