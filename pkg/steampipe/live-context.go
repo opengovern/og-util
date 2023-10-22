@@ -2,11 +2,11 @@ package steampipe
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/turbot/steampipe-plugin-sdk/v5/connection"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
-	"strconv"
 )
 
 type KaytuConfigKey string
@@ -40,19 +40,14 @@ func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache)
 
 func NewSelfClient(ctx context.Context) (*SelfClient, error) {
 	defaultOption := GetDefaultSteampipeOption()
-	uintPort, err := strconv.ParseUint(defaultOption.Port, 10, 16)
-	if err != nil {
-		return nil, err
-	}
-	conn, err := pgx.ConnectConfig(ctx, &pgx.ConnConfig{
-		Config: pgconn.Config{
-			Host:     "localhost",
-			Port:     uint16(uintPort),
-			Database: defaultOption.Db,
-			User:     defaultOption.User,
-			Password: defaultOption.Pass,
-		},
-	})
+	connString := fmt.Sprintf(`host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=GMT`,
+		defaultOption.Host,
+		defaultOption.Port,
+		defaultOption.User,
+		defaultOption.Pass,
+		defaultOption.Db,
+	)
+	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		return nil, err
 	}
