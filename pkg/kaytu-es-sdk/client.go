@@ -3,7 +3,6 @@ package kaytu
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	elasticsearchv7 "github.com/elastic/go-elasticsearch/v7"
 	"github.com/turbot/steampipe-plugin-sdk/v5/connection"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
@@ -23,7 +22,6 @@ type ClientConfig struct {
 	Addresses []string `cty:"addresses"`
 	Username  *string  `cty:"username"`
 	Password  *string  `cty:"password"`
-	AccountID *string  `cty:"accountID"`
 }
 
 func ConfigSchema() map[string]*schema.Attribute {
@@ -36,9 +34,6 @@ func ConfigSchema() map[string]*schema.Attribute {
 			Type: schema.TypeString,
 		},
 		"password": {
-			Type: schema.TypeString,
-		},
-		"accountID": {
 			Type: schema.TypeString,
 		},
 	}
@@ -79,14 +74,6 @@ func NewClientCached(c ClientConfig, cache *connection.ConnectionCache, ctx cont
 }
 
 func NewClient(c ClientConfig) (Client, error) {
-	if c.AccountID == nil || len(*c.AccountID) == 0 {
-		accountID := os.Getenv("STEAMPIPE_ACCOUNT_ID")
-		if len(accountID) == 0 {
-			return Client{}, fmt.Errorf("accountID is either null or empty: %v", c.AccountID)
-		}
-		c.AccountID = &accountID
-	}
-
 	if c.Addresses == nil || len(c.Addresses) == 0 {
 		address := os.Getenv("ES_ADDRESS")
 		c.Addresses = []string{address}
