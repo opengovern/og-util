@@ -92,7 +92,7 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 	for _, v := range docs {
 		msg, err := asProducerMessage(v, topic, partition)
 		if err != nil {
-			logger.Error("Failed calling AsProducerMessage", zap.Error(fmt.Errorf("Failed to convert msg[%s] to Kafka ProducerMessage, ignoring...", messageID(v))))
+			logger.Error(fmt.Sprintf("Failed to convert msg[%s] to Kafka ProducerMessage, ignoring...", messageID(v)), zap.Error(err))
 			continue
 		}
 		msgs = append(msgs, msg)
