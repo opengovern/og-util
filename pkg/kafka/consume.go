@@ -59,6 +59,6 @@ func (tc *TopicConsumer) Consume(ctx context.Context) <-chan *kafka.Message {
 	return msgChan
 }
 
-func CloseConsumer(consumer *kafka.Consumer) {
-	consumer.Close()
+func (tc *TopicConsumer) Close() {
+	tc.consumer.Close()
 }
