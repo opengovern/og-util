@@ -182,3 +182,31 @@ func SyncSend(logger *zap.Logger, producer *confluent_kafka.Producer, msgs []*co
 	}
 	return nil, nil
 }
+
+func SyncSendWithRetry(
+	logger *zap.Logger,
+	producer *confluent_kafka.Producer,
+	msgs []*confluent_kafka.Message,
+	LargeDescribeResourceMessage *prometheus.CounterVec,
+	maxRetry int,
+) error {
+	var err error
+	var failedMessages []*confluent_kafka.Message
+	for retry := 0; retry < maxRetry; retry++ {
+		if len(msgs) == 0 {
+			return nil
+		}
+		failedMessages, err = SyncSend(logger, producer, msgs, LargeDescribeResourceMessage)
+		if err != nil {
+			logger.Error("Failed calling SyncSend", zap.Error(err))
+			if len(failedMessages) == 0 {
+				return err
+			}
+			msgs = failedMessages
+			time.Sleep(15 * time.Second)
+			continue
+		}
+		break
+	}
+	return nil
+}
