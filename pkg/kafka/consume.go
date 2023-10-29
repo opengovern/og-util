@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"go.uber.org/zap"
 	"strings"
 )
 
@@ -44,12 +45,13 @@ func (tc *TopicConsumer) Commit(msg *kafka.Message) error {
 	return err
 }
 
-func (tc *TopicConsumer) Consume(ctx context.Context) <-chan *kafka.Message {
+func (tc *TopicConsumer) Consume(ctx context.Context, logger *zap.Logger) <-chan *kafka.Message {
 	msgChan := make(chan *kafka.Message, 100)
 	go func() {
 		for {
 			msg, err := tc.consumer.ReadMessage(-1)
-			if err != nil {
+			if err != nil && err.(kafka.Error).IsTimeout() == false {
+				logger.Error("failed to read message", zap.Error(err))
 				close(msgChan)
 				return
 			}
