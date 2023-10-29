@@ -235,3 +235,18 @@ func (s *Database) SetConfigTableValue(ctx context.Context, key KaytuConfigKey, 
 
 	return nil
 }
+
+func (s *Database) UnsetConfigTableValue(ctx context.Context, key KaytuConfigKey) error {
+	// Create table if not exists
+	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
+	if err != nil {
+		return err
+	}
+
+	_, err = s.conn.Exec(ctx, "DELETE FROM kaytu_configs WHERE key = $1", string(key))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
