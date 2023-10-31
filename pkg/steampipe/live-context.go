@@ -14,6 +14,7 @@ type KaytuConfigKey string
 const (
 	KaytuConfigKeyAccountID                 KaytuConfigKey = "account_id"
 	KaytuConfigKeyResourceCollectionFilters KaytuConfigKey = "resource_collection_filters"
+	KaytuConfigKeyClientType                KaytuConfigKey = "client_type"
 )
 
 type SelfClient struct {
