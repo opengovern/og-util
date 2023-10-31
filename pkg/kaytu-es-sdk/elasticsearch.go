@@ -54,14 +54,14 @@ type BoolFilter interface {
 
 func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
 	filtersQuals map[string]string,
-	accountProvider string, accountID *string, encodedResourceGroupFilters *string) []BoolFilter {
+	accountProvider string, accountID *string, encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
 	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals,
-		accountProvider, accountID, encodedResourceGroupFilters, false)
+		accountProvider, accountID, encodedResourceGroupFilters, clientType, false)
 }
 
 func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext,
 	filtersQuals map[string]string,
-	accountProvider string, accountID *string, encodedResourceGroupFilters *string,
+	accountProvider string, accountID *string, encodedResourceGroupFilters *string, clientType *string,
 	useDefaultFieldName bool) []BoolFilter {
 	var filters []BoolFilter
 	plugin.Logger(ctx).Trace("BuildFilter", "queryContext.UnsafeQuals", queryContext.UnsafeQuals)
@@ -136,7 +136,18 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 			if err != nil {
 				plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
 			} else {
-				esResourceGroupFilters := make([]BoolFilter, 0, len(resourceGroupFilters))
+				esResourceGroupFilters := make([]BoolFilter, 0, len(resourceGroupFilters)+1)
+				if clientType != nil && len(*clientType) > 0 && *clientType == "compliance" {
+					taglessTypes := make([]string, 0, len(awsTaglessResourceTypes)+len(azureTaglessResourceTypes))
+					for _, awsTaglessResourceType := range awsTaglessResourceTypes {
+						taglessTypes = append(taglessTypes, strings.ToLower(awsTaglessResourceType))
+					}
+					for _, azureTaglessResourceType := range azureTaglessResourceTypes {
+						taglessTypes = append(taglessTypes, strings.ToLower(azureTaglessResourceType))
+					}
+					taglessTermsFilter := NewTermsFilter("metadata.ResourceType", taglessTypes)
+					esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(taglessTermsFilter))
+				}
 				for _, resourceGroupFilter := range resourceGroupFilters {
 					andFilters := make([]BoolFilter, 0, 4)
 					if len(resourceGroupFilter.AccountIDs) > 0 {
