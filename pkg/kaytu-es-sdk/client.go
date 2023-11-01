@@ -12,6 +12,7 @@ import (
 )
 
 type ResourceCollectionFilter struct {
+	Connector     []string          `json:"connector"`
 	AccountIDs    []string          `json:"account_ids"`
 	Regions       []string          `json:"regions"`
 	ResourceTypes []string          `json:"resource_types"`

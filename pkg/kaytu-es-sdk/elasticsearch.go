@@ -149,7 +149,10 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 					esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(taglessTermsFilter))
 				}
 				for _, resourceGroupFilter := range resourceGroupFilters {
-					andFilters := make([]BoolFilter, 0, 4)
+					andFilters := make([]BoolFilter, 0, 5)
+					if len(resourceGroupFilter.Connector) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("source_type", resourceGroupFilter.Connector))
+					}
 					if len(resourceGroupFilter.AccountIDs) > 0 {
 						andFilters = append(andFilters, NewTermsFilter("metadata.AccountID", resourceGroupFilter.AccountIDs))
 					}
