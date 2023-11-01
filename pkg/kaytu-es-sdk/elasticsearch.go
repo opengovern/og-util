@@ -150,8 +150,8 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 				}
 				for _, resourceGroupFilter := range resourceGroupFilters {
 					andFilters := make([]BoolFilter, 0, 5)
-					if len(resourceGroupFilter.Connector) > 0 {
-						andFilters = append(andFilters, NewTermsFilter("source_type", resourceGroupFilter.Connector))
+					if len(resourceGroupFilter.Connectors) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("source_type", resourceGroupFilter.Connectors))
 					}
 					if len(resourceGroupFilter.AccountIDs) > 0 {
 						andFilters = append(andFilters, NewTermsFilter("metadata.AccountID", resourceGroupFilter.AccountIDs))
