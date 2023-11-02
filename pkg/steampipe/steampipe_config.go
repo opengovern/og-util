@@ -127,6 +127,7 @@ connection "` + plugin + `" {
   addresses = ["` + config.Address + `"]
   username = "` + config.Username + `"
   password = "` + config.Password + `"
+  memory_max_mb = 2048
 }
 `
 	dirname, err := os.UserHomeDir()
