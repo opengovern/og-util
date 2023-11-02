@@ -19,6 +19,9 @@ type Tag struct {
 }
 
 type Resource struct {
+	EsID    string `json:"es_id"`
+	EsIndex string `json:"es_index"`
+
 	// ID is the globally unique ID of the resource.
 	ID string `json:"id"`
 	// ID is the globally unique ID of the resource.
@@ -59,6 +62,9 @@ func (r Resource) KeysAndIndex() ([]string, string) {
 }
 
 type LookupResource struct {
+	EsID    string `json:"es_id"`
+	EsIndex string `json:"es_index"`
+
 	// ResourceID is the globally unique ID of the resource.
 	ResourceID string `json:"resource_id"`
 	// Name is the name of the resource.
