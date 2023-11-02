@@ -122,12 +122,14 @@ func PopulateEnv(config config.ElasticSearch) error {
 
 func BuildSpecFile(plugin string, config config.ElasticSearch) error {
 	content := `
+plugin "` + plugin + `" {
+  memory_max_mb = 4096 # megabytes
+}
 connection "` + plugin + `" {
   plugin = "` + plugin + `"
   addresses = ["` + config.Address + `"]
   username = "` + config.Username + `"
   password = "` + config.Password + `"
-  memory_max_mb = 2048
 }
 `
 	dirname, err := os.UserHomeDir()
