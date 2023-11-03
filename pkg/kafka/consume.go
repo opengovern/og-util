@@ -40,6 +40,18 @@ func NewTopicConsumer(ctx context.Context, brokers []string, topic string, consu
 	return &TopicConsumer{consumer: consumer, topic: topic}, nil
 }
 
+func NewTopicConsumerWithRebalanceCB(ctx context.Context, brokers []string, topic string, consumerGroup string, cb kafka.RebalanceCb) (*TopicConsumer, error) {
+	consumer, err := NewKafkaConsumer(ctx, brokers, consumerGroup)
+	if err != nil {
+		return nil, err
+	}
+	err = consumer.Subscribe(topic, cb)
+	if err != nil {
+		return nil, err
+	}
+	return &TopicConsumer{consumer: consumer, topic: topic}, nil
+}
+
 func (tc *TopicConsumer) Commit(msg *kafka.Message) error {
 	_, err := tc.consumer.CommitMessage(msg)
 	return err
