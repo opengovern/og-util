@@ -10,6 +10,7 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"io"
 	"math"
+	"net/http"
 	"strings"
 	"time"
 
@@ -673,6 +674,80 @@ func (c Client) GetByID(ctx context.Context, index string, id string, response a
 	if err := json.Unmarshal(b, response); err != nil {
 		return fmt.Errorf("unmarshal response: %w", err)
 	}
+	return nil
+}
+
+func (c Client) Healthcheck(ctx context.Context) error {
+	opts := []func(request *opensearchapi.ClusterHealthRequest){
+		c.es.Cluster.Health.WithContext(ctx),
+	}
+
+	res, err := c.es.Cluster.Health(opts...)
+	defer CloseSafe(res)
+	if err != nil {
+		return err
+	} else if err := CheckError(res); err != nil {
+		return err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return errors.New("failed to get cluster health")
+	}
+
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	var js map[string]interface{}
+	if err := json.Unmarshal(b, &js); err != nil {
+		return err
+	}
+
+	if js["status"] != "green" && js["status"] != "yellow" {
+		return errors.New("unhealthy")
+	}
+
+	return nil
+}
+
+func (c Client) CreateIndexTemplate(ctx context.Context, name string, body string) error {
+	opts := []func(request *opensearchapi.IndicesPutIndexTemplateRequest){
+		c.es.Indices.PutIndexTemplate.WithContext(ctx),
+	}
+
+	res, err := c.es.Indices.PutIndexTemplate(name, strings.NewReader(body), opts...)
+	defer CloseSafe(res)
+	if err != nil {
+		return err
+	} else if err := CheckError(res); err != nil {
+		return err
+	}
+
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
+		return errors.New("failed to create index template")
+	}
+
+	return nil
+}
+
+func (c Client) CreateComponentTemplate(ctx context.Context, name string, body string) error {
+	opts := []func(request *opensearchapi.ClusterPutComponentTemplateRequest){
+		c.es.Cluster.PutComponentTemplate.WithContext(ctx),
+	}
+
+	res, err := c.es.Cluster.PutComponentTemplate(name, strings.NewReader(body), opts...)
+	defer CloseSafe(res)
+	if err != nil {
+		return err
+	} else if err := CheckError(res); err != nil {
+		return err
+	}
+
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
+		return errors.New("failed to create component template")
+	}
+
 	return nil
 }
 
