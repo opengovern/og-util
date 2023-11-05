@@ -541,7 +541,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		return nil
 	}
 
-	body, resPit, err := p.client.PointInTime.Create(
+	body, _, err := p.client.PointInTime.Create(
 		p.client.PointInTime.Create.WithIndex(p.index),
 		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
 		p.client.PointInTime.Create.WithContext(ctx),
@@ -554,7 +554,16 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		return err
 	}
 
-	p.pitID = resPit.PitID
+	data, err := io.ReadAll(body.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+	var pit PointInTimeResponse
+	if err := json.Unmarshal(data, &pit); err != nil {
+		return fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	p.pitID = pit.ID
 	return nil
 }
 
