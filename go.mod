@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.21.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.19.0
 	github.com/confluentinc/confluent-kafka-go/v2 v2.1.1
+	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/fluxcd/helm-controller/api v0.36.1
 	github.com/globocom/echo-prometheus v0.1.2
 	github.com/golang/protobuf v1.5.3

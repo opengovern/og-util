@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"io"
@@ -26,7 +27,32 @@ func CloseSafe(resp *opensearchapi.Response) {
 	}
 }
 
+func ESCloseSafe(resp *esapi.Response) {
+	if resp != nil && resp.Body != nil {
+		_, _ = io.ReadAll(resp.Body)
+		resp.Body.Close() //nolint,gosec
+	}
+}
+
 func CheckError(resp *opensearchapi.Response) error {
+	if !resp.IsError() {
+		return nil
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read error: %w", err)
+	}
+
+	var e ErrorResponse
+	if err := json.Unmarshal(data, &e); err != nil {
+		return fmt.Errorf(string(data))
+	}
+
+	return e
+}
+
+func ESCheckError(resp *esapi.Response) error {
 	if !resp.IsError() {
 		return nil
 	}
@@ -541,32 +567,46 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		return nil
 	}
 
-	body, pitRes, err := p.client.PointInTime.Create(
+	pitRaw, pitRes, err := p.client.PointInTime.Create(
 		p.client.PointInTime.Create.WithIndex(p.index),
 		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
 		p.client.PointInTime.Create.WithContext(ctx),
 	)
 
-	defer CloseSafe(body)
+	defer CloseSafe(pitRaw)
 	if err != nil {
 		return err
-	} else if err := CheckError(body); err != nil {
-		return err
+	} else if err := CheckError(pitRaw); err != nil {
+		CloseSafe(pitRaw)
+		// try elasticsearch api instead
+		req := esapi.OpenPointInTimeRequest{
+			Index:     []string{p.index},
+			KeepAlive: "1m",
+		}
+		res, err2 := req.Do(ctx, p.client.Transport)
+		defer ESCloseSafe(res)
+		if err2 != nil {
+			return err
+		} else if err2 := ESCheckError(res); err2 != nil {
+			if IsIndexNotFoundErr(err2) {
+				return nil
+			}
+			return err2
+		} else {
+			data, err2 := io.ReadAll(res.Body)
+			if err2 != nil {
+				return fmt.Errorf("read response: %w", err2)
+			}
+			var pit PointInTimeResponse
+			if err2 = json.Unmarshal(data, &pit); err2 != nil {
+				return fmt.Errorf("unmarshal response: %w", err2)
+			}
+			p.pitID = pit.ID
+			return nil
+		}
 	}
 
-	data, err := io.ReadAll(body.Body)
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-	var pit PointInTimeResponse
-	if err := json.Unmarshal(data, &pit); err != nil {
-		return fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	p.pitID = pit.ID
-	if p.pitID == "" {
-		p.pitID = pitRes.PitID
-	}
+	p.pitID = pitRes.PitID
 	return nil
 }
 
