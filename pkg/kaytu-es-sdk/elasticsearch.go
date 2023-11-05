@@ -541,7 +541,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		return nil
 	}
 
-	body, _, err := p.client.PointInTime.Create(
+	body, pitRes, err := p.client.PointInTime.Create(
 		p.client.PointInTime.Create.WithIndex(p.index),
 		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
 		p.client.PointInTime.Create.WithContext(ctx),
@@ -564,6 +564,9 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 	}
 
 	p.pitID = pit.ID
+	if p.pitID == "" {
+		p.pitID = pitRes.PitID
+	}
 	return nil
 }
 
