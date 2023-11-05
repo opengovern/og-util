@@ -9,15 +9,16 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.21.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.19.0
 	github.com/confluentinc/confluent-kafka-go/v2 v2.1.1
-	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/fluxcd/helm-controller/api v0.36.1
 	github.com/globocom/echo-prometheus v0.1.2
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-hclog v1.4.0
 	github.com/jackc/pgx/v4 v4.17.2
+	github.com/jackc/pgx/v5 v5.3.0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/lib/pq v1.10.3
+	github.com/opensearch-project/opensearch-go/v2 v2.3.0
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pganalyze/pg_query_go/v4 v4.2.1
 	github.com/prometheus/client_golang v1.16.0
@@ -57,7 +58,7 @@ require (
 	github.com/allegro/bigcache/v3 v3.1.0 // indirect
 	github.com/apparentlymart/go-dump v0.0.0-20190214190832-042adf3cf4a0 // indirect
 	github.com/apparentlymart/go-textseg/v13 v13.0.0 // indirect
-	github.com/aws/aws-sdk-go v1.44.153 // indirect
+	github.com/aws/aws-sdk-go v1.44.263 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.37 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.31 // indirect
@@ -125,7 +126,6 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.1 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgtype v1.12.0 // indirect
-	github.com/jackc/pgx/v5 v5.3.0 // indirect
 	github.com/jackc/puddle v1.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect

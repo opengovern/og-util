@@ -7,24 +7,25 @@ import (
 	"errors"
 	"fmt"
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
+	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"io"
 	"math"
 	"strings"
+	"time"
 
-	elasticsearchv7 "github.com/elastic/go-elasticsearch/v7"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/elastic/go-elasticsearch/v7/esutil"
-	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
+	"github.com/opensearch-project/opensearch-go/v2"
+	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
+	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 )
 
-func CloseSafe(resp *esapi.Response) {
+func CloseSafe(resp *opensearchapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
 		resp.Body.Close() //nolint,gosec
 	}
 }
 
-func CheckError(resp *esapi.Response) error {
+func CheckError(resp *opensearchapi.Response) error {
 	if !resp.IsError() {
 		return nil
 	}
@@ -394,7 +395,7 @@ func (t NestedFilter) MarshalJSON() ([]byte, error) {
 func (t NestedFilter) IsBoolFilter() {}
 
 type BaseESPaginator struct {
-	client *elasticsearchv7.Client
+	client *opensearch.Client
 
 	index    string         // Query index
 	query    map[string]any // Query filters
@@ -408,7 +409,7 @@ type BaseESPaginator struct {
 	done        bool
 }
 
-func NewPaginator(client *elasticsearchv7.Client, index string, filters []BoolFilter, limit *int64) (*BaseESPaginator, error) {
+func NewPaginator(client *opensearch.Client, index string, filters []BoolFilter, limit *int64) (*BaseESPaginator, error) {
 	var query map[string]any
 	if len(filters) > 0 {
 		query = map[string]any{
@@ -490,9 +491,9 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 		sa.SearchAfter = p.searchAfter
 	}
 
-	opts := []func(*esapi.SearchRequest){
+	opts := []func(*opensearchapi.SearchRequest){
 		p.client.Search.WithContext(ctx),
-		p.client.Search.WithBody(esutil.NewJSONReader(sa)),
+		p.client.Search.WithBody(opensearchutil.NewJSONReader(sa)),
 		p.client.Search.WithTrackTotalHits(false),
 	}
 	if sa.PIT == nil {
@@ -539,27 +540,20 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		return nil
 	}
 
-	resPit, err := p.client.OpenPointInTime([]string{p.index}, "1m",
-		p.client.OpenPointInTime.WithContext(ctx),
+	body, resPit, err := p.client.PointInTime.Create(
+		p.client.PointInTime.Create.WithIndex(p.index),
+		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
+		p.client.PointInTime.Create.WithContext(ctx),
 	)
-	defer CloseSafe(resPit)
+
+	defer CloseSafe(body)
 	if err != nil {
 		return err
-	} else if err := CheckError(resPit); err != nil {
+	} else if err := CheckError(body); err != nil {
 		return err
 	}
 
-	data, err := io.ReadAll(resPit.Body)
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-
-	var pit PointInTimeResponse
-	if err := json.Unmarshal(data, &pit); err != nil {
-		return fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	p.pitID = pit.ID
+	p.pitID = resPit.PitID
 	return nil
 }
 
@@ -592,7 +586,7 @@ type CountResponse struct {
 }
 
 func (c Client) Count(ctx context.Context, index string) (int64, error) {
-	opts := []func(count *esapi.CountRequest){
+	opts := []func(count *opensearchapi.CountRequest){
 		c.es.Count.WithContext(ctx),
 		c.es.Count.WithIndex(index),
 	}
@@ -621,7 +615,7 @@ func (c Client) Count(ctx context.Context, index string) (int64, error) {
 }
 
 func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, query string, filterPath []string, response any, trackTotalHits any) error {
-	opts := []func(*esapi.SearchRequest){
+	opts := []func(*opensearchapi.SearchRequest){
 		c.es.Search.WithContext(ctx),
 		c.es.Search.WithBody(strings.NewReader(query)),
 		c.es.Search.WithTrackTotalHits(trackTotalHits),
@@ -656,7 +650,7 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 }
 
 func (c Client) GetByID(ctx context.Context, index string, id string, response any) error {
-	opts := []func(request *esapi.GetRequest){
+	opts := []func(request *opensearchapi.GetRequest){
 		c.es.Get.WithContext(ctx),
 	}
 
@@ -700,15 +694,15 @@ type DeleteByQueryResponse struct {
 	Failures             []any   `json:"failures"`
 }
 
-func DeleteByQuery(ctx context.Context, es *elasticsearchv7.Client, indices []string, query any, opts ...func(*esapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
-	defaultOpts := []func(*esapi.DeleteByQueryRequest){
+func DeleteByQuery(ctx context.Context, es *opensearch.Client, indices []string, query any, opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+	defaultOpts := []func(*opensearchapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
 	}
 
 	resp, err := es.DeleteByQuery(
 		indices,
-		esutil.NewJSONReader(query),
+		opensearchutil.NewJSONReader(query),
 		append(defaultOpts, opts...)...,
 	)
 	defer CloseSafe(resp)

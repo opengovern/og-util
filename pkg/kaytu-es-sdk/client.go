@@ -3,7 +3,10 @@ package kaytu
 import (
 	"context"
 	"crypto/tls"
-	elasticsearchv7 "github.com/elastic/go-elasticsearch/v7"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/opensearch-project/opensearch-go/v2"
+	signer "github.com/opensearch-project/opensearch-go/v2/signer/awsv2"
 	"github.com/turbot/steampipe-plugin-sdk/v5/connection"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/schema"
@@ -23,6 +26,9 @@ type ClientConfig struct {
 	Addresses []string `cty:"addresses"`
 	Username  *string  `cty:"username"`
 	Password  *string  `cty:"password"`
+
+	IsOpenSearch bool    `cty:"is_open_search"`
+	AwsRegion    *string `cty:"aws_region"`
 }
 
 func ConfigSchema() map[string]*schema.Attribute {
@@ -53,7 +59,7 @@ func GetConfig(connection *plugin.Connection) ClientConfig {
 }
 
 type Client struct {
-	es *elasticsearchv7.Client
+	es *opensearch.Client
 }
 
 func NewClientCached(c ClientConfig, cache *connection.ConnectionCache, ctx context.Context) (Client, error) {
@@ -90,7 +96,7 @@ func NewClient(c ClientConfig) (Client, error) {
 		c.Password = &password
 	}
 
-	cfg := elasticsearchv7.Config{
+	cfg := opensearch.Config{
 		Addresses:           c.Addresses,
 		Username:            *c.Username,
 		Password:            *c.Password,
@@ -102,7 +108,22 @@ func NewClient(c ClientConfig) (Client, error) {
 		},
 	}
 
-	es, err := elasticsearchv7.NewClient(cfg)
+	if c.IsOpenSearch {
+		awsConfig, err := config.LoadDefaultConfig(context.Background())
+		if err != nil {
+			return Client{}, err
+		}
+		if c.AwsRegion != nil {
+			awsConfig.Region = *c.AwsRegion
+		}
+		awsSigner, err := signer.NewSigner(awsConfig)
+		if err != nil {
+			return Client{}, err
+		}
+		cfg.Signer = awsSigner
+	}
+
+	es, err := opensearch.NewClient(cfg)
 	if err != nil {
 		return Client{}, err
 	}
@@ -110,10 +131,10 @@ func NewClient(c ClientConfig) (Client, error) {
 	return Client{es: es}, nil
 }
 
-func (c Client) ES() *elasticsearchv7.Client {
+func (c Client) ES() *opensearch.Client {
 	return c.es
 }
 
-func (c *Client) SetES(es *elasticsearchv7.Client) {
+func (c *Client) SetES(es *opensearch.Client) {
 	c.es = es
 }
