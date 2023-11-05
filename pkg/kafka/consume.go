@@ -11,12 +11,12 @@ type ITopicConsumer interface {
 	Consume(ctx context.Context) <-chan []byte
 }
 
-func NewKafkaConsumer(ctx context.Context, brokers []string, consumerGroup string) (*kafka.Consumer, error) {
+func NewKafkaConsumer(ctx context.Context, brokers []string, consumerGroup string, autoCommit bool) (*kafka.Consumer, error) {
 	return kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers":  strings.Join(brokers, ","),
 		"group.id":           consumerGroup,
 		"auto.offset.reset":  "earliest",
-		"enable.auto.commit": false,
+		"enable.auto.commit": autoCommit,
 		"fetch.wait.max.ms":  1000,
 		// 60 minutes
 		"max.poll.interval.ms": 3600000,
@@ -28,8 +28,8 @@ type TopicConsumer struct {
 	topic    string
 }
 
-func NewTopicConsumer(ctx context.Context, brokers []string, topic string, consumerGroup string) (*TopicConsumer, error) {
-	consumer, err := NewKafkaConsumer(ctx, brokers, consumerGroup)
+func NewTopicConsumer(ctx context.Context, brokers []string, topic string, consumerGroup string, autoCommit bool) (*TopicConsumer, error) {
+	consumer, err := NewKafkaConsumer(ctx, brokers, consumerGroup, autoCommit)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +40,8 @@ func NewTopicConsumer(ctx context.Context, brokers []string, topic string, consu
 	return &TopicConsumer{consumer: consumer, topic: topic}, nil
 }
 
-func NewTopicConsumerWithRebalanceCB(ctx context.Context, brokers []string, topic string, consumerGroup string, cb kafka.RebalanceCb) (*TopicConsumer, error) {
-	consumer, err := NewKafkaConsumer(ctx, brokers, consumerGroup)
+func NewTopicConsumerWithRebalanceCB(ctx context.Context, brokers []string, topic string, consumerGroup string, autoCommit bool, cb kafka.RebalanceCb) (*TopicConsumer, error) {
+	consumer, err := NewKafkaConsumer(ctx, brokers, consumerGroup, autoCommit)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (tc *TopicConsumer) Commit(msg *kafka.Message) error {
 	return err
 }
 
-func (tc *TopicConsumer) Consume(ctx context.Context, logger *zap.Logger) <-chan *kafka.Message {
-	msgChan := make(chan *kafka.Message, 100)
+func (tc *TopicConsumer) Consume(ctx context.Context, logger *zap.Logger, maxPreFetch int) <-chan *kafka.Message {
+	msgChan := make(chan *kafka.Message, maxPreFetch)
 	go func() {
 		for {
 			msg, err := tc.consumer.ReadMessage(-1)
