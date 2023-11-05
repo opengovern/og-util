@@ -27,7 +27,7 @@ type ClientConfig struct {
 	Username  *string  `cty:"username"`
 	Password  *string  `cty:"password"`
 
-	IsOpenSearch bool    `cty:"is_open_search"`
+	IsOpenSearch *bool   `cty:"is_open_search"`
 	AwsRegion    *string `cty:"aws_region"`
 }
 
@@ -108,7 +108,7 @@ func NewClient(c ClientConfig) (Client, error) {
 		},
 	}
 
-	if c.IsOpenSearch {
+	if c.IsOpenSearch != nil && *c.IsOpenSearch {
 		awsConfig, err := config.LoadDefaultConfig(context.Background())
 		if err != nil {
 			return Client{}, err
