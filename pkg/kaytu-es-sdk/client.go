@@ -43,6 +43,14 @@ func ConfigSchema() map[string]*schema.Attribute {
 		"password": {
 			Type: schema.TypeString,
 		},
+		"is_open_search": {
+			Type:     schema.TypeBool,
+			Required: false,
+		},
+		"aws_region": {
+			Type:     schema.TypeString,
+			Required: false,
+		},
 	}
 }
 
