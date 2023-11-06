@@ -5,9 +5,11 @@ type Redis struct {
 }
 
 type ElasticSearch struct {
-	Address  string
-	Username string
-	Password string
+	Address      string
+	Username     string
+	Password     string
+	IsOpenSearch bool
+	AwsRegion    string
 }
 
 type Postgres struct {
