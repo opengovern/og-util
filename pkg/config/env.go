@@ -25,21 +25,26 @@ func ReadFromEnv(configObj interface{}, prefix []string) {
 		valueType := fieldValue.Type()
 		valueValue := fieldValue.Addr()
 
-		if getEnv(prefix, yamlName) == "" {
-			continue
-		}
-
 		switch fieldValue.Kind() {
 		case reflect.String:
+			if getEnv(prefix, yamlName) == "" {
+				continue
+			}
 			v := getEnv(prefix, yamlName)
 			fieldValue.SetString(v)
 		case reflect.Int, reflect.Int32, reflect.Int64:
+			if getEnv(prefix, yamlName) == "" {
+				continue
+			}
 			v, err := strconv.ParseInt(getEnv(prefix, yamlName), 10, 64)
 			if err != nil {
 				panic(err)
 			}
 			fieldValue.SetInt(v)
 		case reflect.Bool:
+			if getEnv(prefix, yamlName) == "" {
+				continue
+			}
 			v, err := strconv.ParseBool(getEnv(prefix, yamlName))
 			if err != nil {
 				panic(err)
