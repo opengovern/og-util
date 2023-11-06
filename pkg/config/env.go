@@ -25,6 +25,10 @@ func ReadFromEnv(configObj interface{}, prefix []string) {
 		valueType := fieldValue.Type()
 		valueValue := fieldValue.Addr()
 
+		if getEnv(prefix, yamlName) == "" {
+			continue
+		}
+
 		switch fieldValue.Kind() {
 		case reflect.String:
 			v := getEnv(prefix, yamlName)
