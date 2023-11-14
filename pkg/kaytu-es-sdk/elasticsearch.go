@@ -9,6 +9,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
+	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/context_key"
 	"io"
 	"math"
 	"net/http"
@@ -529,7 +530,11 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 
 	if doLog {
 		m, _ := json.Marshal(sa)
-		plugin.Logger(ctx).Trace("SearchWithLog", string(m))
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("SearchWithLog", string(m))
+		} else {
+			plugin.Logger(ctx).Trace("SearchWithLog", string(m))
+		}
 	}
 
 	res, err := p.client.Search(opts...)
