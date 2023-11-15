@@ -19,7 +19,7 @@ func NewKafkaConsumer(ctx context.Context, brokers []string, consumerGroup strin
 		"enable.auto.commit": autoCommit,
 		"fetch.wait.max.ms":  1000,
 		// 60 minutes
-		"max.poll.interval.ms": 3600000,
+		//"max.poll.interval.ms": 3600000,
 	})
 }
 
