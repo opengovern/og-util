@@ -28,3 +28,33 @@ type LambdaDescribeWorkerInput struct {
 	KafkaTopic       string      `json:"kafkaTopic"`
 	DescribeJob      DescribeJob `json:"describeJob"`
 }
+
+// Connector source.Type
+//
+//	ResourceName  string
+//	ResourceLabel string
+//	ServiceName   string
+//
+//	Tags map[string][]string
+//
+//	ListDescriber ResourceDescriber
+//	GetDescriber  SingleResourceDescriber
+//
+//	TerraformName        []string
+//	TerraformServiceName string
+//
+//	FastDiscovery bool
+//	CostDiscovery bool
+//	Summarize     bool
+type ResourceType interface {
+	GetConnector() source.Type
+	GetResourceName() string
+	GetResourceLabel() string
+	GetServiceName() string
+	GetTags() map[string][]string
+	GetTerraformName() []string
+	GetTerraformServiceName() string
+	IsFastDiscovery() bool
+	IsCostDiscovery() bool
+	IsSummarized() bool
+}
