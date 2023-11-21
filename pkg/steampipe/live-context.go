@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/turbot/steampipe-plugin-sdk/v5/connection"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
+	"time"
 )
 
 type KaytuConfigKey string
@@ -18,7 +19,8 @@ const (
 )
 
 type SelfClient struct {
-	conn *pgx.Conn
+	createdAt time.Time
+	conn      *pgx.Conn
 }
 
 func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache) (*SelfClient, error) {
@@ -53,7 +55,7 @@ func NewSelfClient(ctx context.Context) (*SelfClient, error) {
 		return nil, err
 	}
 
-	return &SelfClient{conn: conn}, nil
+	return &SelfClient{conn: conn, createdAt: time.Now()}, nil
 }
 
 func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuConfigKey) (*string, error) {
@@ -65,12 +67,35 @@ func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuCon
 		}
 		// if table does not exist, return nil check sql state to verify
 		if err, ok := err.(*pgconn.PgError); ok {
-			if err.Code == "42P01" {
+			switch err.Code {
+			case "42P01":
 				return nil, nil
+			case "HY000":
+				if sc.createdAt.Add(5 * time.Minute).Before(time.Now()) {
+					return nil, err
+				}
+				err := sc.reconnect(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return sc.GetConfigTableValueOrNil(ctx, key)
 			}
 		}
 		return nil, err
 	}
 
 	return value, nil
+}
+
+func (sc *SelfClient) reconnect(ctx context.Context) error {
+	sc.conn.Close(ctx)
+
+	newClient, err := NewSelfClient(ctx)
+	if err != nil {
+		return err
+	}
+	sc.conn = newClient.conn
+	sc.createdAt = newClient.createdAt
+
+	return nil
 }
