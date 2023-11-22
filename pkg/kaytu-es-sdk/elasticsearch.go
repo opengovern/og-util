@@ -502,7 +502,7 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 		Query: p.query,
 	}
 
-	if p.limit > p.pageSize {
+	if p.limit > p.pageSize && p.pitID != "" {
 		sa.PIT = &PointInTime{
 			ID:        p.pitID,
 			KeepAlive: "1m",
@@ -565,12 +565,28 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 }
 
 // createPit, sets up the PointInTime for the search with more than 10000 limit
-func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
+func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 	if p.limit < p.pageSize {
 		return nil
 	} else if p.pitID != "" {
 		return nil
 	}
+
+	defer func() {
+		if err == nil {
+			return
+		}
+		// check if the index exists
+		res, resErr := p.client.Indices.Exists([]string{p.index})
+		defer CloseSafe(res)
+		if resErr != nil {
+			return
+		}
+		if res.StatusCode == http.StatusNotFound {
+			err = nil
+			return
+		}
+	}()
 
 	pitRaw, pitRes, err := p.client.PointInTime.Create(
 		p.client.PointInTime.Create.WithIndex(p.index),
@@ -581,7 +597,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
-	} else if err := CheckError(pitRaw); err != nil || strings.Contains(err.Error(), "illegal_argument_exception") {
+	} else if errIf := CheckError(pitRaw); errIf != nil || strings.Contains(errIf.Error(), "illegal_argument_exception") {
 		CloseSafe(pitRaw)
 		// try elasticsearch api instead
 		req := esapi.OpenPointInTimeRequest{
@@ -591,20 +607,24 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 		res, err2 := req.Do(ctx, p.client.Transport)
 		defer ESCloseSafe(res)
 		if err2 != nil {
+			err = errIf
 			return err
 		} else if err2 := ESCheckError(res); err2 != nil {
 			if IsIndexNotFoundErr(err2) {
 				return nil
 			}
-			return err2
+			err = err2
+			return err
 		} else {
 			data, err2 := io.ReadAll(res.Body)
 			if err2 != nil {
-				return fmt.Errorf("read response: %w", err2)
+				err = fmt.Errorf("read response: %w", err2)
+				return err
 			}
 			var pit PointInTimeResponse
 			if err2 = json.Unmarshal(data, &pit); err2 != nil {
-				return fmt.Errorf("unmarshal response: %w", err2)
+				err = fmt.Errorf("unmarshal response: %w", err2)
+				return err
 			}
 			p.pitID = pit.ID
 			return nil
