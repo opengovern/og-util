@@ -579,7 +579,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 	)
 
 	defer CloseSafe(pitRaw)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
 	} else if err := CheckError(pitRaw); err != nil {
 		CloseSafe(pitRaw)
