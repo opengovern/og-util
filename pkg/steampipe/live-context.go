@@ -52,7 +52,7 @@ func NewSelfClient(ctx context.Context) (*SelfClient, error) {
 		defaultOption.Db,
 	)
 
-	conn, err := pgxpool.Connect(ctx, connString)
+	conn, err := pgxpool.New(ctx, connString)
 	if err != nil {
 		return nil, err
 	}
