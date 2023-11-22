@@ -581,7 +581,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) error {
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
-	} else if err := CheckError(pitRaw); err != nil {
+	} else if err := CheckError(pitRaw); err != nil || strings.Contains(err.Error(), "illegal_argument_exception") {
 		CloseSafe(pitRaw)
 		// try elasticsearch api instead
 		req := esapi.OpenPointInTimeRequest{
