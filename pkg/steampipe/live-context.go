@@ -3,6 +3,7 @@ package steampipe
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/turbot/steampipe-plugin-sdk/v5/connection"
@@ -20,7 +21,7 @@ const (
 
 type SelfClient struct {
 	createdAt time.Time
-	conn      *pgx.Conn
+	conn      *pgxpool.Pool
 }
 
 func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache) (*SelfClient, error) {
@@ -50,7 +51,8 @@ func NewSelfClient(ctx context.Context) (*SelfClient, error) {
 		defaultOption.Pass,
 		defaultOption.Db,
 	)
-	conn, err := pgx.Connect(ctx, connString)
+
+	conn, err := pgxpool.Connect(ctx, connString)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +90,7 @@ func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuCon
 }
 
 func (sc *SelfClient) reconnect(ctx context.Context) error {
-	sc.conn.Close(ctx)
+	sc.conn.Close()
 
 	newClient, err := NewSelfClient(ctx)
 	if err != nil {
