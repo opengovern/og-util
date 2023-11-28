@@ -93,7 +93,7 @@ func (m *ScheduledJobManager) AddJob(job SchedulableJob) error {
 
 	err := m.db.Model(m.jobModel).Create(job).Error
 	if err != nil {
-		m.logger.Error("Failed to create job", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to create job", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return err
 	}
 	return nil
@@ -111,7 +111,7 @@ func (m *ScheduledJobManager) SetJobInProgress(job SchedulableJob) error {
 		Set("status", ScheduledJobStatusInProgress).
 		Set("in_progressed_at", time.Now()).Error
 	if err != nil {
-		m.logger.Error("Failed to set job in progress", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to set job in progress", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return err
 	}
 	return nil
@@ -132,7 +132,7 @@ func (m *ScheduledJobManager) SetJobResult(job SchedulableJob, result ScheduledJ
 		Set("status", result).
 		Set("failure_message", failureMessage).Error
 	if err != nil {
-		m.logger.Error("Failed to set job result", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to set job result", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return err
 	}
 	return nil
@@ -155,12 +155,12 @@ func (m *ScheduledJobManager) enqueue() {
 		ScheduledJobStatusInProgress,
 	}).Count(&currentInFlightJobs).Error
 	if err != nil {
-		m.logger.Error("Failed to count in flight jobs", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to count in flight jobs", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 
 	if int(currentInFlightJobs) >= m.MaxInFlightJobs {
-		m.logger.Debug("Max in flight jobs reached ignoring this enqueue loop cycle", zap.Int64("current in flight jobs", currentInFlightJobs), zap.Int("max in flight jobs", m.MaxInFlightJobs), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Debug("Max in flight jobs reached ignoring this enqueue loop cycle", zap.Int64("current in flight jobs", currentInFlightJobs), zap.Int("max in flight jobs", m.MaxInFlightJobs), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 
@@ -168,14 +168,14 @@ func (m *ScheduledJobManager) enqueue() {
 	err = m.db.Model(m.jobModel).Where("status = ?", ScheduledJobStatusCreated).
 		Limit(m.MaxInFlightJobs - int(currentInFlightJobs)).Order("created_at asc").Find(&jobs).Error
 	if err != nil {
-		m.logger.Error("Failed to fetch jobs to enqueue", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to fetch jobs to enqueue", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 
 	for _, job := range jobs {
 		err := job.Enqueue()
 		if err != nil {
-			m.logger.Error("Failed to enqueue job", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+			m.logger.Error("Failed to enqueue job", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 			continue
 		}
 		err = m.db.Model(m.jobModel).
@@ -183,7 +183,7 @@ func (m *ScheduledJobManager) enqueue() {
 			Where("status = ?", ScheduledJobStatusCreated). // Only set jobs that are created to queued
 			Set("queued_at", time.Now()).Error
 		if err != nil {
-			m.logger.Error("Failed to update job queued_at", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+			m.logger.Error("Failed to update job queued_at", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 			continue
 		}
 	}
@@ -193,7 +193,7 @@ func (m *ScheduledJobManager) cleanup() {
 	err := m.db.Model(m.jobModel).Where("created_at < ?", time.Now().Add(-m.OldJobRetention)).
 		Unscoped().Delete(m.jobModel).Error
 	if err != nil {
-		m.logger.Error("Failed to cleanup jobs", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to cleanup jobs", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 }
@@ -212,7 +212,7 @@ func (m *ScheduledJobManager) timeout() {
 		Where("queued_at < ?", time.Now().Add(-m.QueuedTimeout)).
 		Set("status", ScheduledJobStatusTimeout).Error
 	if err != nil {
-		m.logger.Error("Failed to timeout queued jobs", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to timeout queued jobs", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 
@@ -220,7 +220,7 @@ func (m *ScheduledJobManager) timeout() {
 		Where("in_progressed_at < ?", time.Now().Add(-m.InProgressTimeout)).
 		Set("status", ScheduledJobStatusTimeout).Error
 	if err != nil {
-		m.logger.Error("Failed to timeout in progress jobs", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to timeout in progress jobs", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 }
@@ -242,7 +242,7 @@ func (m *ScheduledJobManager) retry() {
 		Set("status", ScheduledJobStatusCreated).
 		Set("retry_count", gorm.Expr("retry_count + 1")).Error
 	if err != nil {
-		m.logger.Error("Failed to retry jobs", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
+		m.logger.Error("Failed to retry jobs", zap.Error(err), zap.String("model name", reflect.TypeOf(m.jobModel).String()))
 		return
 	}
 }

@@ -28,8 +28,6 @@ type ScheduledJob struct {
 }
 
 type SchedulableJob interface {
-	GetTableName() string
-
 	// GetScheduledJob returns the ScheduledJob, which should be embedded in the struct
 	GetScheduledJob() ScheduledJob
 	Enqueue() error
