@@ -43,11 +43,11 @@ func NewScheduledJobManager(
 ) (*ScheduledJobManager, error) {
 	// Check if the job model includes an embedded scheduled job
 	if reflect.TypeOf(jobModel).Kind() != reflect.Pointer {
-		logger.Error("Job model must be a pointer to a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
+		logger.Error("job model must be a pointer to a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
 		return nil, errors.New(fmt.Sprintf("job model must be a pointer to a struct, got %s", reflect.TypeOf(jobModel).String()))
 	}
 	if reflect.TypeOf(jobModel).Elem().Kind() != reflect.Struct {
-		logger.Error("Job model must be a pointer to a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
+		logger.Error("job model must be a pointer to a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
 		return nil, errors.New(fmt.Sprintf("job model must be a pointer to a struct, got %s", reflect.TypeOf(jobModel).String()))
 	}
 
@@ -57,7 +57,7 @@ func NewScheduledJobManager(
 			break
 		}
 		if i == reflect.TypeOf(jobModel).Elem().NumField()-1 {
-			logger.Error("job model must include an embedded scheduled job", zap.String("job model", reflect.TypeOf(jobModel).String()))
+			logger.Error("job model struct must include an embedded job_manager.ScheduledJob", zap.String("job model", reflect.TypeOf(jobModel).String()))
 			return nil, errors.New(fmt.Sprintf("job model must include an embedded scheduled job, got %s", reflect.TypeOf(jobModel).String()))
 		}
 	}
@@ -87,7 +87,7 @@ func (m *ScheduledJobManager) Start() {
 func (m *ScheduledJobManager) AddJob(job SchedulableJob) error {
 	// Check if the job type is the same as the job model
 	if reflect.TypeOf(job) != reflect.TypeOf(m.jobModel) {
-		m.logger.Error("Job type does not match job model", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
+		m.logger.Error("job type does not match job model type", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
 		return errors.New(fmt.Sprintf("job type does not match this manager's job model, expected %s got %s", reflect.TypeOf(m.jobModel).String(), reflect.TypeOf(job).String()))
 	}
 
