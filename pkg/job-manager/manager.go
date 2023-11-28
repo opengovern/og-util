@@ -99,14 +99,8 @@ func (m *ScheduledJobManager) AddJob(job SchedulableJob) error {
 	return nil
 }
 
-func (m *ScheduledJobManager) SetJobInProgress(job SchedulableJob) error {
-	// Check if the job type is the same as the job model
-	if reflect.TypeOf(job) != reflect.TypeOf(m.jobModel) {
-		m.logger.Error("job type does not match job model", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
-		return errors.New(fmt.Sprintf("job type does not match this manager's job model, expected %s got %s", reflect.TypeOf(m.jobModel).String(), reflect.TypeOf(job).String()))
-	}
-
-	err := m.db.Model(m.jobModel).Where("id = ?", job.GetScheduledJob().ID).
+func (m *ScheduledJobManager) SetJobInProgress(id uint) error {
+	err := m.db.Model(m.jobModel).Where("id = ?", id).
 		Where("status = ?", ScheduledJobStatusQueued). // Only set jobs that are queued to in progress so in case of out of order updates we don't set a job that is already in final state to in progress
 		Set("status", ScheduledJobStatusInProgress).
 		Set("in_progressed_at", time.Now()).Error
@@ -117,14 +111,8 @@ func (m *ScheduledJobManager) SetJobInProgress(job SchedulableJob) error {
 	return nil
 }
 
-func (m *ScheduledJobManager) SetJobResult(job SchedulableJob, result ScheduledJobStatus, failureMessage string) error {
-	// Check if the job type is the same as the job model
-	if reflect.TypeOf(job) != reflect.TypeOf(m.jobModel) {
-		m.logger.Error("Job type does not match job model", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
-		return errors.New(fmt.Sprintf("job type does not match this manager's job model, expected %s got %s", reflect.TypeOf(m.jobModel).String(), reflect.TypeOf(job).String()))
-	}
-
-	err := m.db.Model(m.jobModel).Where("id = ?", job.GetScheduledJob().ID).
+func (m *ScheduledJobManager) SetJobResult(id uint, result ScheduledJobStatus, failureMessage string) error {
+	err := m.db.Model(m.jobModel).Where("id = ?", id).
 		Where("status IN ?", []ScheduledJobStatus{
 			ScheduledJobStatusQueued,
 			ScheduledJobStatusInProgress,
