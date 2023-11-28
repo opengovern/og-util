@@ -16,8 +16,8 @@ const (
 )
 
 type ScheduledJob struct {
-	ID             uint `gorm:"primarykey"`
-	CreatedAt      time.Time
+	ID             uint      `gorm:"primarykey"`
+	CreatedAt      time.Time `gorm:"index"`
 	UpdatedAt      time.Time `gorm:"index:,sort:desc"`
 	QueuedAt       time.Time
 	InProgressedAt time.Time
