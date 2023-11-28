@@ -58,7 +58,7 @@ func NewScheduledJobManager(
 		}
 		if i == reflect.TypeOf(jobModel).Elem().NumField()-1 {
 			logger.Error("job model struct must include an embedded job_manager.ScheduledJob", zap.String("job model", reflect.TypeOf(jobModel).String()))
-			return nil, errors.New(fmt.Sprintf("job model must include an embedded scheduled job, got %s", reflect.TypeOf(jobModel).String()))
+			return nil, errors.New(fmt.Sprintf("job model struct must include an embedded job_manager.ScheduledJob, got %s", reflect.TypeOf(jobModel).String()))
 		}
 	}
 
