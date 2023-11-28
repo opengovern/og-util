@@ -42,17 +42,21 @@ func NewScheduledJobManager(
 	retryCheckInterval time.Duration,
 ) (*ScheduledJobManager, error) {
 	// Check if the job model includes an embedded scheduled job
-	if reflect.TypeOf(jobModel).Kind() != reflect.Struct {
-		logger.Error("Job model must be a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
-		return nil, errors.New(fmt.Sprintf("job model must be a struct, got %s", reflect.TypeOf(jobModel).String()))
+	if reflect.TypeOf(jobModel).Kind() != reflect.Pointer {
+		logger.Error("Job model must be a pointer to a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
+		return nil, errors.New(fmt.Sprintf("job model must be a pointer to a struct, got %s", reflect.TypeOf(jobModel).String()))
+	}
+	if reflect.TypeOf(jobModel).Elem().Kind() != reflect.Struct {
+		logger.Error("Job model must be a pointer to a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
+		return nil, errors.New(fmt.Sprintf("job model must be a pointer to a struct, got %s", reflect.TypeOf(jobModel).String()))
 	}
 
-	for i := 0; i < reflect.TypeOf(jobModel).NumField(); i++ {
-		field := reflect.TypeOf(jobModel).Field(i)
+	for i := 0; i < reflect.TypeOf(jobModel).Elem().NumField(); i++ {
+		field := reflect.TypeOf(jobModel).Elem().Field(i)
 		if field.Anonymous && field.Type == reflect.TypeOf(ScheduledJob{}) {
 			break
 		}
-		if i == reflect.TypeOf(jobModel).NumField()-1 {
+		if i == reflect.TypeOf(jobModel).Elem().NumField()-1 {
 			logger.Error("Job model must include an embedded scheduled job", zap.String("job model", reflect.TypeOf(jobModel).String()))
 			return nil, errors.New(fmt.Sprintf("job model must include an embedded scheduled job, got %s", reflect.TypeOf(jobModel).String()))
 		}
