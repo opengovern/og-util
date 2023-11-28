@@ -1,9 +1,12 @@
 package job_manager
 
 import (
+	"errors"
+	"fmt"
 	"github.com/kaytu-io/kaytu-util/pkg/concurrency"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"reflect"
 	"time"
 )
 
@@ -37,7 +40,24 @@ func NewScheduledJobManager(
 	enqueueCheckInterval time.Duration,
 	timeoutCheckInterval time.Duration,
 	retryCheckInterval time.Duration,
-) *ScheduledJobManager {
+) (*ScheduledJobManager, error) {
+	// Check if the job model includes an embedded scheduled job
+	if reflect.TypeOf(jobModel).Kind() != reflect.Struct {
+		logger.Error("Job model must be a struct", zap.String("job model", reflect.TypeOf(jobModel).String()))
+		return nil, errors.New(fmt.Sprintf("job model must be a struct, got %s", reflect.TypeOf(jobModel).String()))
+	}
+
+	for i := 0; i < reflect.TypeOf(jobModel).NumField(); i++ {
+		field := reflect.TypeOf(jobModel).Field(i)
+		if field.Anonymous && field.Type == reflect.TypeOf(ScheduledJob{}) {
+			break
+		}
+		if i == reflect.TypeOf(jobModel).NumField()-1 {
+			logger.Error("Job model must include an embedded scheduled job", zap.String("job model", reflect.TypeOf(jobModel).String()))
+			return nil, errors.New(fmt.Sprintf("job model must include an embedded scheduled job, got %s", reflect.TypeOf(jobModel).String()))
+		}
+	}
+
 	return &ScheduledJobManager{
 		logger:               logger,
 		db:                   db,
@@ -50,7 +70,7 @@ func NewScheduledJobManager(
 		EnqueueCheckInterval: enqueueCheckInterval,
 		TimeoutCheckInterval: timeoutCheckInterval,
 		RetryCheckInterval:   retryCheckInterval,
-	}
+	}, nil
 }
 
 func (m *ScheduledJobManager) Start() {
@@ -61,6 +81,12 @@ func (m *ScheduledJobManager) Start() {
 }
 
 func (m *ScheduledJobManager) AddJob(job SchedulableJob) error {
+	// Check if the job type is the same as the job model
+	if reflect.TypeOf(job) != reflect.TypeOf(m.jobModel) {
+		m.logger.Error("Job type does not match job model", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
+		return errors.New(fmt.Sprintf("job type does not match this manager's job model, expected %s got %s", reflect.TypeOf(m.jobModel).String(), reflect.TypeOf(job).String()))
+	}
+
 	err := m.db.Model(m.jobModel).Create(job).Error
 	if err != nil {
 		m.logger.Error("Failed to create job", zap.Error(err), zap.String("table", m.jobModel.GetTableName()))
@@ -70,6 +96,12 @@ func (m *ScheduledJobManager) AddJob(job SchedulableJob) error {
 }
 
 func (m *ScheduledJobManager) SetJobInProgress(job SchedulableJob) error {
+	// Check if the job type is the same as the job model
+	if reflect.TypeOf(job) != reflect.TypeOf(m.jobModel) {
+		m.logger.Error("job type does not match job model", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
+		return errors.New(fmt.Sprintf("job type does not match this manager's job model, expected %s got %s", reflect.TypeOf(m.jobModel).String(), reflect.TypeOf(job).String()))
+	}
+
 	err := m.db.Model(m.jobModel).Where("id = ?", job.GetScheduledJob().ID).
 		Where("status = ?", ScheduledJobStatusQueued). // Only set jobs that are queued to in progress so in case of out of order updates we don't set a job that is already in final state to in progress
 		Set("status", ScheduledJobStatusInProgress).
@@ -82,6 +114,12 @@ func (m *ScheduledJobManager) SetJobInProgress(job SchedulableJob) error {
 }
 
 func (m *ScheduledJobManager) SetJobResult(job SchedulableJob, result ScheduledJobStatus, failureMessage string) error {
+	// Check if the job type is the same as the job model
+	if reflect.TypeOf(job) != reflect.TypeOf(m.jobModel) {
+		m.logger.Error("Job type does not match job model", zap.String("job type", reflect.TypeOf(job).String()), zap.String("job model", reflect.TypeOf(m.jobModel).String()))
+		return errors.New(fmt.Sprintf("job type does not match this manager's job model, expected %s got %s", reflect.TypeOf(m.jobModel).String(), reflect.TypeOf(job).String()))
+	}
+
 	err := m.db.Model(m.jobModel).Where("id = ?", job.GetScheduledJob().ID).
 		Where("status IN ?", []ScheduledJobStatus{
 			ScheduledJobStatusQueued,
