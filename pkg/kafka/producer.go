@@ -25,5 +25,6 @@ func NewDefaultKafkaProducer(kafkaServers []string) (*confluent_kafka.Producer, 
 		"linger.ms":        1,
 		"batch.size":       1000000,
 		"compression.type": "lz4",
+		"max.request.size": 104857600,
 	})
 }
