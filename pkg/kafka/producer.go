@@ -20,11 +20,11 @@ func NewKafkaProducer(kafkaServers []string, configs map[string]interface{}) (*c
 
 func NewDefaultKafkaProducer(kafkaServers []string) (*confluent_kafka.Producer, error) {
 	return NewKafkaProducer(kafkaServers, map[string]interface{}{
-		"acks":             "all",
-		"retries":          3,
-		"linger.ms":        1,
-		"batch.size":       1000000,
-		"compression.type": "lz4",
-		"max.request.size": 104857600,
+		"acks":              "all",
+		"retries":           3,
+		"linger.ms":         1,
+		"batch.size":        1000000,
+		"compression.type":  "lz4",
+		"message.max.bytes": 104857600,
 	})
 }
