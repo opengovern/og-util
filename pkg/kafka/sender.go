@@ -102,19 +102,19 @@ func DoSend(producer *confluent_kafka.Producer, topic string, partition int32, d
 		msgsToSend := msgs[startPageIdx:min(startPageIdx+KafkaPageSize, len(msgs))]
 		var err error
 		var failedMessages []*confluent_kafka.Message
-		var failedMessagesValues [][]byte
+		var failedMessagesStringValues []string
 		for retry := 0; retry < 10; retry++ {
 			failedMessages, err = SyncSend(logger, producer, msgsToSend, LargeDescribeResourceMessage)
 			for _, fm := range failedMessages {
-				failedMessagesValues = append(failedMessagesValues, fm.Value)
+				failedMessagesStringValues = append(failedMessagesStringValues, string(fm.Value))
 			}
 			if err != nil {
-				logger.Error("Failed calling SyncSend", zap.Error(fmt.Errorf("failed Messages: %v, error message: %v", failedMessagesValues, err.Error())))
+				logger.Error("Failed calling SyncSend", zap.Error(fmt.Errorf("failed Messages: %v, error message: %v", failedMessagesStringValues, err.Error())))
 				if len(failedMessages) == 0 {
 					return fmt.Errorf("error message: %v", err.Error())
 				}
 				if retry == 9 {
-					return fmt.Errorf("failed Messages: %v, error message: %v", failedMessagesValues, err.Error())
+					return fmt.Errorf("failed Messages: %v, error message: %v", failedMessagesStringValues, err.Error())
 				}
 				msgs = failedMessages
 				time.Sleep(15 * time.Second)
