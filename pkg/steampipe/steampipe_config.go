@@ -88,15 +88,15 @@ connection "kaytu" {
 	if err != nil {
 		return err
 	}
-	err = os.Setenv("ES_ADDRESS", elasticSearchConfig.Address)
+	err = os.Setenv("ELASTICSEARCH_ADDRESS", elasticSearchConfig.Address)
 	if err != nil {
 		return err
 	}
-	err = os.Setenv("ES_USERNAME", elasticSearchConfig.Username)
+	err = os.Setenv("ELASTICSEARCH_USERNAME", elasticSearchConfig.Username)
 	if err != nil {
 		return err
 	}
-	err = os.Setenv("ES_PASSWORD", elasticSearchConfig.Password)
+	err = os.Setenv("ELASTICSEARCH_PASSWORD", elasticSearchConfig.Password)
 	if err != nil {
 		return err
 	}
@@ -105,15 +105,15 @@ connection "kaytu" {
 }
 
 func PopulateEnv(config config.ElasticSearch) error {
-	err := os.Setenv("ES_ADDRESS", config.Address)
+	err := os.Setenv("ELASTICSEARCH_ADDRESS", config.Address)
 	if err != nil {
 		return err
 	}
-	err = os.Setenv("ES_USERNAME", config.Username)
+	err = os.Setenv("ELASTICSEARCH_USERNAME", config.Username)
 	if err != nil {
 		return err
 	}
-	err = os.Setenv("ES_PASSWORD", config.Password)
+	err = os.Setenv("ELASTICSEARCH_PASSWORD", config.Password)
 	if err != nil {
 		return err
 	}

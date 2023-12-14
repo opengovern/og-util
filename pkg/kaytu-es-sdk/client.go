@@ -90,17 +90,17 @@ func NewClientCached(c ClientConfig, cache *connection.ConnectionCache, ctx cont
 
 func NewClient(c ClientConfig) (Client, error) {
 	if c.Addresses == nil || len(c.Addresses) == 0 {
-		address := os.Getenv("ES_ADDRESS")
+		address := os.Getenv("ELASTICSEARCH_ADDRESS")
 		c.Addresses = []string{address}
 	}
 
 	if c.Username == nil || len(*c.Username) == 0 {
-		username := os.Getenv("ES_USERNAME")
+		username := os.Getenv("ELASTICSEARCH_USERNAME")
 		c.Username = &username
 	}
 
 	if c.Password == nil || len(*c.Password) == 0 {
-		password := os.Getenv("ES_PASSWORD")
+		password := os.Getenv("ELASTICSEARCH_PASSWORD")
 		c.Password = &password
 	}
 
