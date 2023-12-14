@@ -540,14 +540,20 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 	res, err := p.client.Search(opts...)
 	defer CloseSafe(res)
 	if err != nil {
-		b, _ := io.ReadAll(res.Body)
+		var b []byte
+		if res != nil {
+			b, _ = io.ReadAll(res.Body)
+		}
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
 			return nil
 		}
-		b, _ := io.ReadAll(res.Body)
+		var b []byte
+		if res != nil {
+			b, _ = io.ReadAll(res.Body)
+		}
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	}
@@ -704,14 +710,20 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 	res, err := c.es.Search(opts...)
 	defer CloseSafe(res)
 	if err != nil {
-		b, _ := io.ReadAll(res.Body)
+		var b []byte
+		if res != nil {
+			b, _ = io.ReadAll(res.Body)
+		}
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
 			return nil
 		}
-		b, _ := io.ReadAll(res.Body)
+		var b []byte
+		if res != nil {
+			b, _ = io.ReadAll(res.Body)
+		}
 		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
 		return err
 	}
