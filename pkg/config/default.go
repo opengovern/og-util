@@ -22,9 +22,8 @@ type Postgres struct {
 }
 
 type KMS struct {
-	AccessKey string
-	SecretKey string
-	Region    string
+	ARN    string
+	Region string
 }
 
 type KaytuService struct {
