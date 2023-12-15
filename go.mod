@@ -32,7 +32,6 @@ require (
 	github.com/sendgrid/sendgrid-go v3.12.0+incompatible
 	github.com/streadway/amqp v1.0.0
 	github.com/stretchr/testify v1.8.4
-	github.com/tidwall/pretty v1.2.1
 	github.com/turbot/go-kit v0.6.0
 	github.com/turbot/steampipe-plugin-sdk/v5 v5.5.1
 	go.opentelemetry.io/otel v1.17.0
