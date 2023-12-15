@@ -21,14 +21,13 @@ cfg := koanf.Provide("testing", Config{
 ```
 
 You can pass the default values by passing an instance of the `Config` and fill it with default values.
-Environment variables should be prefixed by service name to be considered. For example for the `testing`
-service you need to use `TESTING_RABBITMQ__SERVICE` to reference `Config.RabbitMQ.Service`.
+Use `__` in the environment variables to replace `.`, for example use `RABBITMQ__SERVICE` to reference `Config.RabbitMQ.Service`.
 
 Please note that to use `koanf` you need to tag your structure by `koanf` and set the name for configuration
 as follows:
 
 ```go
 type Config struct {
-	RabbitMQ koanf.RabbitMQ `koanf:"rabbitmq"`
+ RabbitMQ koanf.RabbitMQ `koanf:"rabbitmq"`
 }
 ```
