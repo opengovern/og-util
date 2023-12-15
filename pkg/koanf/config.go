@@ -1,7 +1,6 @@
 package koanf
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
-	"github.com/tidwall/pretty"
 )
 
 // New reads configuration with koanf.
@@ -51,22 +49,8 @@ func Provide[T interface{}](service string, def T) T {
 	}
 
 	if err := k.Unmarshal("", &instance); err != nil {
-		log.Fatalf("error unmarshalling config: %s", err)
+		log.Fatalf("error un-marshalling config: %s", err)
 	}
-
-	indent, err := json.MarshalIndent(instance, "", "\t")
-	if err != nil {
-		panic(err)
-	}
-
-	indent = pretty.Color(indent, nil)
-
-	log.Printf(`
-================ Loaded Configuration ================
-service %s
-%s
-======================================================
-	`, service, string(indent))
 
 	return instance
 }

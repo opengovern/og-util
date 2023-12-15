@@ -22,7 +22,7 @@ type Postgres struct {
 	Password string `koanf:"password"`
 	SSLMode  string `koanf:"ssl_mode"`
 
-	MaxIdelConns    int           `koanf:"max_idel_conns"`
+	MaxIdleConns    int           `koanf:"max_idle_conns"`
 	MaxOpenConns    int           `koanf:"max_open_conns"`
 	ConnMaxIdleTime time.Duration `koanf:"conn_max_idle_time"`
 	ConnMaxLifetime time.Duration `koanf:"conn_max_lifetime"`
