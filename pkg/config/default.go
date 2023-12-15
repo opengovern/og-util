@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 type Redis struct {
 	Address string
 }
@@ -19,6 +21,11 @@ type Postgres struct {
 	Username string
 	Password string
 	SSLMode  string
+
+	MaxIdelConns    int
+	MaxOpenConns    int
+	ConnMaxIdleTime time.Duration
+	ConnMaxLifetime time.Duration
 }
 
 type KMS struct {
