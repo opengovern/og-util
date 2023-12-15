@@ -774,9 +774,9 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	res, err := c.es.Cluster.Health(opts...)
 	defer CloseSafe(res)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get cluster health due to %v", err)
 	} else if err := CheckError(res); err != nil {
-		return err
+		return fmt.Errorf("CheckError: %v", err)
 	}
 
 	if res.StatusCode != http.StatusOK {
@@ -785,12 +785,12 @@ func (c Client) Healthcheck(ctx context.Context) error {
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read body due to %v", err)
 	}
 
 	var js map[string]interface{}
 	if err := json.Unmarshal(b, &js); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal due to %v", err)
 	}
 
 	if js["status"] != "green" && js["status"] != "yellow" {
