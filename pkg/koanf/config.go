@@ -1,7 +1,6 @@
 package koanf
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
@@ -13,13 +12,9 @@ import (
 )
 
 // New reads configuration with koanf.
-// service name is used for reading environment variables
-// and def contains the default values.
-func Provide[T interface{}](service string, def T) T {
+// def contains the default values.
+func Provide[T interface{}](def T) T {
 	k := koanf.New(".")
-
-	// prefix indicates environment variables prefix.
-	prefix := fmt.Sprintf("%s_", strings.ToUpper(service))
 
 	// create a new instance based-on given time.
 	var instance T
@@ -38,8 +33,8 @@ func Provide[T interface{}](service string, def T) T {
 	if err := k.Load(
 		// replace __ with . in environment variables so you can reference field a in struct b
 		// as a__b.
-		env.Provider(prefix, ".", func(source string) string {
-			base := strings.ToLower(strings.TrimPrefix(source, prefix))
+		env.Provider("", ".", func(source string) string {
+			base := strings.ToLower(source)
 
 			return strings.ReplaceAll(base, "__", ".")
 		}),
