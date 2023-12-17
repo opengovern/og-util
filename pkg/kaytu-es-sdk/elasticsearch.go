@@ -45,6 +45,7 @@ func CheckError(resp *opensearchapi.Response) error {
 		return fmt.Errorf("read error: %w", err)
 	}
 
+	fmt.Println("failure due to:", string(data))
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
 		return fmt.Errorf(string(data))
