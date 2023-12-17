@@ -3,6 +3,8 @@ package kaytu
 import (
 	"context"
 	"crypto/tls"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/opensearch-project/opensearch-go/v2"
@@ -27,8 +29,10 @@ type ClientConfig struct {
 	Username  *string  `cty:"username"`
 	Password  *string  `cty:"password"`
 
-	IsOpenSearch *bool   `cty:"is_open_search"`
-	AwsRegion    *string `cty:"aws_region"`
+	IsOpenSearch  *bool   `cty:"is_open_search"`
+	AwsRegion     *string `cty:"aws_region"`
+	AssumeRoleArn *string `cty:"assume_role_arn"`
+	ExternalID    *string `cty:"external_id"`
 }
 
 func ConfigSchema() map[string]*schema.Attribute {
@@ -124,6 +128,25 @@ func NewClient(c ClientConfig) (Client, error) {
 		if c.AwsRegion != nil {
 			awsConfig.Region = *c.AwsRegion
 		}
+
+		if c.AssumeRoleArn != nil {
+			awsConfig, err = config.LoadDefaultConfig(
+				context.Background(),
+				config.WithCredentialsProvider(
+					stscreds.NewAssumeRoleProvider(
+						sts.NewFromConfig(awsConfig),
+						*c.AssumeRoleArn,
+						func(o *stscreds.AssumeRoleOptions) {
+							o.ExternalID = c.ExternalID
+						},
+					),
+				),
+			)
+			if err != nil {
+				return Client{}, err
+			}
+		}
+
 		awsSigner, err := signer.NewSigner(awsConfig)
 		if err != nil {
 			return Client{}, err
