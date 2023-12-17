@@ -129,7 +129,7 @@ func NewClient(c ClientConfig) (Client, error) {
 			awsConfig.Region = *c.AwsRegion
 		}
 
-		if c.AssumeRoleArn != nil {
+		if c.AssumeRoleArn != nil && len(*c.AssumeRoleArn) > 0 {
 			awsConfig, err = config.LoadDefaultConfig(
 				context.Background(),
 				config.WithCredentialsProvider(
