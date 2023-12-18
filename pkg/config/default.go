@@ -7,13 +7,14 @@ type Redis struct {
 }
 
 type ElasticSearch struct {
-	Address       string
-	Username      string
-	Password      string
-	IsOpenSearch  bool
-	AwsRegion     string
-	AssumeRoleArn string `yaml:"assume_role_arn"`
-	ExternalID    string `yaml:"external_id"`
+	Address           string
+	Username          string
+	Password          string
+	IsOpenSearch      bool
+	AwsRegion         string
+	AssumeRoleArn     string `yaml:"assume_role_arn"`
+	ExternalID        string `yaml:"external_id"`
+	IngestionEndpoint string `yaml:"ingestion_endpoint"`
 }
 
 type Postgres struct {
