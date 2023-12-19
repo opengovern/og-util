@@ -3,6 +3,7 @@ package kaytu
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"strconv"
@@ -146,6 +147,12 @@ func NewClient(c ClientConfig) (Client, error) {
 		}
 	}
 
+	fmt.Println("ES Addresses:", c.Addresses)
+	fmt.Println("ES Username:", c.Username)
+	fmt.Println("ES IsOpenSearch:", c.IsOpenSearch)
+	fmt.Println("ES AwsRegion:", c.AwsRegion)
+	fmt.Println("ES AssumeRoleArn:", c.AssumeRoleArn)
+	fmt.Println("ES ExternalID:", c.ExternalID)
 	cfg := opensearch.Config{
 		Addresses:           c.Addresses,
 		Username:            *c.Username,

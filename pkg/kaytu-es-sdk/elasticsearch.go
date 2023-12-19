@@ -45,16 +45,15 @@ func CheckError(resp *opensearchapi.Response) error {
 		return fmt.Errorf("read error: %w", err)
 	}
 
-	return fmt.Errorf(string(data))
-	//
-	//var e ErrorResponse
-	//if err := json.Unmarshal(data, &e); err != nil {
-	//	return fmt.Errorf(string(data))
-	//}
-	//if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
-	//}
-	//
-	//return e
+	var e ErrorResponse
+	if err := json.Unmarshal(data, &e); err != nil {
+		return fmt.Errorf(string(data))
+	}
+	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
+		return fmt.Errorf(string(data))
+	}
+
+	return e
 }
 
 func ESCheckError(resp *esapi.Response) error {
@@ -69,6 +68,9 @@ func ESCheckError(resp *esapi.Response) error {
 
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
+		return fmt.Errorf(string(data))
+	}
+	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
 		return fmt.Errorf(string(data))
 	}
 
