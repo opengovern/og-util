@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/opensearch-project/opensearch-go/v2"
@@ -52,6 +53,14 @@ func ConfigSchema() map[string]*schema.Attribute {
 			Required: false,
 		},
 		"aws_region": {
+			Type:     schema.TypeString,
+			Required: false,
+		},
+		"assume_role_arn": {
+			Type:     schema.TypeString,
+			Required: false,
+		},
+		"external_id": {
 			Type:     schema.TypeString,
 			Required: false,
 		},
@@ -106,6 +115,35 @@ func NewClient(c ClientConfig) (Client, error) {
 	if c.Password == nil || len(*c.Password) == 0 {
 		password := os.Getenv("ELASTICSEARCH_PASSWORD")
 		c.Password = &password
+	}
+
+	if c.IsOpenSearch == nil {
+		isOpenSearch := os.Getenv("ELASTICSEARCH_IS_OPEN_SEARCH")
+		if len(isOpenSearch) > 0 {
+			b, _ := strconv.ParseBool(isOpenSearch)
+			c.IsOpenSearch = &b
+		}
+	}
+
+	if c.AwsRegion == nil || len(*c.AwsRegion) == 0 {
+		awsRegion := os.Getenv("ELASTICSEARCH_AWS_REGION")
+		if len(awsRegion) > 0 {
+			c.AwsRegion = &awsRegion
+		}
+	}
+
+	if c.AssumeRoleArn == nil || len(*c.AssumeRoleArn) == 0 {
+		assumeRoleArn := os.Getenv("ELASTICSEARCH_ASSUME_ROLE_ARN")
+		if len(assumeRoleArn) > 0 {
+			c.AssumeRoleArn = &assumeRoleArn
+		}
+	}
+
+	if c.ExternalID == nil || len(*c.ExternalID) == 0 {
+		externalID := os.Getenv("ELASTICSEARCH_EXTERNAL_ID")
+		if len(externalID) > 0 {
+			c.ExternalID = &externalID
+		}
 	}
 
 	cfg := opensearch.Config{
