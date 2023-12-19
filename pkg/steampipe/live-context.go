@@ -62,7 +62,13 @@ func NewSelfClient(ctx context.Context) (*SelfClient, error) {
 
 func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuConfigKey) (*string, error) {
 	var value *string
-	err := sc.conn.QueryRow(ctx, "SELECT value FROM kaytu_configs WHERE key = $1", string(key)).Scan(&value)
+	// Create table if not exists
+	_, err := sc.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
+	if err != nil {
+		return nil, err
+	}
+
+	err = sc.conn.QueryRow(ctx, "SELECT value FROM kaytu_configs WHERE key = $1", string(key)).Scan(&value)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
