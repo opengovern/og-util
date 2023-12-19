@@ -118,7 +118,7 @@ func NewClient(c ClientConfig) (Client, error) {
 	}
 
 	if c.IsOpenSearch == nil {
-		isOpenSearch := os.Getenv("ELASTICSEARCH_IS_OPEN_SEARCH")
+		isOpenSearch := os.Getenv("ELASTICSEARCH_ISOPENSEARCH")
 		if len(isOpenSearch) > 0 {
 			b, _ := strconv.ParseBool(isOpenSearch)
 			c.IsOpenSearch = &b
@@ -126,7 +126,7 @@ func NewClient(c ClientConfig) (Client, error) {
 	}
 
 	if c.AwsRegion == nil || len(*c.AwsRegion) == 0 {
-		awsRegion := os.Getenv("ELASTICSEARCH_AWS_REGION")
+		awsRegion := os.Getenv("ELASTICSEARCH_AWSREGION")
 		if len(awsRegion) > 0 {
 			c.AwsRegion = &awsRegion
 		}
