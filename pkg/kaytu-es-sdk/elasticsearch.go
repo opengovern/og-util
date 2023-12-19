@@ -578,7 +578,7 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 
 // createPit, sets up the PointInTime for the search with more than 10000 limit
 func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
-	if p.limit < p.pageSize {
+	if p.limit <= p.pageSize {
 		return nil
 	} else if p.pitID != "" {
 		return nil
