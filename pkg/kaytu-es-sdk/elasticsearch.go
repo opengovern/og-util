@@ -503,6 +503,14 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 		return err
 	}
 
+	if doLog {
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("Creating search request")
+		} else {
+			plugin.Logger(ctx).Trace("Creating search request")
+		}
+	}
+
 	sa := SearchRequest{
 		Size:  &p.pageSize,
 		Query: p.query,
@@ -523,6 +531,14 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 
 	if p.searchAfter != nil {
 		sa.SearchAfter = p.searchAfter
+	}
+
+	if doLog {
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("Creating Opts")
+		} else {
+			plugin.Logger(ctx).Trace("Creating Opts")
+		}
 	}
 
 	opts := []func(*opensearchapi.SearchRequest){
@@ -588,6 +604,12 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		if err == nil {
 			return
 		}
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("Error", err)
+		} else {
+			plugin.Logger(ctx).Info("Error %v", err)
+		}
+
 		// check if the index exists
 		res, resErr := p.client.Indices.Exists([]string{p.index})
 		defer CloseSafe(res)
@@ -620,6 +642,12 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
 	} else if errIf := CheckError(pitRaw); errIf != nil || strings.Contains(errIf.Error(), "illegal_argument_exception") {
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("Error2", err)
+		} else {
+			plugin.Logger(ctx).Info("Error2 %v", err)
+		}
+
 		CloseSafe(pitRaw)
 
 		if ctx.Value(context_key.Logger) == nil {
@@ -659,7 +687,18 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		}
 	}
 
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("PIT DONE")
+	} else {
+		plugin.Logger(ctx).Info("PIT DONE")
+	}
 	p.pitID = pitRes.PitID
+
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("PIT DONE = ", p.pitID)
+	} else {
+		plugin.Logger(ctx).Info("PIT DONE = %v", p.pitID)
+	}
 	return nil
 }
 
