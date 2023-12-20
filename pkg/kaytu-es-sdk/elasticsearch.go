@@ -550,7 +550,14 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 		if res != nil {
 			b, _ = io.ReadAll(res.Body)
 		}
-		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
+		if doLog {
+			if ctx.Value(context_key.Logger) == nil {
+				fmt.Println(fmt.Sprintf("failure while querying es: %v\n%s\n", err, string(b)))
+			} else {
+				plugin.Logger(ctx).Trace(fmt.Sprintf("failure while querying es: %v\n%s\n", err, string(b)))
+			}
+		}
+
 		return err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
@@ -560,16 +567,36 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 		if res != nil {
 			b, _ = io.ReadAll(res.Body)
 		}
-		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
+		if doLog {
+			if ctx.Value(context_key.Logger) == nil {
+				fmt.Println(fmt.Sprintf("failure while querying es: %v\n%s\n", err, string(b)))
+			} else {
+				plugin.Logger(ctx).Trace(fmt.Sprintf("failure while querying es: %v\n%s\n", err, string(b)))
+			}
+		}
 		return err
 	}
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
+		if doLog {
+			if ctx.Value(context_key.Logger) == nil {
+				fmt.Println(fmt.Sprintf("read response: %v", err))
+			} else {
+				plugin.Logger(ctx).Trace(fmt.Sprintf("read response: %v", err))
+			}
+		}
 		return fmt.Errorf("read response: %w", err)
 	}
 
 	if err := json.Unmarshal(b, response); err != nil {
+		if doLog {
+			if ctx.Value(context_key.Logger) == nil {
+				fmt.Println(fmt.Sprintf("unmarshal response: %v", err))
+			} else {
+				plugin.Logger(ctx).Trace(fmt.Sprintf("unmarshal response: %v", err))
+			}
+		}
 		return fmt.Errorf("unmarshal response: %w", err)
 	}
 
