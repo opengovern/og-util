@@ -607,11 +607,21 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		p.client.PointInTime.Create.WithContext(ctx),
 	)
 
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("PointInTime.Create pitRaw:", pitRaw, " pitRes:", pitRes, " err:", err)
+	} else {
+		plugin.Logger(ctx).Trace("PointInTime.Create pitRaw=%v pitRes=%v err=%v", pitRaw, pitRes, err)
+	}
+
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
-	} else if errIf := CheckError(pitRaw); errIf != nil || strings.Contains(err.Error(), "illegal_argument_exception") {
-		CloseSafe(pitRaw)
+	} else if errIf := CheckError(pitRaw); errIf != nil || (err != nil && strings.Contains(err.Error(), "illegal_argument_exception")) {
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("PointInTime.CheckErr")
+		} else {
+			plugin.Logger(ctx).Trace("PointInTime.CheckErr")
+		}
 
 		// try elasticsearch api instead
 		req := esapi.OpenPointInTimeRequest{
@@ -645,6 +655,12 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 			p.pitID = pit.ID
 			return nil
 		}
+	}
+
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("PointInTime.Done")
+	} else {
+		plugin.Logger(ctx).Trace("PointInTime.Done")
 	}
 
 	p.pitID = pitRes.PitID
