@@ -599,18 +599,34 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 			return
 		}
 	}()
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("Creating PIT")
+	} else {
+		plugin.Logger(ctx).Info("Creating PIT")
+	}
 
 	pitRaw, pitRes, err := p.client.PointInTime.Create(
 		p.client.PointInTime.Create.WithIndex(p.index),
 		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
 		p.client.PointInTime.Create.WithContext(ctx),
 	)
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("Created PIT", pitRaw, "res=", pitRes, "err=", err)
+	} else {
+		plugin.Logger(ctx).Info(fmt.Sprintf("Created PIT %v, res=%v, err=%v", pitRaw, pitRes, err))
+	}
 
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
 	} else if errIf := CheckError(pitRaw); errIf != nil || strings.Contains(errIf.Error(), "illegal_argument_exception") {
 		CloseSafe(pitRaw)
+
+		if ctx.Value(context_key.Logger) == nil {
+			fmt.Println("Going with ES")
+		} else {
+			plugin.Logger(ctx).Info("Going with ES")
+		}
 		// try elasticsearch api instead
 		req := esapi.OpenPointInTimeRequest{
 			Index:     []string{p.index},
