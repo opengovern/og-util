@@ -503,14 +503,6 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 		return err
 	}
 
-	if doLog {
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("Creating search request")
-		} else {
-			plugin.Logger(ctx).Trace("Creating search request")
-		}
-	}
-
 	sa := SearchRequest{
 		Size:  &p.pageSize,
 		Query: p.query,
@@ -531,14 +523,6 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 
 	if p.searchAfter != nil {
 		sa.SearchAfter = p.searchAfter
-	}
-
-	if doLog {
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("Creating Opts")
-		} else {
-			plugin.Logger(ctx).Trace("Creating Opts")
-		}
 	}
 
 	opts := []func(*opensearchapi.SearchRequest){
@@ -604,11 +588,6 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		if err == nil {
 			return
 		}
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("Error", err)
-		} else {
-			plugin.Logger(ctx).Info("Error %v", err)
-		}
 
 		// check if the index exists
 		res, resErr := p.client.Indices.Exists([]string{p.index})
@@ -621,40 +600,19 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 			return
 		}
 	}()
-	if ctx.Value(context_key.Logger) == nil {
-		fmt.Println("Creating PIT")
-	} else {
-		plugin.Logger(ctx).Info("Creating PIT")
-	}
 
 	pitRaw, pitRes, err := p.client.PointInTime.Create(
 		p.client.PointInTime.Create.WithIndex(p.index),
 		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
 		p.client.PointInTime.Create.WithContext(ctx),
 	)
-	if ctx.Value(context_key.Logger) == nil {
-		fmt.Println("Created PIT", pitRaw, "res=", pitRes, "err=", err)
-	} else {
-		plugin.Logger(ctx).Info(fmt.Sprintf("Created PIT %v, res=%v, err=%v", pitRaw, pitRes, err))
-	}
 
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
-	} else if errIf := CheckError(pitRaw); errIf != nil || strings.Contains(errIf.Error(), "illegal_argument_exception") {
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("Error2", err)
-		} else {
-			plugin.Logger(ctx).Info("Error2 %v", err)
-		}
-
+	} else if errIf := CheckError(pitRaw); errIf != nil && strings.Contains(errIf.Error(), "illegal_argument_exception") {
 		CloseSafe(pitRaw)
 
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("Going with ES")
-		} else {
-			plugin.Logger(ctx).Info("Going with ES")
-		}
 		// try elasticsearch api instead
 		req := esapi.OpenPointInTimeRequest{
 			Index:     []string{p.index},
@@ -687,18 +645,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		}
 	}
 
-	if ctx.Value(context_key.Logger) == nil {
-		fmt.Println("PIT DONE")
-	} else {
-		plugin.Logger(ctx).Info("PIT DONE")
-	}
 	p.pitID = pitRes.PitID
-
-	if ctx.Value(context_key.Logger) == nil {
-		fmt.Println("PIT DONE = ", p.pitID)
-	} else {
-		plugin.Logger(ctx).Info("PIT DONE = %v", p.pitID)
-	}
 	return nil
 }
 
