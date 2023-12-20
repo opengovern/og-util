@@ -610,7 +610,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
-	} else if errIf := CheckError(pitRaw); errIf != nil && strings.Contains(errIf.Error(), "illegal_argument_exception") {
+	} else if errIf := CheckError(pitRaw); errIf != nil || strings.Contains(err.Error(), "illegal_argument_exception") {
 		CloseSafe(pitRaw)
 
 		// try elasticsearch api instead
@@ -621,7 +621,9 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		res, err2 := req.Do(ctx, p.client.Transport)
 		defer ESCloseSafe(res)
 		if err2 != nil {
-			err = errIf
+			if errIf != nil {
+				return errIf
+			}
 			return err
 		} else if err2 := ESCheckError(res); err2 != nil {
 			if IsIndexNotFoundErr(err2) {
