@@ -516,7 +516,7 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 
 		sa.Sort = []map[string]any{
 			{
-				"_shard_doc": "desc",
+				"_id": "desc",
 			},
 		}
 	}
