@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
+	"io"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -213,4 +215,30 @@ func (c Client) ES() *opensearch.Client {
 
 func (c *Client) SetES(es *opensearch.Client) {
 	c.es = es
+}
+
+func (c *Client) Delete(docID, index string) error {
+	opts := []func(*opensearchapi.DeleteRequest){
+		c.es.Delete.WithContext(context.Background()),
+	}
+
+	res, err := c.es.Delete(index, docID, opts...)
+	defer CloseSafe(res)
+	if err != nil {
+		var b []byte
+		if res != nil {
+			b, _ = io.ReadAll(res.Body)
+		}
+		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
+		return err
+	} else if err := CheckError(res); err != nil {
+		var b []byte
+		if res != nil {
+			b, _ = io.ReadAll(res.Body)
+		}
+		fmt.Printf("failure while querying es: %v\n%s\n", err, string(b))
+		return err
+	}
+
+	return nil
 }
