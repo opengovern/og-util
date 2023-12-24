@@ -645,9 +645,9 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		return err
 	} else if errIf := CheckError(pitRaw); errIf != nil || (err != nil && strings.Contains(err.Error(), "illegal_argument_exception")) {
 		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("PointInTime.CheckErr")
+			fmt.Println("PointInTime.CheckErr err=", err, "errIf=", errIf)
 		} else {
-			plugin.Logger(ctx).Trace("PointInTime.CheckErr")
+			plugin.Logger(ctx).Trace("PointInTime.CheckErr err=", err, "errIf=", errIf)
 		}
 
 		// try elasticsearch api instead
