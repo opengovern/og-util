@@ -56,6 +56,33 @@ func CheckError(resp *opensearchapi.Response) error {
 	return e
 }
 
+func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) error {
+	if !resp.IsError() {
+		return nil
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read error: %w", err)
+	}
+	
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println("CheckErr data", string(data))
+	} else {
+		plugin.Logger(ctx).Trace("CheckErr data", string(data))
+	}
+
+	var e ErrorResponse
+	if err := json.Unmarshal(data, &e); err != nil {
+		return fmt.Errorf(string(data))
+	}
+	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
+		return fmt.Errorf(string(data))
+	}
+
+	return e
+}
+
 func ESCheckError(resp *esapi.Response) error {
 	if !resp.IsError() {
 		return nil
@@ -643,7 +670,7 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
 		return err
-	} else if errIf := CheckError(pitRaw); errIf != nil || (err != nil && strings.Contains(err.Error(), "illegal_argument_exception")) {
+	} else if errIf := CheckErrorWithContext(pitRaw, ctx); errIf != nil || (err != nil && strings.Contains(err.Error(), "illegal_argument_exception")) {
 		if ctx.Value(context_key.Logger) == nil {
 			fmt.Println("PointInTime.CheckErr err=", err, "errIf=", errIf)
 		} else {
