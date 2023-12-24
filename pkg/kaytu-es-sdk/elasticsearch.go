@@ -56,6 +56,14 @@ func CheckError(resp *opensearchapi.Response) error {
 	return e
 }
 
+func LogWarn(ctx context.Context, data string) {
+	if ctx.Value(context_key.Logger) == nil {
+		fmt.Println(data)
+	} else {
+		plugin.Logger(ctx).Warn(data)
+	}
+}
+
 func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) error {
 	if !resp.IsError() {
 		return nil
@@ -66,11 +74,7 @@ func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) er
 		return fmt.Errorf("read error: %w", err)
 	}
 
-	if ctx.Value(context_key.Logger) == nil {
-		fmt.Println("CheckErr data", string(data))
-	} else {
-		plugin.Logger(ctx).Trace("CheckErr data", string(data))
-	}
+	LogWarn(ctx, fmt.Sprintf("CheckErr data: %s", string(data)))
 
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
@@ -563,11 +567,7 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 
 	if doLog {
 		m, _ := json.Marshal(sa)
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("SearchWithLog", string(m))
-		} else {
-			plugin.Logger(ctx).Trace("SearchWithLog", string(m))
-		}
+		LogWarn(ctx, fmt.Sprintf("SearchWithLog: %s", string(m)))
 	}
 
 	res, err := p.client.Search(opts...)
@@ -610,7 +610,7 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 			if ctx.Value(context_key.Logger) == nil {
 				fmt.Println(fmt.Sprintf("read response: %v", err))
 			} else {
-				plugin.Logger(ctx).Trace(fmt.Sprintf("read response: %v", err))
+				plugin.Logger(ctx).Warn(fmt.Sprintf("read response: %v", err))
 			}
 		}
 		return fmt.Errorf("read response: %w", err)
@@ -621,7 +621,7 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 			if ctx.Value(context_key.Logger) == nil {
 				fmt.Println(fmt.Sprintf("unmarshal response: %v", err))
 			} else {
-				plugin.Logger(ctx).Trace(fmt.Sprintf("unmarshal response: %v", err))
+				plugin.Logger(ctx).Warn(fmt.Sprintf("unmarshal response: %v", err))
 			}
 		}
 		return fmt.Errorf("unmarshal response: %w", err)
@@ -660,27 +660,13 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 		p.client.PointInTime.Create.WithKeepAlive(1*time.Minute),
 		p.client.PointInTime.Create.WithContext(ctx),
 	)
-	//
-	//if ctx.Value(context_key.Logger) == nil {
-	//	fmt.Println("PointInTime.Create pitRaw:", pitRaw, " pitRes:", pitRes, " err:", err)
-	//} else {
-	//	plugin.Logger(ctx).Trace("PointInTime.Create pitRaw=%v pitRes=%v err=%v", pitRaw, pitRes, err)
-	//}
 
 	defer CloseSafe(pitRaw)
 	if err != nil && !strings.Contains(err.Error(), "illegal_argument_exception") {
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("PointInTime.Error err=", err, "pitRaw=", pitRaw)
-		} else {
-			plugin.Logger(ctx).Trace("PointInTime.CheckErr err=%v pitRaw=%v", err, pitRaw)
-		}
+		LogWarn(ctx, fmt.Sprintf("PointInTime.Err err=%v pitRaw=%v", err, pitRaw))
 		return err
 	} else if errIf := CheckErrorWithContext(pitRaw, ctx); errIf != nil || (err != nil && strings.Contains(err.Error(), "illegal_argument_exception")) {
-		if ctx.Value(context_key.Logger) == nil {
-			fmt.Println("PointInTime.CheckErr err=", err, "errIf=", errIf, "pitRaw=", pitRaw)
-		} else {
-			plugin.Logger(ctx).Trace("PointInTime.CheckErr err=%v errIf=%v pitRaw=%v", err, errIf, pitRaw)
-		}
+		LogWarn(ctx, fmt.Sprintf("PointInTime.CheckErr err=%v errIf=%v pitRaw=%s", err, errIf, pitRaw.String()))
 
 		// try elasticsearch api instead
 		req := esapi.OpenPointInTimeRequest{
@@ -698,28 +684,22 @@ func (p *BaseESPaginator) CreatePit(ctx context.Context) (err error) {
 			if IsIndexNotFoundErr(err2) {
 				return nil
 			}
-			err = err2
+			if errIf != nil {
+				return errIf
+			}
 			return err
 		} else {
 			data, err2 := io.ReadAll(res.Body)
 			if err2 != nil {
-				err = fmt.Errorf("read response: %w", err2)
-				return err
+				return fmt.Errorf("read response: %w", err2)
 			}
 			var pit PointInTimeResponse
 			if err2 = json.Unmarshal(data, &pit); err2 != nil {
-				err = fmt.Errorf("unmarshal response: %w", err2)
-				return err
+				return fmt.Errorf("unmarshal response: %w", err2)
 			}
 			p.pitID = pit.ID
 			return nil
 		}
-	}
-
-	if ctx.Value(context_key.Logger) == nil {
-		fmt.Println("PointInTime.Done")
-	} else {
-		plugin.Logger(ctx).Trace("PointInTime.Done")
 	}
 
 	p.pitID = pitRes.PitID
