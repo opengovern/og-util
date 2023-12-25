@@ -47,10 +47,10 @@ func CheckError(resp *opensearchapi.Response) error {
 
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
-		return fmt.Errorf(string(data))
+		return fmt.Errorf("%s: %s", resp.String(), string(data))
 	}
 	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
-		return fmt.Errorf(string(data))
+		return fmt.Errorf("%s: %s", resp.String(), string(data))
 	}
 
 	return e
@@ -520,6 +520,23 @@ func (p *BaseESPaginator) UpdatePageSize(i int64) {
 // The response will be marshalled if the search was successfull
 func (p *BaseESPaginator) Search(ctx context.Context, response any) error {
 	return p.SearchWithLog(ctx, response, false)
+}
+
+func (p *BaseESPaginator) Deallocate(ctx context.Context) error {
+	if p.pitID != "" {
+		pitRaw, _, err := p.client.PointInTime.Delete(
+			p.client.PointInTime.Delete.WithPitID(p.pitID),
+		)
+		if err != nil {
+			LogWarn(ctx, fmt.Sprintf("failed to delete PIT %v", err))
+			return err
+		} else if errIf := CheckError(pitRaw); errIf != nil {
+			LogWarn(ctx, fmt.Sprintf("failed to delete PIT %v", errIf))
+			return errIf
+		}
+		p.pitID = ""
+	}
+	return nil
 }
 
 func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog bool) error {
