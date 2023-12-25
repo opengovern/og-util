@@ -528,12 +528,41 @@ func (p *BaseESPaginator) Deallocate(ctx context.Context) error {
 			p.client.PointInTime.Delete.WithPitID(p.pitID),
 		)
 		if err != nil {
-			LogWarn(ctx, fmt.Sprintf("failed to delete PIT %v", err))
+			LogWarn(ctx, fmt.Sprintf("Deallocate.Err err=%v pitRaw=%v", err, pitRaw))
 			return err
-		} else if errIf := CheckError(pitRaw); errIf != nil {
-			LogWarn(ctx, fmt.Sprintf("failed to delete PIT %v", errIf))
-			return errIf
+		} else if errIf := CheckErrorWithContext(pitRaw, ctx); errIf != nil {
+			LogWarn(ctx, fmt.Sprintf("Deallocate.CheckErr err=%v errIf=%v pitRaw=%s", err, errIf, pitRaw.String()))
+
+			if pitRaw.StatusCode != http.StatusMethodNotAllowed {
+				return errIf
+			}
+
+			// try elasticsearch api instead
+			req := esapi.ClosePointInTimeRequest{
+				Body: strings.NewReader(fmt.Sprintf(`{"id": "%s"}`, p.pitID)),
+			}
+			res, err2 := req.Do(ctx, p.client.Transport)
+			defer ESCloseSafe(res)
+			if err2 != nil {
+				if errIf != nil {
+					return errIf
+				}
+				return err
+			} else if err2 := ESCheckError(res); err2 != nil {
+				if errIf != nil {
+					return errIf
+				}
+				return err
+			}
 		}
+		//
+		//if err != nil {
+		//	LogWarn(ctx, fmt.Sprintf("failed to delete PIT %v", err))
+		//	return err
+		//} else if errIf := CheckError(pitRaw); errIf != nil {
+		//	LogWarn(ctx, fmt.Sprintf("failed to delete PIT %v", errIf))
+		//	return errIf
+		//}
 		p.pitID = ""
 	}
 	return nil
