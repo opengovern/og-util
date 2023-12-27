@@ -5,6 +5,15 @@
 Share utilities between Kaytu go projects and microservices. These modules are provided
 under the `/pkg` and as follows:
 
+### `/pkg/fp`
+
+This package contains functional programming style of things, for example when you want to accept optional
+string parameter you can define it as `*string` and then using the `fp` package pass the value into it:
+
+```go
+fp.Optional("I am an optional string")
+```
+
 ### `/pkg/koanf`
 
 Load configuration from environment variables, file and default based on [koanf](https://github.com/knadh/koanf).
@@ -29,6 +38,6 @@ as follows:
 
 ```go
 type Config struct {
-	RabbitMQ koanf.RabbitMQ `koanf:"rabbitmq"`
+ RabbitMQ koanf.RabbitMQ `koanf:"rabbitmq"`
 }
 ```
