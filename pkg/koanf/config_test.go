@@ -9,38 +9,38 @@ import (
 )
 
 type Config struct {
-	RabbitMQ koanf.RabbitMQ `koanf:"rabbitmq"`
+	Postgres koanf.Postgres `koanf:"postgres"`
 }
 
 func TestProvideUsingDefault(t *testing.T) {
 	require := require.New(t)
 
 	cfg := koanf.Provide("testing", Config{
-		RabbitMQ: koanf.RabbitMQ{
-			Service:  "rabbitmq.io",
+		Postgres: koanf.Postgres{
+			Host:     "psql.io",
 			Username: "admin",
 			Password: "admin",
 		},
 	})
 
-	require.Equal("rabbitmq.io", cfg.RabbitMQ.Service)
-	require.Equal("admin", cfg.RabbitMQ.Password)
+	require.Equal("psql.io", cfg.Postgres.Host)
+	require.Equal("admin", cfg.Postgres.Password)
 }
 
 func TestProvideUsingEnv(t *testing.T) {
-	os.Setenv("TESTING_RABBITMQ__SERVICE", "rabbitmq.com")
-	defer os.Setenv("TESTING_RABBITMQ__SERVICE", "")
+	os.Setenv("TESTING_POSTGRES__HOST", "psql.com")
+	defer os.Setenv("TESTING_POSTGRES__HOST", "")
 
 	require := require.New(t)
 
 	cfg := koanf.Provide("testing", Config{
-		RabbitMQ: koanf.RabbitMQ{
-			Service:  "rabbitmq.io",
+		Postgres: koanf.Postgres{
+			Host:     "psql.io",
 			Username: "admin",
 			Password: "admin",
 		},
 	})
 
-	require.Equal("rabbitmq.com", cfg.RabbitMQ.Service)
-	require.Equal("admin", cfg.RabbitMQ.Password)
+	require.Equal("psql.com", cfg.Postgres.Host)
+	require.Equal("admin", cfg.Postgres.Password)
 }
