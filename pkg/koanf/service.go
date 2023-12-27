@@ -41,12 +41,6 @@ type HttpServer struct {
 	Address string `koanf:"address"`
 }
 
-type RabbitMQ struct {
-	Service  string `koanf:"service"`
-	Username string `koanf:"username"`
-	Password string `koanf:"password"`
-}
-
 type Vault struct {
 	Address string `koanf:"address"`
 	Role    string `koanf:"role"`
