@@ -15,7 +15,7 @@ type Config struct {
 func TestProvideUsingDefault(t *testing.T) {
 	require := require.New(t)
 
-	cfg := koanf.Provide(Config{
+	cfg := koanf.Provide("testing", Config{
 		RabbitMQ: koanf.RabbitMQ{
 			Service:  "rabbitmq.io",
 			Username: "admin",
@@ -28,12 +28,12 @@ func TestProvideUsingDefault(t *testing.T) {
 }
 
 func TestProvideUsingEnv(t *testing.T) {
-	os.Setenv("RABBITMQ__SERVICE", "rabbitmq.com")
-	defer os.Setenv("RABBITMQ__SERVICE", "")
+	os.Setenv("TESTING_RABBITMQ__SERVICE", "rabbitmq.com")
+	defer os.Setenv("TESTING_RABBITMQ__SERVICE", "")
 
 	require := require.New(t)
 
-	cfg := koanf.Provide(Config{
+	cfg := koanf.Provide("testing", Config{
 		RabbitMQ: koanf.RabbitMQ{
 			Service:  "rabbitmq.io",
 			Username: "admin",
