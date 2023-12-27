@@ -66,7 +66,7 @@ func SendToPipeline(ingestionPipelineEndpoint string, resourcesToSend []kafka.Do
 					bodyStr = string(bodyBytes)
 				}
 			}
-			return fmt.Errorf("failed to send resources to OpenSearch, statusCode=%d, body=%s", resp.StatusCode, bodyStr)
+			return fmt.Errorf("failed to send resources to OpenSearch, statusCode=%d, body=%s, requestSize=%d", resp.StatusCode, bodyStr, len(jsonResourcesToSend))
 		}
 	}
 	return nil
