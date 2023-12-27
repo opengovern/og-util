@@ -7,11 +7,22 @@ under the `/pkg` and as follows:
 
 ### `/pkg/fp`
 
-This package contains functional programming style of things, for example when you want to accept optional
+This package contains functional programming style of things.
+
+#### Optional
+
+when you want to accept optional
 string parameter you can define it as `*string` and then using the `fp` package pass the value into it:
 
 ```go
 fp.Optional("I am an optional string")
+```
+
+### Includes
+
+```go
+fp.Includes(1373, []int{1378, 1373})
+fp.Includes(1372, []int{1378, 1373})
 ```
 
 ### `/pkg/koanf`
