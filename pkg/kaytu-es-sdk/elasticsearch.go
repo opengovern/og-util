@@ -470,11 +470,13 @@ type BaseESPaginator struct {
 	limit   int64 // Maximum documents to query
 	queried int64 // Current count of queried documents
 
+	sort []map[string]any
+
 	searchAfter []any
 	done        bool
 }
 
-func NewPaginator(client *opensearch.Client, index string, filters []BoolFilter, limit *int64) (*BaseESPaginator, error) {
+func NewPaginatorWithSort(client *opensearch.Client, index string, filters []BoolFilter, limit *int64, sort []map[string]any) (*BaseESPaginator, error) {
 	var query map[string]any
 	if len(filters) > 0 {
 		query = map[string]any{
@@ -486,6 +488,22 @@ func NewPaginator(client *opensearch.Client, index string, filters []BoolFilter,
 		query = map[string]any{
 			"match_all": map[string]any{},
 		}
+	}
+
+	// We need a tiebreaker for the sort to work properly, so we add _id if it's not present
+	foundId := false
+	for _, sortMap := range sort {
+		for k, _ := range sortMap {
+			if k == "_id" {
+				foundId = true
+				break
+			}
+		}
+	}
+	if !foundId {
+		sort = append(sort, map[string]any{
+			"_id": "desc",
+		})
 	}
 
 	var max int64
@@ -505,8 +523,13 @@ func NewPaginator(client *opensearch.Client, index string, filters []BoolFilter,
 		query:    query,
 		pageSize: 10000,
 		limit:    max,
+		sort:     sort,
 		queried:  0,
 	}, nil
+}
+
+func NewPaginator(client *opensearch.Client, index string, filters []BoolFilter, limit *int64) (*BaseESPaginator, error) {
+	return NewPaginatorWithSort(client, index, filters, limit, nil)
 }
 
 func (p *BaseESPaginator) Done() bool {
@@ -583,18 +606,13 @@ func (p *BaseESPaginator) SearchWithLog(ctx context.Context, response any, doLog
 	sa := SearchRequest{
 		Size:  &p.pageSize,
 		Query: p.query,
+		Sort:  p.sort,
 	}
 
 	if p.limit > p.pageSize && p.pitID != "" {
 		sa.PIT = &PointInTime{
 			ID:        p.pitID,
 			KeepAlive: "1m",
-		}
-
-		sa.Sort = []map[string]any{
-			{
-				"_id": "desc",
-			},
 		}
 	}
 
