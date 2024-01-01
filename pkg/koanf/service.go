@@ -7,11 +7,14 @@ type Redis struct {
 }
 
 type ElasticSearch struct {
-	Address      string `koanf:"address"`
-	Username     string `koanf:"username"`
-	Password     string `koanf:"password"`
-	IsOpenSearch bool   `koanf:"is_open_search"`
-	AwsRegion    string `koanf:"aws_region"`
+	Address           string `koanf:"address"`
+	Username          string `koanf:"username"`
+	Password          string `koanf:"password"`
+	IsOpenSearch      bool   `koanf:"is_open_search"`
+	AWSRegion         string `koanf:"aws_region"`
+	AssumeRoleARN     string `koanf:"assume_role_arn"`
+	ExternalID        string `koanf:"external_id"`
+	IngestionEndpoint string `koanf:"ingestion_endpoint"`
 }
 
 type Postgres struct {
