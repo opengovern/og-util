@@ -49,7 +49,6 @@ type Vault struct {
 	UseTLS  bool   `koanf:"use_tls"`
 }
 
-type Kafka struct {
-	Addresses string `koanf:"addresses"`
-	Topic     string `koanf:"topic"`
+type NATS struct {
+	URL string `koanf:"url"`
 }
