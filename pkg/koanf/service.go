@@ -50,5 +50,6 @@ type Vault struct {
 }
 
 type NATS struct {
-	URL string `koanf:"url"`
+	URL          string        `koanf:"url"`
+	PingInterval time.Duration `koanf:"ping_interval"`
 }
