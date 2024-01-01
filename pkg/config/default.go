@@ -25,7 +25,7 @@ type Postgres struct {
 	Password string
 	SSLMode  string
 
-	MaxIdelConns    int
+	MaxIdleConns    int
 	MaxOpenConns    int
 	ConnMaxIdleTime time.Duration
 	ConnMaxLifetime time.Duration
@@ -61,4 +61,8 @@ type Vault struct {
 type Kafka struct {
 	Addresses string
 	Topic     string
+}
+
+type NATS struct {
+	URL string `koanf:"url"`
 }
