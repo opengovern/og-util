@@ -2,6 +2,13 @@ package config
 
 import "time"
 
+type EnvType string
+
+const (
+	EnvTypeDev  EnvType = "dev"
+	EnvTypeProd EnvType = "prod"
+)
+
 type Redis struct {
 	Address string
 }
