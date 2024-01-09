@@ -7,13 +7,14 @@ import (
 	"fmt"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/kaytu-io/kaytu-util/pkg/es"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 )
 
-func sendToPipelineIndividually(ingestionPipelineEndpoint string, resourcesToSend []doc.Doc) error {
+func sendToPipelineIndividually(ingestionPipelineEndpoint string, resourcesToSend []es.Doc) error {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	if len(resourcesToSend) == 0 {
 		return nil
