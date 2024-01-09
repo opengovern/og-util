@@ -72,7 +72,7 @@ func sendToPipelineIndividually(ingestionPipelineEndpoint string, resourcesToSen
 	return nil
 }
 
-func SendToPipeline(ingestionPipelineEndpoint string, resourcesToSend []doc.Doc) error {
+func SendToPipeline(ingestionPipelineEndpoint string, resourcesToSend []es.Doc) error {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	if len(resourcesToSend) == 0 {
 		return nil
