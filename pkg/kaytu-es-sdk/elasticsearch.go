@@ -436,6 +436,26 @@ func (t BoolMustFilter) MarshalJSON() ([]byte, error) {
 
 func (t BoolMustFilter) IsBoolFilter() {}
 
+type BoolMustNotFilter struct {
+	filters []BoolFilter
+}
+
+func NewBoolMustNotFilter(filters ...BoolFilter) BoolFilter {
+	return BoolMustNotFilter{
+		filters: filters,
+	}
+}
+
+func (t BoolMustNotFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"bool": map[string][]BoolFilter{
+			"must_not": t.filters,
+		},
+	})
+}
+
+func (t BoolMustNotFilter) IsBoolFilter() {}
+
 type NestedFilter struct {
 	path  string
 	query BoolFilter
