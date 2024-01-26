@@ -88,6 +88,10 @@ connection "kaytu" {
 	if err != nil {
 		return err
 	}
+	err = os.Setenv("STEAMPIPE_MEMORY_MAX_MB", "4096")
+	if err != nil {
+		return err
+	}
 	err = os.Setenv("ELASTICSEARCH_ADDRESS", elasticSearchConfig.Address)
 	if err != nil {
 		return err
