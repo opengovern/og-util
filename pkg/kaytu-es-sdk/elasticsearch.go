@@ -166,6 +166,19 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 					filters = append(filters, NewTermFilter(fieldName, qualValue(qual.GetValue())))
 				}
 			}
+			if oprStr == "!=" {
+				if qual.GetValue().GetListValue() != nil {
+					vals := qual.GetValue().GetListValue().GetValues()
+					values := make([]string, 0, len(vals))
+					for _, value := range vals {
+						values = append(values, qualValue(value))
+					}
+
+					filters = append(filters, NewTermsFilter(fieldName, values))
+				} else {
+					filters = append(filters, NewTermFilter(fieldName, qualValue(qual.GetValue())))
+				}
+			}
 			if oprStr == ">" {
 				filters = append(filters, NewRangeFilter(fieldName, qualValue(qual.GetValue()), "", "", ""))
 			}
@@ -277,6 +290,8 @@ func qualValue(qual *proto.QualValue) string {
 		valStr = fmt.Sprintf("%v", v.BoolValue)
 	case *proto.QualValue_InetValue:
 		valStr = fmt.Sprintf("%v", v.InetValue.GetCidr())
+	case *proto.QualValue_TimestampValue:
+		valStr = fmt.Sprintf("%v", v.TimestampValue.AsTime().Format(time.RFC3339))
 	default:
 		valStr = qual.String()
 	}
