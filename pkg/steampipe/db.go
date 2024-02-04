@@ -70,7 +70,8 @@ func (s *Database) Conn() *pgxpool.Pool {
 }
 
 func (s *Database) Query(ctx context.Context, query string, from, size *int, orderBy string,
-	orderDir DirectionType) (*Result, error) {
+	orderDir DirectionType,
+) (*Result, error) {
 	// parameterize order by is not supported by steampipe.
 	// in order to prevent SQL Injection, we ensure that orderby field is only consists of
 	// characters and underline.
@@ -143,6 +144,9 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 	r, err := s.conn.Query(ctx, query)
 	if err != nil {
 		return nil, err
+	}
+	if r.Err() != nil {
+		return nil, r.Err()
 	}
 	defer r.Close()
 
