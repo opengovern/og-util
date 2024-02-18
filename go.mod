@@ -40,8 +40,8 @@ require (
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.61.0
 	google.golang.org/protobuf v1.32.0
-	gorm.io/driver/postgres v1.5.6
-	gorm.io/gorm v1.25.7
+	gorm.io/driver/postgres v1.5.4
+	gorm.io/gorm v1.25.6
 	gorm.io/plugin/prometheus v0.1.0
 	k8s.io/api v0.29.1
 	k8s.io/apimachinery v0.29.1
