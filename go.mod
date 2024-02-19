@@ -43,8 +43,8 @@ require (
 	gorm.io/driver/postgres v1.5.4
 	gorm.io/gorm v1.25.6
 	gorm.io/plugin/prometheus v0.1.0
-	k8s.io/api v0.29.1
-	k8s.io/apimachinery v0.29.1
+	k8s.io/api v0.29.2
+	k8s.io/apimachinery v0.29.2
 	moul.io/zapgorm2 v1.3.0
 	sigs.k8s.io/controller-runtime v0.17.0
 )
