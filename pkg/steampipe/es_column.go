@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	"log"
 	"net"
 	"reflect"
@@ -43,11 +44,14 @@ func Cells(plg *plugin.Plugin, indexName string) ([]string, error) {
 	return cells, nil
 }
 
-func DescriptionToRecord(plg *plugin.Plugin, resource interface{}, indexName string) (map[string]*proto.Column, error) {
+func DescriptionToRecord(logger *zap.Logger, plg *plugin.Plugin, resource interface{}, indexName string) (map[string]*proto.Column, error) {
 	cells := make(map[string]*proto.Column)
 	ctx := buildContext()
 	table, ok := plg.TableMap[indexName]
 	if !ok {
+		if logger != nil {
+			logger.Error("Invalid index name", zap.String("indexName", indexName), zap.Any("plugin", plg), zap.Any("resource", resource))
+		}
 		return cells, fmt.Errorf("invalid index name: %s", indexName)
 	}
 	table.Plugin = plg
@@ -63,11 +67,17 @@ func DescriptionToRecord(plg *plugin.Plugin, resource interface{}, indexName str
 			//value, err := column.Transform.Execute(ctx, &transformData, getDefaultColumnTransform(table, column))
 			value, err := column.Transform.Execute(ctx, &transformData)
 			if err != nil {
+				if logger != nil {
+					logger.Error("Error executing transform", zap.Error(err), zap.String("indexName", indexName), zap.String("columnName", column.Name), zap.Any("resource", resource))
+				}
 				return nil, err
 			}
 
 			c, err := interfaceToColumnValue(column, value)
 			if err != nil {
+				if logger != nil {
+					logger.Error("Error converting to column value", zap.Error(err), zap.String("indexName", indexName), zap.String("columnName", column.Name), zap.Any("resource", resource))
+				}
 				return nil, err
 			}
 
@@ -214,16 +224,22 @@ func interfaceToColumnValue(column *plugin.Column, val interface{}) (*proto.Colu
 
 }
 
-func ConvertToDescription(resourceType string, data interface{}, descriptionMap map[string]interface{}) (d interface{}, err error) {
+func ConvertToDescription(logger *zap.Logger, resourceType string, data interface{}, descriptionMap map[string]interface{}) (d interface{}, err error) {
 	var b []byte
 	defer func() {
 		if r := recover(); r != nil {
+			if logger != nil {
+				logger.Error("Error converting to description", zap.Any("resourceType", resourceType), zap.Any("data", data), zap.Any("descriptionMap", descriptionMap), zap.Any("recovered", r))
+			}
 			err = fmt.Errorf("paniced: %v\nresource_type: %s, json: %s", r, resourceType, string(b))
 		}
 	}()
 
 	b, err = json.Marshal(data)
 	if err != nil {
+		if logger != nil {
+			logger.Error("Error marshalling to description", zap.Error(err), zap.Any("resourceType", resourceType), zap.Any("data", data))
+		}
 		return nil, err
 	}
 
@@ -236,7 +252,9 @@ func ConvertToDescription(resourceType string, data interface{}, descriptionMap 
 	d = reflect.New(reflect.ValueOf(dd).Type()).Interface()
 	err = json.Unmarshal(b, &d)
 	if err != nil {
-		log.Println("failed to unmarshal to description: ", string(b))
+		if logger != nil {
+			logger.Error("Error unmarshalling to description", zap.Error(err), zap.Any("resourceType", resourceType), zap.Any("data", data))
+		}
 		return nil, fmt.Errorf("unmarshalling: %v", err)
 	}
 

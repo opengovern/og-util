@@ -3,6 +3,7 @@ package steampipe
 import (
 	"encoding/json"
 	"fmt"
+	"go.uber.org/zap"
 	"reflect"
 
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
@@ -10,16 +11,22 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v5/grpc/proto"
 )
 
-func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType string, source interface{}, descriptionMap map[string]interface{}) (map[string]string, string, error) {
+func ExtractTagsAndNames(plg *plugin.Plugin, logger *zap.Logger, pluginTableName, resourceType string, source interface{}, descriptionMap map[string]interface{}) (map[string]string, string, error) {
 	var cells map[string]*proto.Column
 
-	desc, err := ConvertToDescription(resourceType, source, descriptionMap)
+	desc, err := ConvertToDescription(logger, resourceType, source, descriptionMap)
 	if err != nil {
+		if logger != nil {
+			logger.Error("Error converting to description", zap.Error(err), zap.String("resourceType", resourceType), zap.Any("source", source))
+		}
 		return nil, "", err
 	}
 
-	cells, err = DescriptionToRecord(plg, desc, pluginTableName)
+	cells, err = DescriptionToRecord(logger, plg, desc, pluginTableName)
 	if err != nil {
+		if logger != nil {
+			logger.Error("Error converting to record", zap.Error(err), zap.String("resourceType", resourceType), zap.Any("source", source))
+		}
 		return nil, "", err
 	}
 
@@ -36,6 +43,9 @@ func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType strin
 				var t interface{}
 				err := json.Unmarshal(jsonBytes, &t)
 				if err != nil {
+					if logger != nil {
+						logger.Error("Error unmarshalling tags", zap.Error(err), zap.String("resourceType", resourceType), zap.Any("source", source))
+					}
 					return nil, "", err
 				}
 
@@ -48,6 +58,9 @@ func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType strin
 						if ts, ok := tv.(string); ok {
 							tags[tk] = ts
 						} else {
+							if logger != nil {
+								logger.Error("Invalid tags value type", zap.String("resourceType", resourceType), zap.Any("valueType", reflect.TypeOf(tv)), zap.Any("value", tv))
+							}
 							return nil, "", fmt.Errorf("invalid tags value type: %s", reflect.TypeOf(tv))
 						}
 					}
@@ -72,12 +85,18 @@ func ExtractTagsAndNames(plg *plugin.Plugin, pluginTableName, resourceType strin
 										tags[key] = ts
 									}
 								} else {
+									if logger != nil {
+										logger.Error("Invalid tags js value type", zap.String("resourceType", resourceType), zap.Any("valueType", reflect.TypeOf(tv)), zap.Any("value", tv))
+									}
 									return nil, "", fmt.Errorf("invalid tags js value type: %s", reflect.TypeOf(tv))
 								}
 							}
 						}
 					}
 				} else {
+					if logger != nil {
+						logger.Error("Invalid tag type", zap.String("resourceType", resourceType), zap.Any("jsonBytes", string(jsonBytes)))
+					}
 					fmt.Printf("invalid tag type for: %s\n", string(jsonBytes))
 					//return nil, "", fmt.Errorf("invalid tags type: %s", reflect.TypeOf(t))
 				}
