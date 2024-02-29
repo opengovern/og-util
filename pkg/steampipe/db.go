@@ -175,6 +175,9 @@ func (s *Database) QueryAll(ctx context.Context, query string) (*Result, error) 
 	if err != nil {
 		return nil, err
 	}
+	if r.Err() != nil {
+		return nil, r.Err()
+	}
 	defer r.Close()
 
 	var headers []string
@@ -201,6 +204,9 @@ func (s *Database) Count(query string) (*Result, error) {
 	r, err := s.conn.Query(context.Background(), query)
 	if err != nil {
 		return nil, err
+	}
+	if r.Err() != nil {
+		return nil, r.Err()
 	}
 	defer r.Close()
 
