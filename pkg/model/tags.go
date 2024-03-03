@@ -60,8 +60,8 @@ func TrimPrivateTags(tags map[string][]string) map[string][]string {
 }
 
 type Tag struct {
-	Key   string         `gorm:"primaryKey;index:idx_key;index:idx_key_value"`
-	Value pq.StringArray `gorm:"type:text[];index:idx_key_value"`
+	Key   string         `gorm:"primaryKey;index:idx_key"`
+	Value pq.StringArray `gorm:"type:text[]"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
