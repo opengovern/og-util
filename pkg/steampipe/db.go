@@ -151,7 +151,12 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 	defer r.Close()
 
 	var headers []string
-	for _, field := range r.FieldDescriptions() {
+	ctxIdx := -1
+	for idx, field := range r.FieldDescriptions() {
+		if string(field.Name) == "_ctx" {
+			ctxIdx = idx
+			continue
+		}
 		headers = append(headers, string(field.Name))
 	}
 	var result [][]interface{}
@@ -161,7 +166,15 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 			return nil, err
 		}
 
-		result = append(result, v)
+		var record []interface{}
+		for idx, c := range v {
+			if idx == ctxIdx {
+				continue
+			}
+			record = append(record, c)
+		}
+
+		result = append(result, record)
 	}
 
 	return &Result{
