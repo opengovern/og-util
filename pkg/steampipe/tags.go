@@ -57,6 +57,8 @@ func ExtractTagsAndNames(plg *plugin.Plugin, logger *zap.Logger, pluginTableName
 					for tk, tv := range tmap {
 						if ts, ok := tv.(string); ok {
 							tags[tk] = ts
+						} else if ts, ok := tv.(bool); ok {
+							tags[tk] = fmt.Sprintf("%v", ts)
 						} else {
 							if logger != nil {
 								logger.Error("Invalid tags value type", zap.String("resourceType", resourceType), zap.Any("valueType", reflect.TypeOf(tv)), zap.Any("value", tv))
