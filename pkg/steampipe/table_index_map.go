@@ -20,6 +20,7 @@ var AzureADKeys = map[string]struct{}{
 	strings.ToLower("Microsoft.Resources/directorysettings"):         {},
 	strings.ToLower("Microsoft.Resources/directoryauditreport"):      {},
 	strings.ToLower("Microsoft.Resources/adminconsentrequestpolicy"): {},
+	strings.ToLower("Microsoft.Resources/userregistrationdetails"):   {},
 }
 
 type SteampipePlugin string
