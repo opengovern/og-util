@@ -92,7 +92,11 @@ func TagStringsToTagMap(tags []string) map[string][]string {
 
 	tagMap := make(map[string][]string)
 	for key, values := range tagUniqueMap {
+		tagMap[key] = make([]string, 0, len(values))
 		for value := range values {
+			if len(value) == 0 {
+				continue
+			}
 			tagMap[key] = append(tagMap[key], value)
 		}
 	}
