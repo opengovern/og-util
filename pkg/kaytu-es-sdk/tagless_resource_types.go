@@ -54,7 +54,7 @@ var azureTaglessResourceTypes = []string{
 	"Microsoft.Resources/subscriptions",
 	"Microsoft.Resources/subscriptions/locations",
 	"Microsoft.Resources/tenants",
-	"Microsoft.Resources/users",
+	"Microsoft.Entra/users",
 	"Microsoft.Security/autoProvisioningSettings",
 	"Microsoft.Security/locations/jitNetworkAccessPolicies",
 	"Microsoft.Security/pricings",
