@@ -19,7 +19,7 @@ type DescribeJob struct {
 	RetryCounter  uint
 }
 
-type LambdaDescribeWorkerInput struct {
+type DescribeWorkerInput struct {
 	WorkspaceId               string      `json:"workspaceId"`
 	WorkspaceName             string      `json:"workspaceName"`
 	DescribeEndpoint          string      `json:"describeEndpoint"`
