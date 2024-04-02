@@ -22,6 +22,7 @@ var AzureADKeys = map[string]struct{}{
 	strings.ToLower("Microsoft.Entra/adminconsentrequestpolicy"): {},
 	strings.ToLower("Microsoft.Entra/userregistrationdetails"):   {},
 	strings.ToLower("Microsoft.Entra/groupmemberships"):          {},
+	strings.ToLower("Microsoft.Entra/appregistrations"):          {},
 }
 
 type SteampipePlugin string
