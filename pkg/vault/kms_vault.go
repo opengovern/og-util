@@ -60,13 +60,13 @@ func NewKMSVaultSourceConfig(ctx context.Context, accessKey, secretKey, region s
 	}, nil
 }
 
-func (v *KMSVaultSourceConfig) Encrypt(cred map[string]any, keyARN string) ([]byte, error) {
+func (v *KMSVaultSourceConfig) Encrypt(ctx context.Context, cred map[string]any, keyARN string, _ string) ([]byte, error) {
 	bytes, err := json.Marshal(cred)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := v.kmsClient.Encrypt(context.TODO(), &kms.EncryptInput{
+	result, err := v.kmsClient.Encrypt(ctx, &kms.EncryptInput{
 		KeyId:               &keyARN,
 		Plaintext:           bytes,
 		EncryptionAlgorithm: types.EncryptionAlgorithmSpecSymmetricDefault,
@@ -80,13 +80,13 @@ func (v *KMSVaultSourceConfig) Encrypt(cred map[string]any, keyARN string) ([]by
 	return []byte(encoded), nil
 }
 
-func (v *KMSVaultSourceConfig) Decrypt(cypherText string, keyARN string) (map[string]any, error) {
+func (v *KMSVaultSourceConfig) Decrypt(ctx context.Context, cypherText string, keyARN string, _ string) (map[string]any, error) {
 	bytes, err := base64.StdEncoding.DecodeString(cypherText)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ciphertext: %v", err)
 	}
 
-	result, err := v.kmsClient.Decrypt(context.TODO(), &kms.DecryptInput{
+	result, err := v.kmsClient.Decrypt(ctx, &kms.DecryptInput{
 		CiphertextBlob:      bytes,
 		EncryptionAlgorithm: types.EncryptionAlgorithmSpecSymmetricDefault,
 		KeyId:               &keyARN,
@@ -103,4 +103,8 @@ func (v *KMSVaultSourceConfig) Decrypt(cypherText string, keyARN string) (map[st
 	}
 
 	return conf, nil
+}
+
+func (v *KMSVaultSourceConfig) GetLatestVersion(ctx context.Context, keyARN string) (string, error) {
+	return "", nil
 }
