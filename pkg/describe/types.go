@@ -8,8 +8,6 @@ import (
 
 type DescribeJob struct {
 	JobID           uint // DescribeResourceJob ID
-	ScheduleJobID   uint
-	ParentJobID     uint // DescribeSourceJob ID
 	ResourceType    string
 	SourceID        string
 	AccountID       string
