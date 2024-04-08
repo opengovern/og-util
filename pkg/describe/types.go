@@ -32,7 +32,6 @@ type DescribeWorkerInput struct {
 
 	VaultConfig vault.Config
 
-	KafkaTopic  string      `json:"kafkaTopic"`
 	DescribeJob DescribeJob `json:"describeJob"`
 }
 
