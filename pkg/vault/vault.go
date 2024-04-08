@@ -22,6 +22,7 @@ type Config struct {
 		ClientId     string `yaml:"client_id" json:"client_id"`
 		ClientSecret string `yaml:"client_secret" json:"client_secret"`
 	} `yaml:"azure"`
+	KeyId string `yaml:"key_id" json:"key_id"`
 }
 
 type VaultSourceConfig interface {
