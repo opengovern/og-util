@@ -25,8 +25,6 @@ type DescribeWorkerInput struct {
 	DescribeEndpoint          string `json:"describeEndpoint"`
 	IngestionPipelineEndpoint string `json:"ingestionPipelineEndpoint"`
 	UseOpenSearch             bool   `json:"useOpenSearch"`
-	KeyARN                    string `json:"keyARN"`
-	KeyRegion                 string `json:"keyRegion"`
 
 	VaultConfig vault.Config
 
