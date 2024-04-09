@@ -26,7 +26,7 @@ type AzureVaultSourceConfig struct {
 }
 
 func NewAzureVaultClient(logger *zap.Logger, config AzureVaultConfig) (*AzureVaultSourceConfig, error) {
-	cred, err := azidentity.NewUsernamePasswordCredential(config.TenantId, config.ClientId, config.Username, config.Password, nil)
+	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.Password, nil)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
 		return nil, err
