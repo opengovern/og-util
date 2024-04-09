@@ -13,11 +13,10 @@ import (
 )
 
 type AzureVaultConfig struct {
-	TenantId string `json:"tenant_id" yaml:"tenant_id" koanf:"tenant_id"`
-	ClientId string `json:"client_id" yaml:"client_id" koanf:"client_id"`
-	Username string `json:"username" yaml:"username" koanf:"username"`
-	Password string `json:"password" yaml:"password" koanf:"password"`
-	BaseUrl  string `json:"base_url" yaml:"base_url" koanf:"base_url"`
+	TenantId     string `json:"tenant_id" yaml:"tenant_id" koanf:"tenant_id"`
+	ClientId     string `json:"client_id" yaml:"client_id" koanf:"client_id"`
+	ClientSecret string `json:"client_secret" yaml:"client_secret" koanf:"client_secret"`
+	BaseUrl      string `json:"base_url" yaml:"base_url" koanf:"base_url"`
 }
 
 type AzureVaultSourceConfig struct {
@@ -26,7 +25,7 @@ type AzureVaultSourceConfig struct {
 }
 
 func NewAzureVaultClient(logger *zap.Logger, config AzureVaultConfig) (*AzureVaultSourceConfig, error) {
-	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.Password, nil)
+	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
 		return nil, err
