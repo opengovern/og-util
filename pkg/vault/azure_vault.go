@@ -136,22 +136,22 @@ type AzureVaultSecretHandler struct {
 	client *azsecrets.Client
 }
 
-func NewAzureVaultSecretHandler(logger *zap.Logger, config AzureVaultConfig) *AzureVaultSecretHandler {
+func NewAzureVaultSecretHandler(logger *zap.Logger, config AzureVaultConfig) (*AzureVaultSecretHandler, error) {
 	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
-		return nil
+		return nil, err
 	}
 	client, err := azsecrets.NewClient(config.BaseUrl, cred, nil)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault client", zap.Error(err))
-		return nil
+		return nil, err
 	}
 
 	return &AzureVaultSecretHandler{
 		logger: logger,
 		client: client,
-	}
+	}, err
 }
 
 func (a *AzureVaultSecretHandler) GetSecret(ctx context.Context, secretId string) (string, error) {
