@@ -61,7 +61,7 @@ func NewAzureVaultClient(ctx context.Context, logger *zap.Logger, config AzureVa
 	return &sc, nil
 }
 
-func (sc *AzureVaultSourceConfig) Encrypt(ctx context.Context, cred map[string]any, _, _ string) (string, error) {
+func (sc *AzureVaultSourceConfig) Encrypt(ctx context.Context, cred map[string]any) (string, error) {
 	bytes, err := json.Marshal(cred)
 	if err != nil {
 		sc.logger.Error("failed to marshal the credential", zap.Error(err))
@@ -90,7 +90,7 @@ func (sc *AzureVaultSourceConfig) Encrypt(ctx context.Context, cred map[string]a
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-func (sc *AzureVaultSourceConfig) Decrypt(ctx context.Context, cypherText string, _ string) (map[string]any, error) {
+func (sc *AzureVaultSourceConfig) Decrypt(ctx context.Context, cypherText string) (map[string]any, error) {
 	aesCipher, err := aes.NewCipher(sc.AesKey)
 	if err != nil {
 		sc.logger.Error("failed to create cipher", zap.Error(err))
