@@ -7,16 +7,15 @@ import (
 )
 
 type DescribeJob struct {
-	JobID           uint // DescribeResourceJob ID
-	ResourceType    string
-	SourceID        string
-	AccountID       string
-	DescribedAt     int64
-	SourceType      source.Type
-	CipherText      string
-	VaultKeyVersion string
-	TriggerType     enums.DescribeTriggerType
-	RetryCounter    uint
+	JobID        uint // DescribeResourceJob ID
+	ResourceType string
+	SourceID     string
+	AccountID    string
+	DescribedAt  int64
+	SourceType   source.Type
+	CipherText   string
+	TriggerType  enums.DescribeTriggerType
+	RetryCounter uint
 }
 
 type DescribeWorkerInput struct {
