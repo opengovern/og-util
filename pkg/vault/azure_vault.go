@@ -1,15 +1,16 @@
 package vault
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys"
-	utils "github.com/kaytu-io/kaytu-util/pkg/pointer"
+	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
-	"sort"
 )
 
 type AzureVaultConfig struct {
@@ -20,115 +21,112 @@ type AzureVaultConfig struct {
 }
 
 type AzureVaultSourceConfig struct {
-	logger      *zap.Logger
-	vaultClient *azkeys.Client
+	logger *zap.Logger
+	AesKey []byte
 }
 
-func NewAzureVaultClient(logger *zap.Logger, config AzureVaultConfig) (*AzureVaultSourceConfig, error) {
+func NewAzureVaultClient(ctx context.Context, logger *zap.Logger, config AzureVaultConfig, secretId string) (*AzureVaultSourceConfig, error) {
 	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
 		return nil, err
 	}
-	client, err := azkeys.NewClient(config.BaseUrl, cred, nil)
+	client, err := azsecrets.NewClient(config.BaseUrl, cred, nil)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault client", zap.Error(err))
 		return nil, err
 	}
 
+	secret, err := client.GetSecret(ctx, secretId, "", nil)
+	if err != nil {
+		logger.Error("failed to get secret", zap.Error(err))
+		return nil, err
+	}
+	if secret.Value == nil {
+		logger.Error("secret value is nil")
+		return nil, errors.New("secret value is nil")
+	}
+
+	aesKey, err := base64.StdEncoding.DecodeString(*secret.Value)
+	if err != nil {
+		logger.Error("failed to decode secret value", zap.Error(err))
+		return nil, err
+	}
+
 	sc := AzureVaultSourceConfig{
-		logger:      logger,
-		vaultClient: client,
+		logger: logger,
+		AesKey: aesKey,
 	}
 
 	return &sc, nil
 }
 
-func (sc *AzureVaultSourceConfig) Encrypt(ctx context.Context, cred map[string]any, keyId, keyVersion string) ([]byte, error) {
+func (sc *AzureVaultSourceConfig) Encrypt(ctx context.Context, cred map[string]any, _, _ string) (string, error) {
 	bytes, err := json.Marshal(cred)
 	if err != nil {
 		sc.logger.Error("failed to marshal the credential", zap.Error(err))
-		return nil, err
+		return "", err
 	}
 
-	res, err := sc.vaultClient.Encrypt(ctx, keyId, keyVersion, azkeys.KeyOperationParameters{
-		Algorithm: utils.GetPointer(azkeys.EncryptionAlgorithmRSAOAEP256),
-		Value:     bytes,
-	}, nil)
+	aesCipher, err := aes.NewCipher(sc.AesKey)
 	if err != nil {
-		sc.logger.Error("failed to encrypt the credential", zap.Error(err), zap.String("keyId", keyId), zap.String("keyVersion", keyVersion))
-		return nil, err
+		sc.logger.Error("failed to create cipher", zap.Error(err))
+		return "", err
+	}
+	gcm, err := cipher.NewGCM(aesCipher)
+	if err != nil {
+		sc.logger.Error("failed to create gcm", zap.Error(err))
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	_, err = rand.Read(nonce)
+	if err != nil {
+		sc.logger.Error("failed to generate nonce", zap.Error(err))
+		return "", err
 	}
 
-	return res.Result, nil
+	cipherText := gcm.Seal(nonce, nonce, bytes, nil)
+
+	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-func (sc *AzureVaultSourceConfig) Decrypt(ctx context.Context, cypherText string, keyId, keyVersion string) (map[string]any, error) {
-	res, err := sc.vaultClient.Decrypt(ctx, keyId, keyVersion, azkeys.KeyOperationParameters{
-		Algorithm: utils.GetPointer(azkeys.EncryptionAlgorithmRSAOAEP256),
-		Value:     []byte(cypherText),
-	}, nil)
+func (sc *AzureVaultSourceConfig) Decrypt(ctx context.Context, cypherText string, _ string) (map[string]any, error) {
+	aesCipher, err := aes.NewCipher(sc.AesKey)
 	if err != nil {
-		sc.logger.Error("failed to decrypt the credential", zap.Error(err), zap.String("keyId", keyId), zap.String("keyVersion", keyVersion))
+		sc.logger.Error("failed to create cipher", zap.Error(err))
 		return nil, err
 	}
-	if res.Result == nil {
-		sc.logger.Error("failed to decrypt the credential - result is null", zap.String("keyId", keyId), zap.String("keyVersion", keyVersion))
+	gcm, err := cipher.NewGCM(aesCipher)
+	if err != nil {
+		sc.logger.Error("failed to create gcm", zap.Error(err))
 		return nil, err
 	}
 
-	decodedResult, err := base64.StdEncoding.DecodeString(string(res.Result))
+	decodedCipherText, err := base64.StdEncoding.DecodeString(cypherText)
 	if err != nil {
-		sc.logger.Error("failed to decode the decrypted credential", zap.Error(err), zap.String("keyId", keyId), zap.String("keyVersion", keyVersion))
+		sc.logger.Error("failed to decode the cypher text", zap.Error(err))
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(decodedCipherText) < nonceSize {
+		sc.logger.Error("cipher text is too short", zap.Int("length", len(decodedCipherText)), zap.Int("nonceSize", nonceSize))
+		return nil, errors.New("cipher text is too short")
+	}
+
+	nonce, cipherText := decodedCipherText[:nonceSize], decodedCipherText[nonceSize:]
+	plainText, err := gcm.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		sc.logger.Error("failed to decrypt the credential", zap.Error(err))
 		return nil, err
 	}
 
 	conf := make(map[string]any)
-	err = json.Unmarshal(decodedResult, &conf)
+	err = json.Unmarshal(plainText, &conf)
 	if err != nil {
-		sc.logger.Error("failed to unmarshal the decrypted credential", zap.Error(err), zap.String("keyId", keyId), zap.String("keyVersion", keyVersion))
+		sc.logger.Error("failed to unmarshal the decrypted credential", zap.Error(err))
 		return nil, err
 	}
 
 	return conf, nil
-}
-
-func (sc *AzureVaultSourceConfig) GetLatestVersion(ctx context.Context, keyId string) (string, error) {
-	pager := sc.vaultClient.NewListKeyPropertiesVersionsPager(keyId, nil)
-	keyVersions := make([]*azkeys.KeyProperties, 0)
-	for pager.More() {
-		page, err := pager.NextPage(ctx)
-		if err != nil {
-			sc.logger.Error("failed to get key versions", zap.Error(err), zap.String("keyId", keyId))
-			return "", err
-		}
-		for _, props := range page.Value {
-			if props == nil {
-				continue
-			}
-			keyVersions = append(keyVersions, props)
-		}
-	}
-
-	sort.Slice(keyVersions, func(i, j int) bool {
-		if keyVersions[i].Attributes.Created == nil {
-			return false
-		}
-		if keyVersions[j].Attributes.Created == nil {
-			return true
-		}
-		return keyVersions[i].Attributes.Created.After(*keyVersions[j].Attributes.Created)
-	})
-
-	if len(keyVersions) == 0 {
-		sc.logger.Error("no key versions found", zap.String("keyId", keyId))
-		return "", errors.New("no key versions found")
-	}
-	kid := keyVersions[0].KID
-	if kid == nil {
-		sc.logger.Error("no key id found", zap.String("keyId", keyId))
-		return "", errors.New("no key id found")
-	}
-
-	return kid.Version(), nil
 }
