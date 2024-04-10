@@ -130,3 +130,57 @@ func (sc *AzureVaultSourceConfig) Decrypt(ctx context.Context, cypherText string
 
 	return conf, nil
 }
+
+type AzureVaultSecretHandler struct {
+	logger *zap.Logger
+	client *azsecrets.Client
+}
+
+func NewAzureVaultSecretHandler(logger *zap.Logger, config AzureVaultConfig) *AzureVaultSecretHandler {
+	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
+	if err != nil {
+		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
+		return nil
+	}
+	client, err := azsecrets.NewClient(config.BaseUrl, cred, nil)
+	if err != nil {
+		logger.Error("failed to create Azure Key Vault client", zap.Error(err))
+		return nil
+	}
+
+	return &AzureVaultSecretHandler{
+		logger: logger,
+		client: client,
+	}
+}
+
+func (a *AzureVaultSecretHandler) GetSecret(ctx context.Context, secretId string) (string, error) {
+	secret, err := a.client.GetSecret(ctx, secretId, "", nil)
+	if err != nil {
+		a.logger.Error("failed to get secret", zap.Error(err))
+		return "", err
+	}
+	if secret.Value == nil {
+		a.logger.Error("secret value is nil")
+		return "", errors.New("secret value is nil")
+	}
+
+	return *secret.Value, nil
+}
+
+func (a *AzureVaultSecretHandler) SetSecret(ctx context.Context, secretName string, secretValue []byte) (string, error) {
+	base64SecretValue := base64.StdEncoding.EncodeToString(secretValue)
+	res, err := a.client.SetSecret(ctx, secretName, azsecrets.SetSecretParameters{
+		Value: &base64SecretValue,
+	}, nil)
+	if err != nil {
+		a.logger.Error("failed to set secret", zap.Error(err))
+		return "", err
+	}
+	if res.ID == nil {
+		a.logger.Error("secret id is nil")
+		return "", errors.New("secret id is nil")
+	}
+
+	return res.ID.Name(), nil
+}
