@@ -184,3 +184,13 @@ func (a *AzureVaultSecretHandler) SetSecret(ctx context.Context, secretName stri
 
 	return res.ID.Name(), nil
 }
+
+func (a *AzureVaultSecretHandler) DeleteSecret(ctx context.Context, secretId string) error {
+	_, err := a.client.DeleteSecret(ctx, secretId, nil)
+	if err != nil {
+		a.logger.Error("failed to delete secret", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
