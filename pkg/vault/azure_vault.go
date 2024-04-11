@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	"go.uber.org/zap"
@@ -25,8 +26,15 @@ type AzureVaultSourceConfig struct {
 	AesKey []byte
 }
 
+func newAzureCredential(config AzureVaultConfig) (azcore.TokenCredential, error) {
+	if config.ClientId == "" || config.ClientSecret == "" {
+		return azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{TenantID: config.TenantId})
+	}
+	return azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
+}
+
 func NewAzureVaultClient(ctx context.Context, logger *zap.Logger, config AzureVaultConfig, secretId string) (*AzureVaultSourceConfig, error) {
-	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
+	cred, err := newAzureCredential(config)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
 		return nil, err
@@ -137,7 +145,7 @@ type AzureVaultSecretHandler struct {
 }
 
 func NewAzureVaultSecretHandler(logger *zap.Logger, config AzureVaultConfig) (*AzureVaultSecretHandler, error) {
-	cred, err := azidentity.NewClientSecretCredential(config.TenantId, config.ClientId, config.ClientSecret, nil)
+	cred, err := newAzureCredential(config)
 	if err != nil {
 		logger.Error("failed to create Azure Key Vault credential", zap.Error(err))
 		return nil, err
