@@ -11,6 +11,7 @@ type ElasticSearch struct {
 	Username          string `koanf:"username"`
 	Password          string `koanf:"password"`
 	IsOpenSearch      bool   `koanf:"is_open_search"`
+	IsOnAks           bool   `koanf:"is_on_aks"`
 	AWSRegion         string `koanf:"aws_region"`
 	AssumeRoleARN     string `koanf:"assume_role_arn"`
 	ExternalID        string `koanf:"external_id"`
