@@ -37,6 +37,8 @@ type ClientConfig struct {
 	AwsRegion     *string `cty:"aws_region"`
 	AssumeRoleArn *string `cty:"assume_role_arn"`
 	ExternalID    *string `cty:"external_id"`
+
+	IsOnAks *bool `cty:"is_on_aks"`
 }
 
 func ConfigSchema() map[string]*schema.Attribute {
@@ -142,6 +144,14 @@ func NewClient(c ClientConfig) (Client, error) {
 		}
 	}
 
+	if c.IsOnAks == nil {
+		isOnAks := os.Getenv("ELASTICSEARCH_ISONAKS")
+		if len(isOnAks) > 0 {
+			b, _ := strconv.ParseBool(isOnAks)
+			c.IsOnAks = &b
+		}
+	}
+
 	if c.ExternalID == nil || len(*c.ExternalID) == 0 {
 		externalID := os.Getenv("ELASTICSEARCH_EXTERNAL_ID")
 		if len(externalID) > 0 {
@@ -167,7 +177,7 @@ func NewClient(c ClientConfig) (Client, error) {
 		},
 	}
 
-	if c.IsOpenSearch != nil && *c.IsOpenSearch {
+	if c.IsOpenSearch != nil && *c.IsOpenSearch && (c.IsOnAks == nil || *c.IsOnAks == false) {
 		awsConfig, err := config.LoadDefaultConfig(context.Background())
 		if err != nil {
 			return Client{}, err
