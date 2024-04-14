@@ -9,7 +9,7 @@ import (
 )
 
 func (c Client) CreateIndexIfNotExist(ctx context.Context, logger *zap.Logger, index string) error {
-	res, err := c.es.Indices.Create(index)
+	res, err := c.es.Indices.Create(index, c.es.Indices.Create.WithContext(ctx))
 	defer CloseSafe(res)
 	if err != nil {
 		var b []byte
@@ -33,25 +33,29 @@ func (c Client) CreateIndexIfNotExist(ctx context.Context, logger *zap.Logger, i
 	return nil
 }
 
-func (c Client) ListIndices(ctx context.Context) ([]string, error) {
-	res, err := c.es.Cat.Indices()
+func (c Client) ListIndices(ctx context.Context, logger *zap.Logger) ([]string, error) {
+	res, err := c.es.Cat.Indices(c.es.Cat.Indices.WithContext(ctx))
 	defer CloseSafe(res)
 	if err != nil {
+		logger.Error("failure while listing indices", zap.Error(err), zap.Any("response", res))
 		return nil, err
 	} else if err := CheckError(res); err != nil {
 		if IsIndexNotFoundErr(err) {
 			return nil, nil
 		}
+		logger.Error("failure while listing indices", zap.Error(err), zap.Any("response", res))
 		return nil, err
 	}
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
+		logger.Error("failure while reading response", zap.Error(err), zap.Any("response", res))
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
 	var response []map[string]string
 	if err := json.Unmarshal(b, &response); err != nil {
+		logger.Error("failure while unmarshalling response", zap.Error(err), zap.Any("response", res))
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 	indices := make([]string, 0)
