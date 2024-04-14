@@ -169,7 +169,7 @@ func NewClient(c ClientConfig) (Client, error) {
 		Addresses:           c.Addresses,
 		Username:            *c.Username,
 		Password:            *c.Password,
-		CompressRequestBody: true,
+		CompressRequestBody: false,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true, //nolint,gosec
