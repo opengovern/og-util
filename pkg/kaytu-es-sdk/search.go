@@ -68,7 +68,15 @@ func (c Client) Count(ctx context.Context, index string) (int64, error) {
 	return response.Count, nil
 }
 
+func removeControlChars(s string) string {
+	for i := 0; i < 32; i++ {
+		s = strings.ReplaceAll(s, string(rune(i)), "")
+	}
+	return s
+}
+
 func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, query string, filterPath []string, response any, trackTotalHits any) error {
+	query = removeControlChars(query)
 	opts := []func(*opensearchapi.SearchRequest){
 		c.es.Search.WithContext(ctx),
 		c.es.Search.WithBody(strings.NewReader(query)),
