@@ -18,6 +18,7 @@ type ElasticSearch struct {
 	Username          string
 	Password          string
 	IsOpenSearch      bool
+	IsOnAks           bool
 	AwsRegion         string
 	AssumeRoleArn     string `yaml:"assume_role_arn"`
 	ExternalID        string `yaml:"external_id"`
