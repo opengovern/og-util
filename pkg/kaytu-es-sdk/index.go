@@ -34,7 +34,10 @@ func (c Client) CreateIndexIfNotExist(ctx context.Context, logger *zap.Logger, i
 }
 
 func (c Client) ListIndices(ctx context.Context, logger *zap.Logger) ([]string, error) {
-	res, err := c.es.Cat.Indices(c.es.Cat.Indices.WithBytes("{}"), c.es.Cat.Indices.WithContext(ctx))
+	res, err := c.es.Cat.Indices(
+		c.es.Cat.Indices.WithContext(ctx),
+		c.es.Cat.Indices.WithFormat("json"),
+	)
 	defer CloseSafe(res)
 	if err != nil {
 		logger.Error("failure while listing indices", zap.Error(err), zap.Any("response", res))
