@@ -42,7 +42,7 @@ message AzureResource {
   map<string,string> tags = 11;
 }
 
-service DescribeService {
+service EsSinkService {
   rpc DeliverAWSResources(AWSResources) returns (kaytu.entity.v1.ResponseOK) {}
   rpc DeliverAzureResources(AzureResources) returns (kaytu.entity.v1.ResponseOK) {}
 }

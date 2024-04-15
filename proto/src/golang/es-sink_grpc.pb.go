@@ -18,122 +18,122 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// DescribeServiceClient is the client API for DescribeService service.
+// EsSinkServiceClient is the client API for EsSinkService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type DescribeServiceClient interface {
+type EsSinkServiceClient interface {
 	DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error)
 	DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error)
 }
 
-type describeServiceClient struct {
+type esSinkServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewDescribeServiceClient(cc grpc.ClientConnInterface) DescribeServiceClient {
-	return &describeServiceClient{cc}
+func NewEsSinkServiceClient(cc grpc.ClientConnInterface) EsSinkServiceClient {
+	return &esSinkServiceClient{cc}
 }
 
-func (c *describeServiceClient) DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error) {
+func (c *esSinkServiceClient) DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error) {
 	out := new(ResponseOK)
-	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.DescribeService/DeliverAWSResources", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.EsSinkService/DeliverAWSResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *describeServiceClient) DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error) {
+func (c *esSinkServiceClient) DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error) {
 	out := new(ResponseOK)
-	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.DescribeService/DeliverAzureResources", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.EsSinkService/DeliverAzureResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// DescribeServiceServer is the server API for DescribeService service.
-// All implementations must embed UnimplementedDescribeServiceServer
+// EsSinkServiceServer is the server API for EsSinkService service.
+// All implementations must embed UnimplementedEsSinkServiceServer
 // for forward compatibility
-type DescribeServiceServer interface {
+type EsSinkServiceServer interface {
 	DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error)
 	DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error)
-	mustEmbedUnimplementedDescribeServiceServer()
+	mustEmbedUnimplementedEsSinkServiceServer()
 }
 
-// UnimplementedDescribeServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedDescribeServiceServer struct {
+// UnimplementedEsSinkServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedEsSinkServiceServer struct {
 }
 
-func (UnimplementedDescribeServiceServer) DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error) {
+func (UnimplementedEsSinkServiceServer) DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeliverAWSResources not implemented")
 }
-func (UnimplementedDescribeServiceServer) DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error) {
+func (UnimplementedEsSinkServiceServer) DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeliverAzureResources not implemented")
 }
-func (UnimplementedDescribeServiceServer) mustEmbedUnimplementedDescribeServiceServer() {}
+func (UnimplementedEsSinkServiceServer) mustEmbedUnimplementedEsSinkServiceServer() {}
 
-// UnsafeDescribeServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to DescribeServiceServer will
+// UnsafeEsSinkServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to EsSinkServiceServer will
 // result in compilation errors.
-type UnsafeDescribeServiceServer interface {
-	mustEmbedUnimplementedDescribeServiceServer()
+type UnsafeEsSinkServiceServer interface {
+	mustEmbedUnimplementedEsSinkServiceServer()
 }
 
-func RegisterDescribeServiceServer(s grpc.ServiceRegistrar, srv DescribeServiceServer) {
-	s.RegisterService(&DescribeService_ServiceDesc, srv)
+func RegisterEsSinkServiceServer(s grpc.ServiceRegistrar, srv EsSinkServiceServer) {
+	s.RegisterService(&EsSinkService_ServiceDesc, srv)
 }
 
-func _DescribeService_DeliverAWSResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _EsSinkService_DeliverAWSResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AWSResources)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DescribeServiceServer).DeliverAWSResources(ctx, in)
+		return srv.(EsSinkServiceServer).DeliverAWSResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/kaytu.es_sink.v1.DescribeService/DeliverAWSResources",
+		FullMethod: "/kaytu.es_sink.v1.EsSinkService/DeliverAWSResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DescribeServiceServer).DeliverAWSResources(ctx, req.(*AWSResources))
+		return srv.(EsSinkServiceServer).DeliverAWSResources(ctx, req.(*AWSResources))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DescribeService_DeliverAzureResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _EsSinkService_DeliverAzureResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AzureResources)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DescribeServiceServer).DeliverAzureResources(ctx, in)
+		return srv.(EsSinkServiceServer).DeliverAzureResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/kaytu.es_sink.v1.DescribeService/DeliverAzureResources",
+		FullMethod: "/kaytu.es_sink.v1.EsSinkService/DeliverAzureResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DescribeServiceServer).DeliverAzureResources(ctx, req.(*AzureResources))
+		return srv.(EsSinkServiceServer).DeliverAzureResources(ctx, req.(*AzureResources))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// DescribeService_ServiceDesc is the grpc.ServiceDesc for DescribeService service.
+// EsSinkService_ServiceDesc is the grpc.ServiceDesc for EsSinkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var DescribeService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kaytu.es_sink.v1.DescribeService",
-	HandlerType: (*DescribeServiceServer)(nil),
+var EsSinkService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "kaytu.es_sink.v1.EsSinkService",
+	HandlerType: (*EsSinkServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "DeliverAWSResources",
-			Handler:    _DescribeService_DeliverAWSResources_Handler,
+			Handler:    _EsSinkService_DeliverAWSResources_Handler,
 		},
 		{
 			MethodName: "DeliverAzureResources",
-			Handler:    _DescribeService_DeliverAzureResources_Handler,
+			Handler:    _EsSinkService_DeliverAzureResources_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
