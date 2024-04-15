@@ -45,6 +45,11 @@ type HttpServer struct {
 	Address string `koanf:"address"`
 }
 
+type GrpcServer struct {
+	Address string `koanf:"address"`
+	AuthUri string `koanf:"auth_uri"`
+}
+
 type Vault struct {
 	Address string `koanf:"address"`
 	Role    string `koanf:"role"`
