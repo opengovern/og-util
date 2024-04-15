@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v4.25.3
-// source: describe.proto
+// source: es-sink.proto
 
 package golang
 
@@ -22,8 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DescribeServiceClient interface {
-	DeliverResult(ctx context.Context, in *DeliverResultRequest, opts ...grpc.CallOption) (*ResponseOK, error)
-	SetInProgress(ctx context.Context, in *SetInProgressRequest, opts ...grpc.CallOption) (*ResponseOK, error)
+	DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error)
+	DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error)
 }
 
 type describeServiceClient struct {
@@ -34,18 +34,18 @@ func NewDescribeServiceClient(cc grpc.ClientConnInterface) DescribeServiceClient
 	return &describeServiceClient{cc}
 }
 
-func (c *describeServiceClient) DeliverResult(ctx context.Context, in *DeliverResultRequest, opts ...grpc.CallOption) (*ResponseOK, error) {
+func (c *describeServiceClient) DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error) {
 	out := new(ResponseOK)
-	err := c.cc.Invoke(ctx, "/kaytu.describe.v1.DescribeService/DeliverResult", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.DescribeService/DeliverAWSResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *describeServiceClient) SetInProgress(ctx context.Context, in *SetInProgressRequest, opts ...grpc.CallOption) (*ResponseOK, error) {
+func (c *describeServiceClient) DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error) {
 	out := new(ResponseOK)
-	err := c.cc.Invoke(ctx, "/kaytu.describe.v1.DescribeService/SetInProgress", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.DescribeService/DeliverAzureResources", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +56,8 @@ func (c *describeServiceClient) SetInProgress(ctx context.Context, in *SetInProg
 // All implementations must embed UnimplementedDescribeServiceServer
 // for forward compatibility
 type DescribeServiceServer interface {
-	DeliverResult(context.Context, *DeliverResultRequest) (*ResponseOK, error)
-	SetInProgress(context.Context, *SetInProgressRequest) (*ResponseOK, error)
+	DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error)
+	DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error)
 	mustEmbedUnimplementedDescribeServiceServer()
 }
 
@@ -65,11 +65,11 @@ type DescribeServiceServer interface {
 type UnimplementedDescribeServiceServer struct {
 }
 
-func (UnimplementedDescribeServiceServer) DeliverResult(context.Context, *DeliverResultRequest) (*ResponseOK, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeliverResult not implemented")
+func (UnimplementedDescribeServiceServer) DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeliverAWSResources not implemented")
 }
-func (UnimplementedDescribeServiceServer) SetInProgress(context.Context, *SetInProgressRequest) (*ResponseOK, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetInProgress not implemented")
+func (UnimplementedDescribeServiceServer) DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeliverAzureResources not implemented")
 }
 func (UnimplementedDescribeServiceServer) mustEmbedUnimplementedDescribeServiceServer() {}
 
@@ -84,38 +84,38 @@ func RegisterDescribeServiceServer(s grpc.ServiceRegistrar, srv DescribeServiceS
 	s.RegisterService(&DescribeService_ServiceDesc, srv)
 }
 
-func _DescribeService_DeliverResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeliverResultRequest)
+func _DescribeService_DeliverAWSResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AWSResources)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DescribeServiceServer).DeliverResult(ctx, in)
+		return srv.(DescribeServiceServer).DeliverAWSResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/kaytu.describe.v1.DescribeService/DeliverResult",
+		FullMethod: "/kaytu.es_sink.v1.DescribeService/DeliverAWSResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DescribeServiceServer).DeliverResult(ctx, req.(*DeliverResultRequest))
+		return srv.(DescribeServiceServer).DeliverAWSResources(ctx, req.(*AWSResources))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DescribeService_SetInProgress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SetInProgressRequest)
+func _DescribeService_DeliverAzureResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AzureResources)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DescribeServiceServer).SetInProgress(ctx, in)
+		return srv.(DescribeServiceServer).DeliverAzureResources(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/kaytu.describe.v1.DescribeService/SetInProgress",
+		FullMethod: "/kaytu.es_sink.v1.DescribeService/DeliverAzureResources",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DescribeServiceServer).SetInProgress(ctx, req.(*SetInProgressRequest))
+		return srv.(DescribeServiceServer).DeliverAzureResources(ctx, req.(*AzureResources))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -124,18 +124,18 @@ func _DescribeService_SetInProgress_Handler(srv interface{}, ctx context.Context
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var DescribeService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "kaytu.describe.v1.DescribeService",
+	ServiceName: "kaytu.es_sink.v1.DescribeService",
 	HandlerType: (*DescribeServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "DeliverResult",
-			Handler:    _DescribeService_DeliverResult_Handler,
+			MethodName: "DeliverAWSResources",
+			Handler:    _DescribeService_DeliverAWSResources_Handler,
 		},
 		{
-			MethodName: "SetInProgress",
-			Handler:    _DescribeService_SetInProgress_Handler,
+			MethodName: "DeliverAzureResources",
+			Handler:    _DescribeService_DeliverAzureResources_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "describe.proto",
+	Metadata: "es-sink.proto",
 }
