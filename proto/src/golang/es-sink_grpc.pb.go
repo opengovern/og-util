@@ -22,8 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EsSinkServiceClient interface {
-	DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error)
-	DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error)
+	Ingest(ctx context.Context, in *IngestRequest, opts ...grpc.CallOption) (*ResponseOK, error)
 }
 
 type esSinkServiceClient struct {
@@ -34,18 +33,9 @@ func NewEsSinkServiceClient(cc grpc.ClientConnInterface) EsSinkServiceClient {
 	return &esSinkServiceClient{cc}
 }
 
-func (c *esSinkServiceClient) DeliverAWSResources(ctx context.Context, in *AWSResources, opts ...grpc.CallOption) (*ResponseOK, error) {
+func (c *esSinkServiceClient) Ingest(ctx context.Context, in *IngestRequest, opts ...grpc.CallOption) (*ResponseOK, error) {
 	out := new(ResponseOK)
-	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.EsSinkService/DeliverAWSResources", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *esSinkServiceClient) DeliverAzureResources(ctx context.Context, in *AzureResources, opts ...grpc.CallOption) (*ResponseOK, error) {
-	out := new(ResponseOK)
-	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.EsSinkService/DeliverAzureResources", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/kaytu.es_sink.v1.EsSinkService/Ingest", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +46,7 @@ func (c *esSinkServiceClient) DeliverAzureResources(ctx context.Context, in *Azu
 // All implementations must embed UnimplementedEsSinkServiceServer
 // for forward compatibility
 type EsSinkServiceServer interface {
-	DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error)
-	DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error)
+	Ingest(context.Context, *IngestRequest) (*ResponseOK, error)
 	mustEmbedUnimplementedEsSinkServiceServer()
 }
 
@@ -65,11 +54,8 @@ type EsSinkServiceServer interface {
 type UnimplementedEsSinkServiceServer struct {
 }
 
-func (UnimplementedEsSinkServiceServer) DeliverAWSResources(context.Context, *AWSResources) (*ResponseOK, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeliverAWSResources not implemented")
-}
-func (UnimplementedEsSinkServiceServer) DeliverAzureResources(context.Context, *AzureResources) (*ResponseOK, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeliverAzureResources not implemented")
+func (UnimplementedEsSinkServiceServer) Ingest(context.Context, *IngestRequest) (*ResponseOK, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ingest not implemented")
 }
 func (UnimplementedEsSinkServiceServer) mustEmbedUnimplementedEsSinkServiceServer() {}
 
@@ -84,38 +70,20 @@ func RegisterEsSinkServiceServer(s grpc.ServiceRegistrar, srv EsSinkServiceServe
 	s.RegisterService(&EsSinkService_ServiceDesc, srv)
 }
 
-func _EsSinkService_DeliverAWSResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AWSResources)
+func _EsSinkService_Ingest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IngestRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EsSinkServiceServer).DeliverAWSResources(ctx, in)
+		return srv.(EsSinkServiceServer).Ingest(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/kaytu.es_sink.v1.EsSinkService/DeliverAWSResources",
+		FullMethod: "/kaytu.es_sink.v1.EsSinkService/Ingest",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EsSinkServiceServer).DeliverAWSResources(ctx, req.(*AWSResources))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _EsSinkService_DeliverAzureResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AzureResources)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EsSinkServiceServer).DeliverAzureResources(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/kaytu.es_sink.v1.EsSinkService/DeliverAzureResources",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EsSinkServiceServer).DeliverAzureResources(ctx, req.(*AzureResources))
+		return srv.(EsSinkServiceServer).Ingest(ctx, req.(*IngestRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -128,12 +96,8 @@ var EsSinkService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*EsSinkServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "DeliverAWSResources",
-			Handler:    _EsSinkService_DeliverAWSResources_Handler,
-		},
-		{
-			MethodName: "DeliverAzureResources",
-			Handler:    _EsSinkService_DeliverAzureResources_Handler,
+			MethodName: "Ingest",
+			Handler:    _EsSinkService_Ingest_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

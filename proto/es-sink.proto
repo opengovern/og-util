@@ -5,44 +5,12 @@ package kaytu.es_sink.v1;
 option go_package="github.com/kaytu-io/kaytu-util/proto/src/golang";
 
 import "entity.proto";
+import "google/protobuf/any.proto";
 
-message AWSResources {
-  repeated AWSResource resources = 1;
-}
-
-message AWSResource {
-  string arn = 1;
-  string id = 2;
-  string name = 3;
-  string account = 4;
-  string region = 5;
-  string partition = 6;
-  string type = 7;
-  string description_json = 8;
-  kaytu.entity.v1.DescribeJob job = 9;
-  string unique_id = 10;
-  map<string,string> metadata = 11;
-  map<string,string> tags = 12;
-}
-
-message AzureResources {
-  repeated AzureResource resources = 1;
-}
-message AzureResource {
-  string id = 1;
-  string name = 2;
-  string type = 3;
-  string resource_group = 4;
-  string location = 5;
-  string subscription_id = 6;
-  string description_json = 7;
-  kaytu.entity.v1.DescribeJob job = 8;
-  string unique_id = 9;
-  map<string,string> metadata = 10;
-  map<string,string> tags = 11;
+message IngestRequest {
+  repeated google.protobuf.Any docs = 1;
 }
 
 service EsSinkService {
-  rpc DeliverAWSResources(AWSResources) returns (kaytu.entity.v1.ResponseOK) {}
-  rpc DeliverAzureResources(AzureResources) returns (kaytu.entity.v1.ResponseOK) {}
+  rpc Ingest(IngestRequest) returns (kaytu.entity.v1.ResponseOK) {}
 }
