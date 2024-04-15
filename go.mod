@@ -17,7 +17,7 @@ require (
 	github.com/fluxcd/helm-controller/api v0.37.4
 	github.com/globocom/echo-prometheus v0.1.2
 	github.com/gogo/googleapis v1.4.1
-	github.com/golang/protobuf v1.5.3
+	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-hclog v1.6.2
 	github.com/jackc/pgx/v4 v4.18.3
@@ -49,8 +49,8 @@ require (
 	gorm.io/driver/postgres v1.5.4
 	gorm.io/gorm v1.25.6
 	gorm.io/plugin/prometheus v0.1.0
-	k8s.io/api v0.29.1
-	k8s.io/apimachinery v0.29.1
+	k8s.io/api v0.29.3
+	k8s.io/apimachinery v0.29.3
 	moul.io/zapgorm2 v1.3.0
 	sigs.k8s.io/controller-runtime v0.17.0
 )
