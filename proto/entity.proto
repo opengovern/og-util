@@ -4,6 +4,35 @@ package kaytu.entity.v1;
 
 option go_package="github.com/kaytu-io/kaytu-util/proto/src/golang";
 
+message AWSResource {
+  string arn = 1;
+  string id = 2;
+  string name = 3;
+  string account = 4;
+  string region = 5;
+  string partition = 6;
+  string type = 7;
+  string description_json = 8;
+  kaytu.entity.v1.DescribeJob job = 9;
+  string unique_id = 10;
+  map<string,string> metadata = 11;
+  map<string,string> tags = 12;
+}
+
+message AzureResource {
+  string id = 1;
+  string name = 2;
+  string type = 3;
+  string resource_group = 4;
+  string location = 5;
+  string subscription_id = 6;
+  string description_json = 7;
+  kaytu.entity.v1.DescribeJob job = 8;
+  string unique_id = 9;
+  map<string,string> metadata = 10;
+  map<string,string> tags = 11;
+}
+
 message DescribeJob {
   uint32 job_id = 1;
   uint32 schedule_job_id = 2;
