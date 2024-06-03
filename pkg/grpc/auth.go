@@ -4,6 +4,7 @@ import (
 	"context"
 	envoyAuth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
+	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -11,10 +12,10 @@ import (
 	"net/http"
 )
 
-func checkGRPCAuth(ctx context.Context, authClient envoyAuth.AuthorizationClient) error {
+func checkGRPCAuth(ctx context.Context, authClient envoyAuth.AuthorizationClient) (context.Context, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return status.Errorf(codes.Unauthenticated, "missing metadata")
+		return ctx, status.Errorf(codes.Unauthenticated, "missing metadata")
 	}
 
 	mdHeaders := make(map[string]string)
@@ -34,30 +35,39 @@ func checkGRPCAuth(ctx context.Context, authClient envoyAuth.AuthorizationClient
 		},
 	})
 	if err != nil {
-		return status.Errorf(codes.Unauthenticated, "authentication failed: %v", err)
+		return ctx, status.Errorf(codes.Unauthenticated, "authentication failed: %v", err)
 	}
 
-	if result.GetStatus() == nil || result.GetStatus().GetCode() != int32(rpc.OK) {
-		return status.Errorf(codes.Unauthenticated, http.StatusText(http.StatusUnauthorized))
+	if result.GetStatus() == nil || result.GetStatus().GetCode() != int32(rpc.OK) || result.GetOkResponse() == nil {
+		return ctx, status.Errorf(codes.Unauthenticated, http.StatusText(http.StatusUnauthorized))
 	}
 
-	return nil
+	for _, header := range result.GetOkResponse().GetHeaders() {
+		ctx = metadata.AppendToOutgoingContext(ctx, header.GetHeader().GetKey(), header.GetHeader().GetValue())
+	}
+
+	return ctx, nil
 }
 
 func CheckGRPCAuthUnaryInterceptorWrapper(authClient envoyAuth.AuthorizationClient) func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if err := checkGRPCAuth(ctx, authClient); err != nil {
+		if ctx, err := checkGRPCAuth(ctx, authClient); err != nil {
 			return nil, err
+		} else {
+			return handler(ctx, req)
 		}
-		return handler(ctx, req)
 	}
 }
 
 func CheckGRPCAuthStreamInterceptorWrapper(authClient envoyAuth.AuthorizationClient) func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		if err := checkGRPCAuth(ss.Context(), authClient); err != nil {
+		if ctx, err := checkGRPCAuth(ss.Context(), authClient); err != nil {
 			return err
+		} else {
+			return handler(srv, &grpc_middleware.WrappedServerStream{
+				ServerStream:   ss,
+				WrappedContext: ctx,
+			})
 		}
-		return handler(srv, ss)
 	}
 }
