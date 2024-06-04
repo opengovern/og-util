@@ -46,9 +46,10 @@ func checkGRPCAuth(ctx context.Context, authClient envoyAuth.AuthorizationClient
 		if header.GetHeader() == nil {
 			continue
 		}
-		ctx = metadata.AppendToOutgoingContext(ctx, header.GetHeader().GetKey(), header.GetHeader().GetValue())
+		md.Append(header.GetHeader().GetKey(), header.GetHeader().GetValue())
 	}
 
+	ctx = metadata.NewIncomingContext(ctx, md)
 	return ctx, nil
 }
 
