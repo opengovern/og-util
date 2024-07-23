@@ -22,3 +22,9 @@ type VaultSourceConfig interface {
 	Encrypt(ctx context.Context, data map[string]any) (string, error)
 	Decrypt(ctx context.Context, cypherText string) (map[string]any, error)
 }
+
+type VaultSecretHandler interface {
+	GetSecret(ctx context.Context, secretId string) (string, error)
+	SetSecret(ctx context.Context, secretName string, secretValue []byte) (string, error)
+	DeleteSecret(ctx context.Context, secretId string) error
+}
