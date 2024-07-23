@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	vault "github.com/hashicorp/vault/api"
-	auth "github.com/hashicorp/vault/api/auth/kubernetes"
+	kubernetesAuth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +44,7 @@ func newHashiCorpCredential(ctx context.Context, logger *zap.Logger, config Hash
 	}
 
 	if doAuth {
-		k8sAuth, err := auth.NewKubernetesAuth(
+		k8sAuth, err := kubernetesAuth.NewKubernetesAuth(
 			vaultRoleName,
 		)
 		if err != nil {
@@ -258,8 +258,17 @@ func (a *HashiCorpVaultSealHandler) TryInit(ctx context.Context) (*vault.InitRes
 		return nil, nil
 	}
 
-	return a.client.Sys().InitWithContext(ctx, &vault.InitRequest{})
+	return a.client.Sys().InitWithContext(ctx, &vault.InitRequest{
+		SecretShares:    5,
+		SecretThreshold: 3,
+	})
 }
+
+//func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
+//	a.client.SetToken(rootToken)
+//
+//	a.client.Sys().EnableAuthWithOptionsWithContext(ctx)
+//}
 
 func (a *HashiCorpVaultSealHandler) TryUnseal(ctx context.Context, keys []string) error {
 	sealStatusResponse, err := a.client.Sys().SealStatusWithContext(ctx)
