@@ -293,6 +293,15 @@ func (a *HashiCorpVaultSealHandler) enableKuberAuth(ctx context.Context, rootTok
 		return err
 	}
 
+	return nil
+}
+
+func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
+	err := a.enableKuberAuth(ctx, rootToken)
+	if err != nil {
+		return err
+	}
+
 	kubernetesConfig, err := rest.InClusterConfig()
 	if err != nil {
 		a.logger.Error("failed to get kubernetes config", zap.Error(err))
@@ -304,15 +313,6 @@ func (a *HashiCorpVaultSealHandler) enableKuberAuth(ctx context.Context, rootTok
 	})
 	if err != nil {
 		a.logger.Error("failed to set kubernetes config", zap.Error(err))
-		return err
-	}
-
-	return nil
-}
-
-func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
-	err := a.enableKuberAuth(ctx, rootToken)
-	if err != nil {
 		return err
 	}
 
@@ -338,6 +338,14 @@ path "%s/*" {
 	})
 	if err != nil {
 		a.logger.Error("failed to set role", zap.Error(err))
+		return err
+	}
+
+	err = a.client.Sys().MountWithContext(ctx, secretMountPath, &vault.MountInput{
+		Type: "kv-v2",
+	})
+	if err != nil {
+		a.logger.Error("failed to mount secrets", zap.Error(err))
 		return err
 	}
 
