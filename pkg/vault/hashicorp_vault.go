@@ -12,13 +12,15 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	kubernetesAuth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
+	"path"
 	"strings"
 )
 
 const (
-	secretMountPath = "secret"
-	keyMapKey       = "key"
-	vaultRoleName   = "workspace-creds-manager"
+	secretMountPath    = "secrets"
+	keyMapKey          = "key"
+	vaultRoleName      = "workspace-creds-manager"
+	kubernetesAuthPath = "auth/kubernetes"
 )
 
 type HashiCorpConfig struct {
@@ -265,7 +267,7 @@ func (a *HashiCorpVaultSealHandler) TryInit(ctx context.Context) (*vault.InitRes
 	})
 }
 
-func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
+func (a *HashiCorpVaultSealHandler) enableKuberAuth(ctx context.Context, rootToken string) error {
 	a.client.SetToken(rootToken)
 
 	listAuthRes, err := a.client.Sys().ListAuthWithContext(ctx)
@@ -273,8 +275,8 @@ func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToke
 		a.logger.Error("failed to list auth", zap.Error(err))
 		return err
 	}
-	for path, authType := range listAuthRes {
-		if strings.Contains(strings.ToLower(path), "auth/kubernetes") {
+	for mountPath, authType := range listAuthRes {
+		if strings.Contains(strings.ToLower(mountPath), "kubernetes") {
 			return nil
 		}
 		if strings.Contains(strings.ToLower(authType.Type), "kubernetes") {
@@ -282,9 +284,49 @@ func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToke
 		}
 	}
 
-	return a.client.Sys().EnableAuthWithOptionsWithContext(ctx, "auth/kubernetes", &vault.EnableAuthOptions{
+	err = a.client.Sys().EnableAuthWithOptionsWithContext(ctx, "kubernetes", &vault.EnableAuthOptions{
 		Type: "kubernetes",
 	})
+	if err != nil {
+		a.logger.Error("failed to enable kubernetes auth", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
+	err := a.enableKuberAuth(ctx, rootToken)
+	if err != nil {
+		return err
+	}
+
+	policy := fmt.Sprintf(`
+path "%s/*" {
+	  capabilities = ["read", "list", "create", "update", "delete"]
+}
+`, secretMountPath)
+
+	_, err = a.client.Logical().WriteWithContext(ctx, path.Join("sys/policy", vaultRoleName), map[string]any{
+		"policy": policy,
+	})
+	if err != nil {
+		a.logger.Error("failed to set policy", zap.Error(err))
+		return err
+	}
+
+	_, err = a.client.Logical().WriteWithContext(ctx, path.Join(kubernetesAuthPath, "role", vaultRoleName), map[string]any{
+		"bound_service_account_names":      "*",
+		"bound_service_account_namespaces": "*",
+		"policies":                         vaultRoleName,
+		"ttl":                              "8640h",
+	})
+	if err != nil {
+		a.logger.Error("failed to set role", zap.Error(err))
+		return err
+	}
+
+	return nil
 }
 
 func (a *HashiCorpVaultSealHandler) TryUnseal(ctx context.Context, keys []string) error {
