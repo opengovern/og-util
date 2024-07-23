@@ -12,6 +12,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	kubernetesAuth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
+	"strings"
 )
 
 const (
@@ -266,6 +267,20 @@ func (a *HashiCorpVaultSealHandler) TryInit(ctx context.Context) (*vault.InitRes
 
 func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
 	a.client.SetToken(rootToken)
+
+	listAuthRes, err := a.client.Sys().ListAuthWithContext(ctx)
+	if err != nil {
+		a.logger.Error("failed to list auth", zap.Error(err))
+		return err
+	}
+	for path, authType := range listAuthRes {
+		if strings.Contains(strings.ToLower(path), "auth/kubernetes") {
+			return nil
+		}
+		if strings.Contains(strings.ToLower(authType.Type), "kubernetes") {
+			return nil
+		}
+	}
 
 	return a.client.Sys().EnableAuthWithOptionsWithContext(ctx, "auth/kubernetes", &vault.EnableAuthOptions{})
 }
