@@ -282,7 +282,9 @@ func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToke
 		}
 	}
 
-	return a.client.Sys().EnableAuthWithOptionsWithContext(ctx, "auth/kubernetes", &vault.EnableAuthOptions{})
+	return a.client.Sys().EnableAuthWithOptionsWithContext(ctx, "auth/kubernetes", &vault.EnableAuthOptions{
+		Type: "kubernetes",
+	})
 }
 
 func (a *HashiCorpVaultSealHandler) TryUnseal(ctx context.Context, keys []string) error {
