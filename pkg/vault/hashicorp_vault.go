@@ -12,6 +12,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	kubernetesAuth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
+	"k8s.io/client-go/rest"
 	"path"
 	"strings"
 )
@@ -289,6 +290,20 @@ func (a *HashiCorpVaultSealHandler) enableKuberAuth(ctx context.Context, rootTok
 	})
 	if err != nil {
 		a.logger.Error("failed to enable kubernetes auth", zap.Error(err))
+		return err
+	}
+
+	kubernetesConfig, err := rest.InClusterConfig()
+	if err != nil {
+		a.logger.Error("failed to get kubernetes config", zap.Error(err))
+		return err
+	}
+
+	_, err = a.client.Logical().Write("auth/kubernetes/config", map[string]any{
+		"kubernetes_host": kubernetesConfig.Host,
+	})
+	if err != nil {
+		a.logger.Error("failed to set kubernetes config", zap.Error(err))
 		return err
 	}
 
