@@ -341,6 +341,17 @@ path "%s/*" {
 		return err
 	}
 
+	mounts, err := a.client.Sys().ListMounts()
+	if err != nil {
+		a.logger.Error("failed to list mounts", zap.Error(err))
+		return err
+	}
+	for mountPath, _ := range mounts {
+		if strings.HasPrefix(strings.ToLower(mountPath), secretMountPath) {
+			return nil
+		}
+	}
+
 	err = a.client.Sys().MountWithContext(ctx, secretMountPath, &vault.MountInput{
 		Type: "kv-v2",
 	})
