@@ -264,11 +264,11 @@ func (a *HashiCorpVaultSealHandler) TryInit(ctx context.Context) (*vault.InitRes
 	})
 }
 
-//func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
-//	a.client.SetToken(rootToken)
-//
-//	a.client.Sys().EnableAuthWithOptionsWithContext(ctx)
-//}
+func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
+	a.client.SetToken(rootToken)
+
+	return a.client.Sys().EnableAuthWithOptionsWithContext(ctx, "auth/kubernetes", &vault.EnableAuthOptions{})
+}
 
 func (a *HashiCorpVaultSealHandler) TryUnseal(ctx context.Context, keys []string) error {
 	sealStatusResponse, err := a.client.Sys().SealStatusWithContext(ctx)
