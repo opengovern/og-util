@@ -21,8 +21,9 @@ type DescribeJob struct {
 type DescribeWorkerInput struct {
 	WorkspaceId               string `json:"workspaceId"`
 	WorkspaceName             string `json:"workspaceName"`
-	DescribeEndpoint          string `json:"describeEndpoint"`
-	DescribeEndpointAuth      bool   `json:"describeEndpointAuth"`
+	JobEndpoint               string `json:"jobEndpoint"`
+	DeliverEndpoint           string `json:"describeEndpoint"`
+	EndpointAuth              bool   `json:"describeEndpointAuth"`
 	IngestionPipelineEndpoint string `json:"ingestionPipelineEndpoint"`
 	UseOpenSearch             bool   `json:"useOpenSearch"`
 
