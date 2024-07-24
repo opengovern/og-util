@@ -276,11 +276,8 @@ func (a *HashiCorpVaultSealHandler) enableKuberAuth(ctx context.Context, rootTok
 		a.logger.Error("failed to list auth", zap.Error(err))
 		return err
 	}
-	for mountPath, authType := range listAuthRes {
-		if strings.Contains(strings.ToLower(mountPath), "kubernetes") {
-			return nil
-		}
-		if strings.Contains(strings.ToLower(authType.Type), "kubernetes") {
+	for mountPath, _ := range listAuthRes {
+		if strings.HasPrefix(strings.ToLower(mountPath), "kubernetes") {
 			return nil
 		}
 	}
@@ -296,7 +293,34 @@ func (a *HashiCorpVaultSealHandler) enableKuberAuth(ctx context.Context, rootTok
 	return nil
 }
 
+func (a *HashiCorpVaultSealHandler) setupSecretsMount(ctx context.Context, rootToken string) error {
+	a.client.SetToken(rootToken)
+
+	mounts, err := a.client.Sys().ListMounts()
+	if err != nil {
+		a.logger.Error("failed to list mounts", zap.Error(err))
+		return err
+	}
+	for mountPath, _ := range mounts {
+		if strings.HasPrefix(strings.ToLower(mountPath), secretMountPath) {
+			return nil
+		}
+	}
+
+	err = a.client.Sys().MountWithContext(ctx, secretMountPath, &vault.MountInput{
+		Type: "kv-v2",
+	})
+	if err != nil {
+		a.logger.Error("failed to mount secrets", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
 func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToken string) error {
+	a.client.SetToken(rootToken)
+
 	err := a.enableKuberAuth(ctx, rootToken)
 	if err != nil {
 		return err
@@ -308,7 +332,7 @@ func (a *HashiCorpVaultSealHandler) SetupKuberAuth(ctx context.Context, rootToke
 		return err
 	}
 
-	_, err = a.client.Logical().Write("auth/kubernetes/config", map[string]any{
+	_, err = a.client.Logical().WriteWithContext(ctx, "auth/kubernetes/config", map[string]any{
 		"kubernetes_host": kubernetesConfig.Host,
 	})
 	if err != nil {
@@ -341,22 +365,8 @@ path "%s/*" {
 		return err
 	}
 
-	mounts, err := a.client.Sys().ListMounts()
+	err = a.setupSecretsMount(ctx, rootToken)
 	if err != nil {
-		a.logger.Error("failed to list mounts", zap.Error(err))
-		return err
-	}
-	for mountPath, _ := range mounts {
-		if strings.HasPrefix(strings.ToLower(mountPath), secretMountPath) {
-			return nil
-		}
-	}
-
-	err = a.client.Sys().MountWithContext(ctx, secretMountPath, &vault.MountInput{
-		Type: "kv-v2",
-	})
-	if err != nil {
-		a.logger.Error("failed to mount secrets", zap.Error(err))
 		return err
 	}
 
