@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"gopkg.in/go-playground/validator.v9"
 
 	"go.uber.org/zap"
 )
