@@ -48,7 +48,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho v0.53.0
 	go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
-	go.opentelemetry.io/otel/sdk v1.23.1
+	go.opentelemetry.io/otel/sdk v1.28.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/net v0.27.0
 	google.golang.org/grpc v1.65.0
