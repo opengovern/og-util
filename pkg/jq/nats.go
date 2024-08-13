@@ -97,7 +97,7 @@ func (jq *JobQueue) Consume(
 	queue string,
 	handler func(jetstream.Msg),
 ) (jetstream.ConsumeContext, error) {
-	return jq.ConsumeWithConfig(ctx, service, stream, topics, queue, jetstream.ConsumerConfig{
+	return jq.ConsumeWithConfig(ctx, service, stream, topics, jetstream.ConsumerConfig{
 		Name:              fmt.Sprintf("%s-service", service),
 		Description:       fmt.Sprintf("%s Service", strings.ToTitle(service)),
 		FilterSubjects:    topics,
@@ -107,7 +107,7 @@ func (jq *JobQueue) Consume(
 		DeliverPolicy:     jetstream.DeliverAllPolicy,
 		MaxAckPending:     -1,
 		InactiveThreshold: time.Hour,
-	}, handler)
+	}, nil, handler)
 }
 
 // ConsumeWithConfig consumes messages from the given topic using the specified consumer config
@@ -118,8 +118,8 @@ func (jq *JobQueue) ConsumeWithConfig(
 	service string,
 	stream string,
 	topics []string,
-	queue string,
 	config jetstream.ConsumerConfig,
+	pullConsumerOpts []jetstream.PullConsumeOpt,
 	handler func(jetstream.Msg),
 ) (jetstream.ConsumeContext, error) {
 	config.Name = fmt.Sprintf("%s-service", service)
@@ -131,7 +131,7 @@ func (jq *JobQueue) ConsumeWithConfig(
 		return nil, err
 	}
 
-	consumeCtx, err := consumer.Consume(handler)
+	consumeCtx, err := consumer.Consume(handler, pullConsumerOpts...)
 	if err != nil {
 		return nil, err
 	}
