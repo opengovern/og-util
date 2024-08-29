@@ -59,11 +59,14 @@ func ExtractTagsAndNames(plg *plugin.Plugin, logger *zap.Logger, pluginTableName
 							tags[tk] = ts
 						} else if ts, ok := tv.(bool); ok {
 							tags[tk] = fmt.Sprintf("%v", ts)
+						} else if ts, ok := tv.([]interface{}); ok {
+							out, _ := json.Marshal(ts)
+							tags[tk] = string(out)
 						} else {
 							if logger != nil {
 								logger.Error("Invalid tags value type", zap.String("resourceType", resourceType), zap.Any("valueType", reflect.TypeOf(tv)), zap.Any("value", tv))
 							}
-							return nil, "", fmt.Errorf("invalid tags value type: %s", reflect.TypeOf(tv))
+							//return tags, "", fmt.Errorf("invalid tags value type: %s", reflect.TypeOf(tv))
 						}
 					}
 				} else if tarr, ok := t.([]interface{}); ok {
@@ -90,7 +93,7 @@ func ExtractTagsAndNames(plg *plugin.Plugin, logger *zap.Logger, pluginTableName
 									if logger != nil {
 										logger.Error("Invalid tags js value type", zap.String("resourceType", resourceType), zap.Any("valueType", reflect.TypeOf(tv)), zap.Any("value", tv))
 									}
-									return nil, "", fmt.Errorf("invalid tags js value type: %s", reflect.TypeOf(tv))
+									//return nil, "", fmt.Errorf("invalid tags js value type: %s", reflect.TypeOf(tv))
 								}
 							}
 						}
