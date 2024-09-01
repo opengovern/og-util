@@ -7,7 +7,8 @@ type CspmUsageRequest struct {
 	WorkspaceId     string    `json:"workspace_id"`
 	GatherTimestamp time.Time `json:"gather_timestamp"`
 
-	AwsAccountCount        int `json:"aws_account_count"`
-	AzureSubscriptionCount int `json:"azure_subscription_count"`
-	ApproximateSpend       int `json:"approximate_spend"`
+	Hostname               string `json:"hostname"`
+	AwsAccountCount        int    `json:"aws_account_count"`
+	AzureSubscriptionCount int    `json:"azure_subscription_count"`
+	ApproximateSpend       int    `json:"approximate_spend"`
 }
