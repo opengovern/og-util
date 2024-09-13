@@ -107,6 +107,17 @@ func QueryArrayParam(ctx echo.Context, paramName string) []string {
 	return values
 }
 
+func QueryMapParam(ctx echo.Context, paramName string) map[string][]string {
+	mapParam := make(map[string][]string)
+	for key, values := range ctx.QueryParams() {
+		if strings.HasPrefix(key, fmt.Sprintf("%s[", paramName)) && strings.HasSuffix(key, "]") {
+			tagKey := key[len(fmt.Sprintf("%s[", paramName)) : len(key)-1]
+			mapParam[tagKey] = values
+		}
+	}
+	return mapParam
+}
+
 func initTracer() (*sdktrace.TracerProvider, error) {
 	exporter, err := jaeger.New(jaeger.WithAgentEndpoint(jaeger.WithAgentHost(agentHost)))
 	if err != nil {
