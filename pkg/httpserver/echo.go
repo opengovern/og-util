@@ -3,20 +3,18 @@ package httpserver
 import (
 	"context"
 	"fmt"
+	"github.com/labstack/echo/v4"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/kaytu-io/kaytu-util/pkg/metrics"
-	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"gopkg.in/go-playground/validator.v9"
-
 	"go.uber.org/zap"
 )
 
@@ -105,6 +103,17 @@ func QueryArrayParam(ctx echo.Context, paramName string) []string {
 		}
 	}
 	return values
+}
+
+func QueryMapParam(ctx echo.Context, paramName string) map[string][]string {
+	mapParam := make(map[string][]string)
+	for key, values := range ctx.QueryParams() {
+		if strings.HasPrefix(key, fmt.Sprintf("%s[", paramName)) && strings.HasSuffix(key, "]") {
+			tagKey := key[len(fmt.Sprintf("%s[", paramName)) : len(key)-1]
+			mapParam[tagKey] = values
+		}
+	}
+	return mapParam
 }
 
 func initTracer() (*sdktrace.TracerProvider, error) {
