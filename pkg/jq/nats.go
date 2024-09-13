@@ -139,10 +139,11 @@ func (jq *JobQueue) ConsumeWithConfig(
 	return consumeCtx, nil
 }
 
-func (jq *JobQueue) Produce(ctx context.Context, topic string, data []byte, id string) error {
-	if _, err := jq.js.Publish(ctx, topic, data, jetstream.WithMsgID(id)); err != nil {
-		return err
+func (jq *JobQueue) Produce(ctx context.Context, topic string, data []byte, id string) (*uint64, error) {
+	pubAck, err := jq.js.Publish(ctx, topic, data, jetstream.WithMsgID(id))
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return &pubAck.Sequence, nil
 }
