@@ -3,18 +3,20 @@ package httpserver
 import (
 	"context"
 	"fmt"
-	"github.com/labstack/echo/v4"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/kaytu-io/kaytu-util/pkg/metrics"
+	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"gopkg.in/go-playground/validator.v9"
+
 	"go.uber.org/zap"
 )
 
