@@ -60,6 +60,10 @@ func NewSelfClient(ctx context.Context) (*SelfClient, error) {
 	return &SelfClient{conn: conn, createdAt: time.Now()}, nil
 }
 
+func (sc *SelfClient) GetConnection() *pgxpool.Pool {
+	return sc.conn
+}
+
 func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuConfigKey) (*string, error) {
 	var value *string
 	// Create table if not exists
