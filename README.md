@@ -1,8 +1,8 @@
-# Kaytu Utils
+# Open Governance Utils
 
 ## Introduction
 
-Share utilities between Kaytu go projects and microservices. These modules are provided
+Share utilities between OpenGovernance go projects and microservices. These modules are provided
 under the `/pkg` and as follows:
 
 ### `/pkg/fp`
