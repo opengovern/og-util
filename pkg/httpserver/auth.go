@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kaytu-io/kaytu-util/pkg/api"
 	"github.com/labstack/echo/v4"
+	"github.com/opengovern/og-util/pkg/api"
 )
 
 const (
