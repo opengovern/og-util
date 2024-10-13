@@ -3,12 +3,13 @@ package esSinkClient
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kaytu-io/kaytu-util/pkg/es"
-	"github.com/kaytu-io/kaytu-util/pkg/es/ingest/entity"
-	"github.com/kaytu-io/kaytu-util/pkg/httpclient"
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
+	"github.com/opengovern/og-util/pkg/es"
+	"github.com/opengovern/og-util/pkg/es/ingest/entity"
+	"github.com/opengovern/og-util/pkg/httpclient"
+	"go.uber.org/zap"
 )
 
 type EsSinkServiceClient interface {

@@ -5,13 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/kaytu-io/kaytu-util/pkg/es"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/opengovern/og-util/pkg/es"
 )
 
 func sendToPipelineIndividually(ingestionPipelineEndpoint string, resourcesToSend []es.Doc) error {

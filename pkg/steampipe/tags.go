@@ -3,8 +3,9 @@ package steampipe
 import (
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"reflect"
+
+	"go.uber.org/zap"
 
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 

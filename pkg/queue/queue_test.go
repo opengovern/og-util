@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaytu-io/kaytu-util/pkg/dockertest"
+	"github.com/opengovern/og-util/pkg/dockertest"
 	"github.com/stretchr/testify/suite"
 )
 

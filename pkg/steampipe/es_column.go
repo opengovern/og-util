@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"log"
 	"net"
 	"reflect"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/hashicorp/go-hclog"

@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"time"
+
+	"go.uber.org/zap"
 
 	helmv2 "github.com/fluxcd/helm-controller/api/v2beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,8 +20,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kaytu-io/kaytu-util/pkg/config"
-	"github.com/kaytu-io/kaytu-util/pkg/source"
+	"github.com/opengovern/og-util/pkg/config"
+	"github.com/opengovern/og-util/pkg/source"
 )
 
 func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, connector source.Type) error {

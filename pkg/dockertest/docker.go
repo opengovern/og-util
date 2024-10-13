@@ -13,7 +13,7 @@ import (
 
 	confluent_kafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/google/uuid"
-	"github.com/kaytu-io/kaytu-util/pkg/postgres"
+	"github.com/opengovern/og-util/pkg/postgres"
 	"github.com/ory/dockertest/v3"
 	dc "github.com/ory/dockertest/v3/docker"
 	"github.com/streadway/amqp"

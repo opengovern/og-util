@@ -1,9 +1,9 @@
 package describe
 
 import (
-	"github.com/kaytu-io/kaytu-util/pkg/describe/enums"
-	"github.com/kaytu-io/kaytu-util/pkg/source"
-	"github.com/kaytu-io/kaytu-util/pkg/vault"
+	"github.com/opengovern/og-util/pkg/describe/enums"
+	"github.com/opengovern/og-util/pkg/source"
+	"github.com/opengovern/og-util/pkg/vault"
 )
 
 type DescribeJob struct {

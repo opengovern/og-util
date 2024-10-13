@@ -2,14 +2,15 @@ package grpc
 
 import (
 	"context"
+	"net/http"
+
 	envoyAuth "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/gogo/googleapis/google/rpc"
-	"github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"net/http"
 )
 
 func checkGRPCAuth(ctx context.Context, authClient envoyAuth.AuthorizationClient) (context.Context, error) {

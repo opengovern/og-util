@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kaytu-io/kaytu-util/pkg/koanf"
+	"github.com/opengovern/og-util/pkg/koanf"
 	"github.com/stretchr/testify/require"
 )
 
