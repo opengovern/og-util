@@ -3,7 +3,7 @@ package fp_test
 import (
 	"testing"
 
-	"github.com/kaytu-io/kaytu-util/pkg/fp"
+	"github.com/opengovern/og-util/pkg/fp"
 	"github.com/stretchr/testify/require"
 )
 
