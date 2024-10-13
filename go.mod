@@ -1,4 +1,4 @@
-module github.com/kaytu-io/kaytu-util
+module github.com/opengovern/og-util
 
 go 1.22.0
 
