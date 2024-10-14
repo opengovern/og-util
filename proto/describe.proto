@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package kaytu.describe.v1;
 
-option go_package="github.com/kaytu-io/kaytu-util/proto/src/golang";
+option go_package="github.com/opengovern/og-util/proto/src/golang";
 
 import "entity.proto";
 

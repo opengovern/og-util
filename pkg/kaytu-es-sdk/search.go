@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 	"io"
 	"strings"
+
+	"github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 )
 
 type PointInTime struct {

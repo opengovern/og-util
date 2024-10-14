@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"io"
+
+	"go.uber.org/zap"
 )
 
 func (c Client) CreateIndexIfNotExist(ctx context.Context, logger *zap.Logger, index string) error {
