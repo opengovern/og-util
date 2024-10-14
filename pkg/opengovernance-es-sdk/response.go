@@ -1,4 +1,4 @@
-package kaytu
+package opengovernance
 
 import "fmt"
 

@@ -1,4 +1,4 @@
-package kaytu
+package opengovernance
 
 var awsTaglessResourceTypes = []string{
 	"AWS::Account::AlternateContact",
