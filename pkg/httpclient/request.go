@@ -304,14 +304,14 @@ func (ctx *Context) Reset(r *http.Request, w http.ResponseWriter) {
 
 func (ctx *Context) ToHeaders() map[string]string {
 	return map[string]string{
-		httpserver.XKaytuUserIDHeader:   ctx.UserID,
-		httpserver.XKaytuUserRoleHeader: string(ctx.UserRole),
+		httpserver.XPlatformUserIDHeader:   ctx.UserID,
+		httpserver.XPlatformUserRoleHeader: string(ctx.UserRole),
 	}
 }
 
 func FromEchoContext(c echo.Context) *Context {
-	role := c.Request().Header.Get(httpserver.XKaytuUserRoleHeader)
-	id := c.Request().Header.Get(httpserver.XKaytuUserIDHeader)
+	role := c.Request().Header.Get(httpserver.XPlatformUserRoleHeader)
+	id := c.Request().Header.Get(httpserver.XPlatformUserIDHeader)
 	ctx := c.Request().Context()
 	return &Context{
 		Ctx:      ctx,

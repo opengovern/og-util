@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	XKaytuUserIDHeader         = "X-Kaytu-UserId"
-	XKaytuUserRoleHeader       = "X-Kaytu-UserRole"
-	XKaytuUserConnectionsScope = "X-Kaytu-UserConnectionsScope"
+	XPlatformUserIDHeader         = "X-Platform-UserId"
+	XPlatformUserRoleHeader       = "X-Platform-UserRole"
+	XPlatformUserConnectionsScope = "X-Platform-UserConnectionsScope"
 )
 
 func AuthorizeHandler(h echo.HandlerFunc, minRole api.Role) echo.HandlerFunc {
@@ -36,25 +36,25 @@ func RequireMinRole(ctx echo.Context, minRole api.Role) error {
 }
 
 func GetUserRole(ctx echo.Context) api.Role {
-	role := ctx.Request().Header.Get(XKaytuUserRoleHeader)
+	role := ctx.Request().Header.Get(XPlatformUserRoleHeader)
 	if strings.TrimSpace(role) == "" {
-		panic(fmt.Errorf("header %s is missing", XKaytuUserRoleHeader))
+		panic(fmt.Errorf("header %s is missing", XPlatformUserRoleHeader))
 	}
 
 	return api.GetRole(role)
 }
 
 func GetUserID(ctx echo.Context) string {
-	id := ctx.Request().Header.Get(XKaytuUserIDHeader)
+	id := ctx.Request().Header.Get(XPlatformUserIDHeader)
 	if strings.TrimSpace(id) == "" {
-		panic(fmt.Errorf("header %s is missing", XKaytuUserIDHeader))
+		panic(fmt.Errorf("header %s is missing", XPlatformUserIDHeader))
 	}
 
 	return id
 }
 
 func CheckAccessToConnectionID(ctx echo.Context, connectionID string) error {
-	connectionIDsStr := ctx.Request().Header.Get(XKaytuUserConnectionsScope)
+	connectionIDsStr := ctx.Request().Header.Get(XPlatformUserConnectionsScope)
 	if len(connectionIDsStr) == 0 {
 		return nil
 	}
@@ -73,7 +73,7 @@ func CheckAccessToConnectionID(ctx echo.Context, connectionID string) error {
 }
 
 func ResolveConnectionIDs(ctx echo.Context, connectionIDs []string) ([]string, error) {
-	connectionIDsStr := ctx.Request().Header.Get(XKaytuUserConnectionsScope)
+	connectionIDsStr := ctx.Request().Header.Get(XPlatformUserConnectionsScope)
 	if len(connectionIDsStr) == 0 {
 		return connectionIDs, nil
 	}
@@ -114,10 +114,6 @@ func roleToPriority(role api.Role) int {
 		return 1
 	case api.AdminRole:
 		return 2
-	case api.KaytuAdminRole:
-		return 98
-	case api.InternalRole:
-		return 99
 	default:
 		panic("unsupported role: " + role)
 	}

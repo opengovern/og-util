@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	KaytuPrivateTagPrefix = "x-kaytu-"
+	KaytuPrivateTagPrefix = "x-platform-"
 	KaytuServiceCostTag   = KaytuPrivateTagPrefix + "cost-service-map"
 )
 
