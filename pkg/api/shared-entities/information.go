@@ -4,7 +4,6 @@ import "time"
 
 // CspmUsageRequest is the request object for the call home feature data gathering
 type CspmUsageRequest struct {
-	WorkspaceId     string    `json:"workspace_id"`
 	GatherTimestamp time.Time `json:"gather_timestamp"`
 
 	Hostname               string `json:"hostname"`

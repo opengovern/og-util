@@ -1,10 +1,7 @@
 package steampipe
 
 import (
-	"context"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -12,13 +9,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
-	helmv2 "github.com/fluxcd/helm-controller/api/v2beta1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	kuberTypes "k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/opengovern/og-util/pkg/config"
 	"github.com/opengovern/og-util/pkg/source"
@@ -146,41 +136,6 @@ connection "` + plugin + `" {
 	filePath := path.Join(dirname, ".steampipe", "config", plugin+".spc")
 	os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
 	return os.WriteFile(filePath, []byte(content), os.ModePerm)
-}
-
-func GetStackElasticConfig(workspaceId string, stackId string) (config.ElasticSearch, error) {
-	scheme := runtime.NewScheme()
-	if err := helmv2.AddToScheme(scheme); err != nil {
-		return config.ElasticSearch{}, err
-	}
-	if err := corev1.AddToScheme(scheme); err != nil {
-		return config.ElasticSearch{}, err
-	}
-	kubeClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{Scheme: scheme})
-	if err != nil {
-		return config.ElasticSearch{}, err
-	}
-
-	releaseName := stackId
-	secretName := fmt.Sprintf("%s-es-elastic-user", releaseName)
-
-	secret := &corev1.Secret{}
-	err = kubeClient.Get(context.TODO(), kuberTypes.NamespacedName{
-		Namespace: workspaceId,
-		Name:      secretName,
-	}, secret)
-	if err != nil {
-		return config.ElasticSearch{}, err
-	}
-	password, err := base64.URLEncoding.DecodeString(string(secret.Data["elastic"]))
-	if err != nil {
-		return config.ElasticSearch{}, err
-	}
-	return config.ElasticSearch{
-		Address:  fmt.Sprintf("https://%s-es-http:9200/", releaseName),
-		Username: "elastic",
-		Password: string(password),
-	}, nil
 }
 
 // StartSteampipeServiceAndGetConnection starts steampipe service and returns steampipe connection

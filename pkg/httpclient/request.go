@@ -23,10 +23,8 @@ type EchoError struct {
 type Context struct {
 	Ctx context.Context
 
-	UserRole      api.Role
-	UserID        string
-	WorkspaceName string
-	WorkspaceID   string
+	UserRole api.Role
+	UserID   string
 }
 
 func (ctx *Context) Request() *http.Request {
@@ -306,33 +304,19 @@ func (ctx *Context) Reset(r *http.Request, w http.ResponseWriter) {
 
 func (ctx *Context) ToHeaders() map[string]string {
 	return map[string]string{
-		httpserver.XKaytuUserIDHeader:        ctx.UserID,
-		httpserver.XKaytuUserRoleHeader:      string(ctx.UserRole),
-		httpserver.XKaytuWorkspaceIDHeader:   ctx.WorkspaceID,
-		httpserver.XKaytuWorkspaceNameHeader: ctx.WorkspaceName,
+		httpserver.XKaytuUserIDHeader:   ctx.UserID,
+		httpserver.XKaytuUserRoleHeader: string(ctx.UserRole),
 	}
 }
 
-func (ctx *Context) GetWorkspaceName() string {
-	return ctx.WorkspaceName
-}
-
-func (ctx *Context) GetWorkspaceID() string {
-	return ctx.WorkspaceID
-}
-
 func FromEchoContext(c echo.Context) *Context {
-	wsID := c.Request().Header.Get(httpserver.XKaytuWorkspaceIDHeader)
-	name := c.Request().Header.Get(httpserver.XKaytuWorkspaceNameHeader)
 	role := c.Request().Header.Get(httpserver.XKaytuUserRoleHeader)
 	id := c.Request().Header.Get(httpserver.XKaytuUserIDHeader)
 	ctx := c.Request().Context()
 	return &Context{
-		Ctx:           ctx,
-		WorkspaceName: name,
-		WorkspaceID:   wsID,
-		UserRole:      api.Role(role),
-		UserID:        id,
+		Ctx:      ctx,
+		UserRole: api.Role(role),
+		UserID:   id,
 	}
 }
 
