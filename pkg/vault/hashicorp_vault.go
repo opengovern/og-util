@@ -20,7 +20,7 @@ import (
 const (
 	secretMountPath    = "secrets"
 	keyMapKey          = "key"
-	vaultRoleName      = "workspace-creds-manager"
+	vaultRoleName      = "creds-manager"
 	kubernetesAuthPath = "auth/kubernetes"
 )
 

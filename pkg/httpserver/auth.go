@@ -10,8 +10,6 @@ import (
 )
 
 const (
-	XKaytuWorkspaceIDHeader    = "X-Kaytu-WorkspaceID"
-	XKaytuWorkspaceNameHeader  = "X-Kaytu-WorkspaceName"
 	XKaytuUserIDHeader         = "X-Kaytu-UserId"
 	XKaytuUserRoleHeader       = "X-Kaytu-UserRole"
 	XKaytuUserConnectionsScope = "X-Kaytu-UserConnectionsScope"
@@ -35,24 +33,6 @@ func RequireMinRole(ctx echo.Context, minRole api.Role) error {
 	}
 
 	return nil
-}
-
-func GetWorkspaceName(ctx echo.Context) string {
-	name := ctx.Request().Header.Get(XKaytuWorkspaceNameHeader)
-	if strings.TrimSpace(name) == "" {
-		panic(fmt.Errorf("header %s is missing", XKaytuWorkspaceNameHeader))
-	}
-
-	return name
-}
-
-func GetWorkspaceID(ctx echo.Context) string {
-	id := ctx.Request().Header.Get(XKaytuWorkspaceIDHeader)
-	if strings.TrimSpace(id) == "" {
-		panic(fmt.Errorf("header %s is missing", XKaytuWorkspaceIDHeader))
-	}
-
-	return id
 }
 
 func GetUserRole(ctx echo.Context) api.Role {
