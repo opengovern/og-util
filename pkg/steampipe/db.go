@@ -245,13 +245,13 @@ func (s *Database) Count(query string) (*Result, error) {
 
 func (s *Database) SetConfigTableValue(ctx context.Context, key OpenGovernanceConfigKey, value string) error {
 	// Create table if not exists
-	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
+	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS og_configs(key TEXT PRIMARY KEY, value TEXT)")
 	if err != nil {
 		return err
 	}
 
 	// Insert or update
-	_, err = s.conn.Exec(ctx, "INSERT INTO kaytu_configs(key, value) VALUES($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2", string(key), value)
+	_, err = s.conn.Exec(ctx, "INSERT INTO og_configs(key, value) VALUES($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2", string(key), value)
 	if err != nil {
 		return err
 	}
@@ -261,12 +261,12 @@ func (s *Database) SetConfigTableValue(ctx context.Context, key OpenGovernanceCo
 
 func (s *Database) UnsetConfigTableValue(ctx context.Context, key OpenGovernanceConfigKey) error {
 	// Create table if not exists
-	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
+	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS og_configs(key TEXT PRIMARY KEY, value TEXT)")
 	if err != nil {
 		return err
 	}
 
-	_, err = s.conn.Exec(ctx, "DELETE FROM kaytu_configs WHERE key = $1", string(key))
+	_, err = s.conn.Exec(ctx, "DELETE FROM og_configs WHERE key = $1", string(key))
 	if err != nil {
 		return err
 	}
