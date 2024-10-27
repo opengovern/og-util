@@ -37,7 +37,7 @@ type KMS struct {
 	Region string `koanf:"region"`
 }
 
-type KaytuService struct {
+type OpenGovernanceService struct {
 	BaseURL string `koanf:"base_url"`
 }
 
