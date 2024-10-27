@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package kaytu.describe.v1;
+package opengovernance.describe.v1;
 
 option go_package="github.com/opengovern/og-util/proto/src/golang";
 

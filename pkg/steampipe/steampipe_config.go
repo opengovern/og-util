@@ -44,7 +44,7 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, connector
 	return nil
 }
 
-func PopulateKaytuPluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres, pennywiseBaseURL string) error {
+func PopulateOpenGovernancePluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres, pennywiseBaseURL string) error {
 	if len(postgresConfig.SSLMode) == 0 {
 		postgresConfig.SSLMode = "disable"
 	}
