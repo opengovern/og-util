@@ -37,7 +37,7 @@ func isNotFoundHandler(handler echo.HandlerFunc) bool {
 
 func AddEchoMiddleware(e *echo.Echo) {
 	config := echoPrometheus.Config{
-		Namespace: "kaytu",
+		Namespace: "opengovernance",
 		Subsystem: "http",
 		Buckets: []float64{
 			0.001, // 1ms
