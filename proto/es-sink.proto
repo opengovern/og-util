@@ -12,5 +12,5 @@ message IngestRequest {
 }
 
 service EsSinkService {
-  rpc Ingest(IngestRequest) returns (kaytu.entity.v1.ResponseOK) {}
+  rpc Ingest(IngestRequest) returns (opengovernance.entity.v1.ResponseOK) {}
 }

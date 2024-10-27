@@ -11,7 +11,7 @@ message DeliverResultRequest {
   uint32 parent_job_id = 2;
   string status = 3;
   string error = 4;
-  kaytu.entity.v1.DescribeJob describe_job = 5;
+  opengovernance.entity.v1.DescribeJob describe_job = 5;
   repeated string described_resource_ids = 6;
   string errorCode = 7;
 }
@@ -21,6 +21,6 @@ message SetInProgressRequest {
 }
 
 service DescribeService {
-  rpc DeliverResult(DeliverResultRequest) returns (kaytu.entity.v1.ResponseOK) {}
-  rpc SetInProgress(SetInProgressRequest) returns (kaytu.entity.v1.ResponseOK) {}
+  rpc DeliverResult(DeliverResultRequest) returns (opengovernance.entity.v1.ResponseOK) {}
+  rpc SetInProgress(SetInProgressRequest) returns (opengovernance.entity.v1.ResponseOK) {}
 }
