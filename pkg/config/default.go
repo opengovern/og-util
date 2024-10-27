@@ -44,7 +44,7 @@ type KMS struct {
 	Region string
 }
 
-type KaytuService struct {
+type OpenGovernanceService struct {
 	BaseURL string
 }
 

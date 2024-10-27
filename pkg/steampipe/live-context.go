@@ -12,12 +12,12 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 )
 
-type KaytuConfigKey string
+type OpenGovernanceConfigKey string
 
 const (
-	KaytuConfigKeyAccountID                 KaytuConfigKey = "account_id"
-	KaytuConfigKeyResourceCollectionFilters KaytuConfigKey = "resource_collection_filters"
-	KaytuConfigKeyClientType                KaytuConfigKey = "client_type"
+	OpenGovernanceConfigKeyAccountID                 OpenGovernanceConfigKey = "account_id"
+	OpenGovernanceConfigKeyResourceCollectionFilters OpenGovernanceConfigKey = "resource_collection_filters"
+	OpenGovernanceConfigKeyClientType                OpenGovernanceConfigKey = "client_type"
 )
 
 type SelfClient struct {
@@ -26,7 +26,7 @@ type SelfClient struct {
 }
 
 func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache) (*SelfClient, error) {
-	value, ok := cache.Get(ctx, "kaytu-steampipe-self-client")
+	value, ok := cache.Get(ctx, "opengovernance-steampipe-self-client")
 	if ok {
 		return value.(*SelfClient), nil
 	}
@@ -38,7 +38,7 @@ func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache)
 		return nil, err
 	}
 
-	cache.Set(ctx, "kaytu-steampipe-self-client", client)
+	cache.Set(ctx, "opengovernance-steampipe-self-client", client)
 
 	return client, nil
 }
@@ -65,7 +65,7 @@ func (sc *SelfClient) GetConnection() *pgxpool.Pool {
 	return sc.conn
 }
 
-func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuConfigKey) (*string, error) {
+func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key OpenGovernanceConfigKey) (*string, error) {
 	var value *string
 	// Create table if not exists
 	_, err := sc.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
