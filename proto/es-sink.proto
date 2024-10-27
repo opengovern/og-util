@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package kaytu.es_sink.v1;
+package opengovernance.es_sink.v1;
 
 option go_package="github.com/opengovern/og-util/proto/src/golang";
 
