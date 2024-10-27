@@ -68,12 +68,12 @@ func (sc *SelfClient) GetConnection() *pgxpool.Pool {
 func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key OpenGovernanceConfigKey) (*string, error) {
 	var value *string
 	// Create table if not exists
-	_, err := sc.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
+	_, err := sc.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS og_configs(key TEXT PRIMARY KEY, value TEXT)")
 	if err != nil {
 		return nil, err
 	}
 
-	err = sc.conn.QueryRow(ctx, "SELECT value FROM kaytu_configs WHERE key = $1", string(key)).Scan(&value)
+	err = sc.conn.QueryRow(ctx, "SELECT value FROM og_configs WHERE key = $1", string(key)).Scan(&value)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
