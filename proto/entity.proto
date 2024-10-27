@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package kaytu.entity.v1;
+package opengovernance.entity.v1;
 
 option go_package="github.com/opengovern/og-util/proto/src/golang";
 
@@ -13,7 +13,7 @@ message AWSResource {
   string partition = 6;
   string type = 7;
   string description_json = 8;
-  kaytu.entity.v1.DescribeJob job = 9;
+  opengovernance.entity.v1.DescribeJob job = 9;
   string unique_id = 10;
   map<string,string> metadata = 11;
   map<string,string> tags = 12;
@@ -27,7 +27,7 @@ message AzureResource {
   string location = 5;
   string subscription_id = 6;
   string description_json = 7;
-  kaytu.entity.v1.DescribeJob job = 8;
+  opengovernance.entity.v1.DescribeJob job = 8;
   string unique_id = 9;
   map<string,string> metadata = 10;
   map<string,string> tags = 11;
