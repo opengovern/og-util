@@ -12,12 +12,12 @@ import (
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 )
 
-type KaytuConfigKey string
+type OpenGovernanceConfigKey string
 
 const (
-	KaytuConfigKeyAccountID                 KaytuConfigKey = "account_id"
-	KaytuConfigKeyResourceCollectionFilters KaytuConfigKey = "resource_collection_filters"
-	KaytuConfigKeyClientType                KaytuConfigKey = "client_type"
+	OpenGovernanceConfigKeyAccountID                 OpenGovernanceConfigKey = "account_id"
+	OpenGovernanceConfigKeyResourceCollectionFilters OpenGovernanceConfigKey = "resource_collection_filters"
+	OpenGovernanceConfigKeyClientType                OpenGovernanceConfigKey = "client_type"
 )
 
 type SelfClient struct {
@@ -65,7 +65,7 @@ func (sc *SelfClient) GetConnection() *pgxpool.Pool {
 	return sc.conn
 }
 
-func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key KaytuConfigKey) (*string, error) {
+func (sc *SelfClient) GetConfigTableValueOrNil(ctx context.Context, key OpenGovernanceConfigKey) (*string, error) {
 	var value *string
 	// Create table if not exists
 	_, err := sc.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")

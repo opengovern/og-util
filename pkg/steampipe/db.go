@@ -243,7 +243,7 @@ func (s *Database) Count(query string) (*Result, error) {
 	}, nil
 }
 
-func (s *Database) SetConfigTableValue(ctx context.Context, key KaytuConfigKey, value string) error {
+func (s *Database) SetConfigTableValue(ctx context.Context, key OpenGovernanceConfigKey, value string) error {
 	// Create table if not exists
 	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
 	if err != nil {
@@ -259,7 +259,7 @@ func (s *Database) SetConfigTableValue(ctx context.Context, key KaytuConfigKey, 
 	return nil
 }
 
-func (s *Database) UnsetConfigTableValue(ctx context.Context, key KaytuConfigKey) error {
+func (s *Database) UnsetConfigTableValue(ctx context.Context, key OpenGovernanceConfigKey) error {
 	// Create table if not exists
 	_, err := s.conn.Exec(ctx, "CREATE TABLE IF NOT EXISTS kaytu_configs(key TEXT PRIMARY KEY, value TEXT)")
 	if err != nil {

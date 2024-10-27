@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	KaytuPrivateTagPrefix = "x-platform-"
-	KaytuServiceCostTag   = KaytuPrivateTagPrefix + "cost-service-map"
+	OpenGovernancePrivateTagPrefix = "x-platform-"
+	OpenGovernanceServiceCostTag   = OpenGovernancePrivateTagPrefix + "cost-service-map"
 )
 
 type TagLike interface {
@@ -52,7 +52,7 @@ func GetTagsMap(tags []TagLike) map[string][]string {
 
 func TrimPrivateTags(tags map[string][]string) map[string][]string {
 	for k := range tags {
-		if strings.HasPrefix(k, KaytuPrivateTagPrefix) {
+		if strings.HasPrefix(k, OpenGovernancePrivateTagPrefix) {
 			delete(tags, k)
 		}
 	}
