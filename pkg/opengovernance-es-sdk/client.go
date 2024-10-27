@@ -91,7 +91,7 @@ type Client struct {
 }
 
 func NewClientCached(c ClientConfig, cache *connection.ConnectionCache, ctx context.Context) (Client, error) {
-	value, ok := cache.Get(ctx, "kaytu-es-client")
+	value, ok := cache.Get(ctx, "og-es-client")
 	if ok {
 		return value.(Client), nil
 	}
@@ -103,7 +103,7 @@ func NewClientCached(c ClientConfig, cache *connection.ConnectionCache, ctx cont
 		return Client{}, err
 	}
 
-	cache.Set(ctx, "kaytu-es-client", client)
+	cache.Set(ctx, "og-es-client", client)
 
 	return client, nil
 }
