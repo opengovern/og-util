@@ -26,7 +26,7 @@ type SelfClient struct {
 }
 
 func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache) (*SelfClient, error) {
-	value, ok := cache.Get(ctx, "kaytu-steampipe-self-client")
+	value, ok := cache.Get(ctx, "opengovernance-steampipe-self-client")
 	if ok {
 		return value.(*SelfClient), nil
 	}
@@ -38,7 +38,7 @@ func NewSelfClientCached(ctx context.Context, cache *connection.ConnectionCache)
 		return nil, err
 	}
 
-	cache.Set(ctx, "kaytu-steampipe-self-client", client)
+	cache.Set(ctx, "opengovernance-steampipe-self-client", client)
 
 	return client, nil
 }
