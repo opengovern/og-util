@@ -29,7 +29,7 @@ func RequireMinRole(ctx echo.Context, minRole api.Role) error {
 	if !hasAccess(GetUserRole(ctx), minRole) {
 		userRole := GetUserRole(ctx)
 		fmt.Println("required role = ", minRole, " user role = ", userRole)
-		return echo.NewHTTPError(http.StatusForbidden, "missing required permission")
+		return echo.NewHTTPError(http.StatusNotAcceptable, "missing required permission")
 	}
 
 	return nil
@@ -69,7 +69,7 @@ func CheckAccessToConnectionID(ctx echo.Context, connectionID string) error {
 			return nil
 		}
 	}
-	return echo.NewHTTPError(http.StatusForbidden, "Invalid connection ID")
+	return echo.NewHTTPError(http.StatusNotAcceptable, "Invalid connection ID")
 }
 
 func ResolveConnectionIDs(ctx echo.Context, connectionIDs []string) ([]string, error) {
