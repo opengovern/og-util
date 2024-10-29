@@ -2,7 +2,7 @@ package describe
 
 import (
 	"github.com/opengovern/og-util/pkg/describe/enums"
-	"github.com/opengovern/og-util/pkg/source"
+	"github.com/opengovern/og-util/pkg/integration"
 	"github.com/opengovern/og-util/pkg/vault"
 )
 
@@ -12,7 +12,7 @@ type DescribeJob struct {
 	SourceID     string
 	AccountID    string
 	DescribedAt  int64
-	SourceType   source.Type
+	SourceType   integration.Type
 	CipherText   string
 	TriggerType  enums.DescribeTriggerType
 	RetryCounter uint
@@ -48,7 +48,7 @@ type DescribeWorkerInput struct {
 //	CostDiscovery bool
 //	Summarize     bool
 type ResourceType interface {
-	GetConnector() source.Type
+	GetConnector() integration.Type
 	GetResourceName() string
 	GetResourceLabel() string
 	GetServiceName() string
