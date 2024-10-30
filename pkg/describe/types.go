@@ -28,6 +28,8 @@ type DescribeWorkerInput struct {
 	VaultConfig vault.Config
 
 	DescribeJob DescribeJob `json:"describeJob"`
+
+	ExtraInputs map[string][]string `json:"extraInputs"`
 }
 
 // Connector source.Type
