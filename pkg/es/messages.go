@@ -1,10 +1,9 @@
 package es
 
 import (
+	"github.com/opengovern/og-util/pkg/integration"
 	"regexp"
 	"strings"
-
-	"github.com/opengovern/og-util/pkg/source"
 )
 
 const (
@@ -28,8 +27,8 @@ type Resource struct {
 	ARN string `json:"arn"`
 	// Description is the description of the resource based on the describe call.
 	Description interface{} `json:"description"`
-	// SourceType is the type of the source of the resource, i.e. AWS Cloud, Azure Cloud.
-	SourceType source.Type `json:"source_type"`
+	// IntegrationType is the type of the integration source of the resource, i.e. AWS Cloud, Azure Cloud.
+	IntegrationType integration.Type `json:"integration_type"`
 	// ResourceType is the type of the resource.
 	ResourceType string `json:"resource_type"`
 	// ResourceJobID is the DescribeResourceJob ID that described this resource
@@ -69,8 +68,8 @@ type LookupResource struct {
 	ResourceID string `json:"resource_id"`
 	// Name is the name of the resource.
 	Name string `json:"name"`
-	// SourceType is the type of the source of the resource, i.e. AWS Cloud, Azure Cloud.
-	SourceType source.Type `json:"source_type"`
+	// IntegrationType is the type of the integration source of the resource, i.e. AWS Cloud, Azure Cloud.
+	IntegrationType integration.Type `json:"integration_type"`
 	// ResourceType is the type of the resource.
 	ResourceType string `json:"resource_type"`
 	// ServiceName is the service of the resource.
@@ -101,7 +100,7 @@ func (r LookupResource) KeysAndIndex() ([]string, string) {
 	return []string{
 		r.ResourceID,
 		r.SourceID,
-		string(r.SourceType),
+		string(r.IntegrationType),
 		strings.ToLower(r.ResourceType),
 	}, InventorySummaryIndex
 }
