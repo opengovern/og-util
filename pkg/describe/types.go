@@ -28,6 +28,8 @@ type DescribeWorkerInput struct {
 	VaultConfig vault.Config
 
 	DescribeJob DescribeJob `json:"describeJob"`
+
+	ExtraInputs map[string][]string `json:"extraInputs"`
 }
 
 // Connector source.Type
@@ -51,11 +53,5 @@ type ResourceType interface {
 	GetConnector() integration.Type
 	GetResourceName() string
 	GetResourceLabel() string
-	GetServiceName() string
 	GetTags() map[string][]string
-	GetTerraformName() []string
-	GetTerraformServiceName() string
-	IsFastDiscovery() bool
-	IsCostDiscovery() bool
-	IsSummarized() bool
 }
