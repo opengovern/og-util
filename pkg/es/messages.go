@@ -62,6 +62,8 @@ type LookupResource struct {
 	ResourceID string `json:"resource_id"`
 	// ResourceName is the name of the resource.
 	ResourceName string `json:"resource_name"`
+	// Location is location/region of the resource
+	Location string `json:"location"`
 	// IntegrationType is the type of the integration source of the resource, i.e. AWS Cloud, Azure Cloud.
 	IntegrationType integration.Type `json:"integration_type"`
 	// ResourceType is the type of the resource.
