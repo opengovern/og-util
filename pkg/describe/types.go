@@ -32,26 +32,8 @@ type DescribeWorkerInput struct {
 	ExtraInputs map[string][]string `json:"extraInputs"`
 }
 
-// Connector source.Type
-//
-//	ResourceName  string
-//	ResourceLabel string
-//	ServiceName   string
-//
-//	Tags map[string][]string
-//
-//	ListDescriber ResourceDescriber
-//	GetDescriber  SingleResourceDescriber
-//
-//	TerraformName        []string
-//	TerraformServiceName string
-//
-//	FastDiscovery bool
-//	CostDiscovery bool
-//	Summarize     bool
 type ResourceType interface {
-	GetConnector() integration.Type
+	GetIntegrationType() integration.Type
 	GetResourceName() string
-	GetResourceLabel() string
 	GetTags() map[string][]string
 }
