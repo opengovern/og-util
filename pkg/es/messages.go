@@ -21,8 +21,8 @@ type Resource struct {
 	EsID    string `json:"es_id"`
 	EsIndex string `json:"es_index"`
 
-	// GUID is the unique Global ID of the resource
-	GUID string `json:"guid"`
+	// PlatformID is the unique Global ID of the resource inside the platform
+	PlatformID string `json:"platform_id"`
 	// ResourceID is the unique ID of the resource in the integration.
 	ResourceID string `json:"resource_id"`
 	// ResourceName is the name of the resource.
@@ -58,6 +58,8 @@ type LookupResource struct {
 	EsID    string `json:"es_id"`
 	EsIndex string `json:"es_index"`
 
+	// PlatformID is the unique Global ID of the resource inside the platform
+	PlatformID string `json:"platform_id"`
 	// ResourceID is the globally unique ID of the resource.
 	ResourceID string `json:"resource_id"`
 	// ResourceName is the name of the resource.
