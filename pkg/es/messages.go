@@ -35,8 +35,8 @@ type Resource struct {
 	ResourceType string `json:"resource_type"`
 	// IntegrationID is the integration ID that the resource belongs to
 	IntegrationID string `json:"integration_id"`
-	// IntegrationMetadata is arbitrary data associated with each resource
-	IntegrationMetadata map[string]string `json:"integration_metadata"`
+	// Metadata is arbitrary data associated with each resource
+	Metadata map[string]string `json:"metadata"`
 	// CanonicalTags is the list of tags associated with the resource
 	CanonicalTags []Tag `json:"canonical_tags"`
 	// DescribedBy is the resource describe job id
