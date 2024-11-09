@@ -55,4 +55,5 @@ jobs:
       # Output the new tag
       - name: Display new tag
         if: ${{ success() && steps.versioning.outcome == 'success' }}
-        run: echo "Created new tag: ${{ steps.versioning.outputs.new_tag }}"
+        run: |
+          echo "Created new tag: ${{ steps.versioning.outputs.new_tag }}"
