@@ -6,8 +6,7 @@ import "time"
 type CspmUsageRequest struct {
 	GatherTimestamp time.Time `json:"gather_timestamp"`
 
-	Hostname               string `json:"hostname"`
-	AwsAccountCount        int    `json:"aws_account_count"`
-	AzureSubscriptionCount int    `json:"azure_subscription_count"`
-	ApproximateSpend       int    `json:"approximate_spend"`
+	Hostname             string         `json:"hostname"`
+	IntegrationTypeCount map[string]int `json:"integration_type_count"`
+	ApproximateSpend     int            `json:"approximate_spend"`
 }
