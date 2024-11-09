@@ -24,36 +24,10 @@ jobs:
         run: go test -v ./...
 
       # Conditional step: Create a new tag if tests pass
-      - name: Bump Version and Create Tag
-        if: ${{ success() && steps.go_test.outcome == 'success' }}
-        id: versioning
-        env:
-          TAG_CREATION_TOKEN: ${{ secrets.OG_RELEASE_TAG_UPDATE }}
-        run: |
-          # Configure git with the token to allow tag creation
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch --tags
-
-          # Get the latest tag and increment based on semantic versioning rules
-          latest_tag=$(git tag --sort=-v:refname | head -n 1)
-          if [ -z "$latest_tag" ]; then
-            # If no tags exist, start at v0.1.0
-            new_tag="v0.1.0"
-          else
-            # Split the latest tag into major, minor, and patch
-            IFS='.' read -r major minor patch <<< "${latest_tag//v/}"
-            # Increment the patch version
-            patch=$((patch + 1))
-            new_tag="v${major}.${minor}.${patch}"
-          fi
-
-          # Create and push the new tag
-          git tag "$new_tag"
-          git push https://${{ secrets.OG_RELEASE_TAG_UPDATE }}@github.com/opengovern/og-util "$new_tag"
-
-      # Output the new tag
-      - name: Display new tag
-        if: ${{ success() && steps.versioning.outcome == 'success' }}
-        run: |
-          echo "Created new tag: ${{ steps.versioning.outputs.new_tag }}"
+      - name: Tag version
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.OG_RELEASE_TAG_UPDATE }}
+          release_branches: main
+          tag_prefix: v
