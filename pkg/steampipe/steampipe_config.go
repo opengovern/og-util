@@ -44,7 +44,7 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, connector
 	return nil
 }
 
-func PopulateOpenGovernancePluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres, pennywiseBaseURL string) error {
+func PopulateOpenGovernancePluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres) error {
 	if len(postgresConfig.SSLMode) == 0 {
 		postgresConfig.SSLMode = "disable"
 	}
@@ -61,7 +61,6 @@ connection "opengovernance" {
   pg_password = "` + postgresConfig.Password + `"
   pg_database = "` + postgresConfig.DB + `"
   pg_ssl_mode = "` + postgresConfig.SSLMode + `"
-  pennywise_baseurl = "` + pennywiseBaseURL + `"
 }
 `
 	dirname, err := os.UserHomeDir()
