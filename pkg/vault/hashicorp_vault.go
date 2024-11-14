@@ -259,13 +259,6 @@ func NewHashiCorpVaultSealHandler(ctx context.Context, logger *zap.Logger, confi
 		return nil, err
 	}
 
-	// check if auth was successful
-	_, err = client.Auth().Token().LookupSelf()
-	if err != nil {
-		logger.Error("failed to authenticate", zap.Error(err))
-		return nil, err
-	}
-
 	return &HashiCorpVaultSealHandler{
 		logger: logger,
 		client: client,
