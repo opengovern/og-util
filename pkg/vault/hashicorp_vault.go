@@ -207,7 +207,7 @@ func NewHashiCorpVaultSecretHandler(ctx context.Context, logger *zap.Logger, con
 }
 
 func (a *HashiCorpVaultSecretHandler) GetSecret(ctx context.Context, secretId string) (string, error) {
-	secret, err := a.client.KVv2(secretId).Get(ctx, secretId)
+	secret, err := a.client.KVv2(secretMountPath).Get(ctx, secretId)
 	if err != nil {
 		a.logger.Error("failed to get secret", zap.Error(err))
 		return "", err
