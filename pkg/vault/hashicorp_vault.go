@@ -76,6 +76,13 @@ func NewHashiCorpVaultClient(ctx context.Context, logger *zap.Logger, config Has
 		return nil, err
 	}
 
+	// check if auth was successful
+	_, err = client.Auth().Token().LookupSelf()
+	if err != nil {
+		logger.Error("failed to authenticate", zap.Error(err))
+		return nil, err
+	}
+
 	secret, err := client.KVv2(secretMountPath).Get(ctx, secretId)
 	if err != nil {
 		logger.Error("failed to get secret", zap.Error(err))
@@ -186,6 +193,13 @@ func NewHashiCorpVaultSecretHandler(ctx context.Context, logger *zap.Logger, con
 		return nil, err
 	}
 
+	// check if auth was successful
+	_, err = client.Auth().Token().LookupSelf()
+	if err != nil {
+		logger.Error("failed to authenticate", zap.Error(err))
+		return nil, err
+	}
+
 	return &HashiCorpVaultSecretHandler{
 		logger: logger,
 		client: client,
@@ -242,6 +256,13 @@ func NewHashiCorpVaultSealHandler(ctx context.Context, logger *zap.Logger, confi
 	client, err := newHashiCorpCredential(ctx, logger, config, false)
 	if err != nil {
 		logger.Error("failed to create HashiCorp Vault client", zap.Error(err))
+		return nil, err
+	}
+
+	// check if auth was successful
+	_, err = client.Auth().Token().LookupSelf()
+	if err != nil {
+		logger.Error("failed to authenticate", zap.Error(err))
 		return nil, err
 	}
 
