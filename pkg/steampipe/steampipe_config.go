@@ -1,7 +1,6 @@
 package steampipe
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path"
@@ -11,36 +10,18 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/opengovern/og-util/pkg/config"
-	"github.com/opengovern/og-util/pkg/source"
 )
 
-func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, connector source.Type) error {
-	switch connector {
-	case source.CloudAWS:
-		err := BuildSpecFile("aws", elasticSearchConfig)
-		if err != nil {
-			return err
-		}
-		err = PopulateEnv(elasticSearchConfig)
-		if err != nil {
-			return err
-		}
-	case source.CloudAzure:
-		err := BuildSpecFile("azure", elasticSearchConfig)
-		if err != nil {
-			return err
-		}
-		err = BuildSpecFile("azuread", elasticSearchConfig)
-		if err != nil {
-			return err
-		}
-		err = PopulateEnv(elasticSearchConfig)
-		if err != nil {
-			return err
-		}
-	default:
-		return errors.New("error: invalid source type")
+func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, steampipePluginName string) error {
+	err := BuildSpecFile(steampipePluginName, elasticSearchConfig)
+	if err != nil {
+		return err
 	}
+	err = PopulateEnv(elasticSearchConfig)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
