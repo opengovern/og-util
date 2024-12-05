@@ -15,7 +15,7 @@ import (
 type OpenGovernanceConfigKey string
 
 const (
-	OpenGovernanceConfigKeyAccountID                 OpenGovernanceConfigKey = "account_id"
+	OpenGovernanceConfigKeyIntegrationID             OpenGovernanceConfigKey = "integration_id"
 	OpenGovernanceConfigKeyResourceCollectionFilters OpenGovernanceConfigKey = "resource_collection_filters"
 	OpenGovernanceConfigKeyClientType                OpenGovernanceConfigKey = "client_type"
 )
