@@ -125,15 +125,12 @@ type BoolFilter interface {
 }
 
 func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
-	filtersQuals map[string]string,
-	accountProvider string, accountID *string, encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
-	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals,
-		accountProvider, accountID, encodedResourceGroupFilters, clientType, false)
+	filtersQuals map[string]string, integrationID *string, encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
+	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals, integrationID, encodedResourceGroupFilters, clientType, false)
 }
 
 func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext,
-	filtersQuals map[string]string,
-	accountProvider string, accountID *string, encodedResourceGroupFilters *string, clientType *string,
+	filtersQuals map[string]string, integrationID *string, encodedResourceGroupFilters *string, clientType *string,
 	useDefaultFieldName bool) []BoolFilter {
 	var filters []BoolFilter
 	plugin.Logger(ctx).Trace("BuildFilter", "queryContext.UnsafeQuals", queryContext.UnsafeQuals)
@@ -187,15 +184,8 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		}
 	}
 
-	if accountID != nil && len(*accountID) > 0 && *accountID != "all" {
-		var accountFieldName string
-		switch accountProvider {
-		case "aws":
-			accountFieldName = "AccountID"
-		case "azure":
-			accountFieldName = "SubscriptionID"
-		}
-		filters = append(filters, NewTermFilter("metadata."+accountFieldName, *accountID))
+	if integrationID != nil && len(*integrationID) > 0 && *integrationID != "all" {
+		filters = append(filters, NewTermFilter("integration_id", *integrationID))
 	}
 
 	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
