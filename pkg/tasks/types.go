@@ -10,10 +10,7 @@ type TaskRequest struct {
 	IngestionPipelineEndpoint string `json:"ingestionPipelineEndpoint"`
 	UseOpenSearch             bool   `json:"useOpenSearch"`
 
-	DescribeJob TaskDefinition `json:"describeJob"`
+	TaskDefinition TaskDefinition `json:"taskDefinition"`
 
 	ExtraInputs map[string][]string `json:"extraInputs"`
-}
-
-type TaskResponse struct {
 }
