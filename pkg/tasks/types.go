@@ -1,10 +1,10 @@
 package tasks
 
 type TaskDefinition struct {
-	RunID      uint              `json:"runId"`
-	TaskType   string            `json:"taskType"`
-	ResultType string            `json:"resultType"`
-	Params     map[string]string `json:"params"`
+	RunID        uint              `json:"runId"`
+	TaskType     string            `json:"taskType"`
+	ResourceType string            `json:"resourceType"`
+	Params       map[string]string `json:"params"`
 }
 
 type TaskRequest struct {
