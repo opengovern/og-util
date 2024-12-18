@@ -14,6 +14,3 @@ type TaskRequest struct {
 
 	ExtraInputs map[string][]string `json:"extraInputs"`
 }
-
-type TaskResponse struct {
-}
