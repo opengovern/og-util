@@ -102,6 +102,7 @@ type TaskResult struct {
 	ResourceID   string            `json:"resource_id"`
 	ResourceName string            `json:"resource_name"`
 	Description  interface{}       `json:"description"`
+	TaskType     string            `json:"task_type"`
 	ResultType   string            `json:"result_type"`
 	Metadata     map[string]string `json:"metadata"`
 	DescribedBy  string            `json:"described_by"`
@@ -111,6 +112,7 @@ type TaskResult struct {
 func (r TaskResult) KeysAndIndex() ([]string, string) {
 	return []string{
 		r.ResourceID,
+		r.TaskType,
 		r.ResultType,
 	}, ResourceTypeToESIndex(r.ResultType)
 }
