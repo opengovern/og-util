@@ -93,3 +93,24 @@ func ResourceTypeToESIndex(t string) string {
 	t = stopWordsRe.ReplaceAllString(t, "_")
 	return strings.ToLower(t)
 }
+
+type TaskResult struct {
+	EsID    string `json:"es_id"`
+	EsIndex string `json:"es_index"`
+
+	PlatformID   string            `json:"platform_id"`
+	ResourceID   string            `json:"resource_id"`
+	ResourceName string            `json:"resource_name"`
+	Description  interface{}       `json:"description"`
+	ResultType   string            `json:"result_type"`
+	Metadata     map[string]string `json:"metadata"`
+	DescribedBy  string            `json:"described_by"`
+	DescribedAt  int64             `json:"described_at"`
+}
+
+func (r TaskResult) KeysAndIndex() ([]string, string) {
+	return []string{
+		r.ResourceID,
+		r.ResultType,
+	}, ResourceTypeToESIndex(r.ResultType)
+}
