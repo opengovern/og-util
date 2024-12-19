@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	pg_query_go "github.com/pganalyze/pg_query_go/v4"
 )
 
@@ -54,7 +54,7 @@ func NewSteampipeDatabase(option Option) (*Database, error) {
 		option.Db,
 	)
 
-	conn, err := pgxpool.Connect(context.Background(), connString)
+	conn, err := pgxpool.New(context.Background(), connString)
 	if err != nil {
 		return nil, err
 	}
