@@ -31,7 +31,7 @@ type DescribeWorkerInput struct {
 
 	DescribeJob DescribeJob `json:"describeJob"`
 
-	ExtraInputs map[string][]string `json:"extraInputs"`
+	ExtraInputs map[string]string `json:"extraInputs"`
 }
 
 type ResourceType interface {
