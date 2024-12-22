@@ -31,3 +31,4 @@ jobs:
           github_token: ${{ secrets.OG_RELEASE_TAG_UPDATE }}
           release_branches: main
           tag_prefix: v
+
