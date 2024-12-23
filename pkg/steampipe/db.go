@@ -140,8 +140,9 @@ func (s *Database) Query(ctx context.Context, query string, from, size *int, ord
 
 	fmt.Println("query is: ", query)
 	fmt.Println("size: ", size, "from:", from)
-
+	fmt.Println("result is: ", statement.GetSortClause(), statement.GetLimitCount(), statement.GetLimitOffset())
 	r, err := s.conn.Query(ctx, query)
+	fmt.Println("r is: ", r)
 	if err != nil {
 		return nil, err
 	}

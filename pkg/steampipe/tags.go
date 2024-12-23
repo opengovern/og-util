@@ -16,6 +16,7 @@ func ExtractTagsAndNames(plg *plugin.Plugin, logger *zap.Logger, pluginTableName
 	var cells map[string]*proto.Column
 
 	desc, err := ConvertToDescription(logger, resourceType, source, descriptionMap)
+	logger.Info("ConvertToDescription", zap.Any("desc", desc), zap.Error(err))
 	if err != nil {
 		if logger != nil {
 			logger.Error("Error converting to description", zap.Error(err), zap.String("resourceType", resourceType), zap.Any("source", source))

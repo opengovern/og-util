@@ -87,6 +87,7 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 	}
 
 	res, err := c.es.Search(opts...)
+	fmt.Println("res is: ", res)
 	defer CloseSafe(res)
 	if err != nil {
 		var b []byte
@@ -108,6 +109,8 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 	}
 
 	b, err := io.ReadAll(res.Body)
+	fmt.Println("b is: ", string(b))
+
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
