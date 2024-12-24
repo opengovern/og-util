@@ -28,7 +28,7 @@ type Resource struct {
 	// ResourceName is the name of the resource.
 	ResourceName string `json:"resource_name"`
 	// Description is the description of the resource based on the describe call.
-	Description interface{} `json:"description"`
+	Description interface{} `json:"Description"`
 	// IntegrationType is the type of the integration source of the resource, i.e. AWS Cloud, Azure Cloud.
 	IntegrationType integration.Type `json:"integration_type"`
 	// ResourceType is the type of the resource.
