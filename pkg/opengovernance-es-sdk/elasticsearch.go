@@ -26,16 +26,18 @@
 //
 // 2. Query Building and Filter Types
 //    - BuildFilter / BuildFilterWithDefaultFieldName
-//      Translates external query context (e.g., from Steampipe, or from the integrator’s code) into
+//      Translates external query context (e.g. from Steampipe, or from the integrator’s code) into
 //      “BoolFilter” objects like TermFilter, TermsFilter, RangeFilter, etc.
 //    - Filter Structs
-//       * TermFilter        => Single exact match (e.g. `"term": {"field": "value"}`)
-//       * TermsFilter       => Multi-value match (`"terms": {"field": [...]}`)
-//       * RangeFilter       => Range queries (`"range": {...}` supporting `gt`, `gte`, `lt`, `lte`)
-//       * BoolMustFilter    => AND relationships (`"must": [...]`)
-//       * BoolShouldFilter  => OR relationships (`"should": [...]`)
-//       * BoolMustNotFilter => NOT relationships (`"must_not": [...]`)
-//       * NestedFilter      => Nested field queries (`"nested": {...}`)
+//       * TermFilter         => Single exact match for "=" (possibly case-insensitive or dual approach).
+//       * TermFilterExact    => Single exact match for "==" (keyword-only, case-sensitive).
+//       * TermsFilter        => Multi-value match (`"terms": {"field": [...]}`).
+//       * RangeFilter        => Range queries (`"range": {...}`).
+//       * BoolMustFilter     => AND relationships (`"must": [...]`).
+//       * BoolShouldFilter   => OR relationships (`"should": [...]`).
+//       * BoolMustNotFilter  => NOT relationships (`"must_not": [...]`).
+//       * NestedFilter       => Nested field queries (`"nested": {...}`).
+//       * **MatchFilter**    => For the new "LIKE" operator.
 //      Each filter object implements MarshalJSON() to produce valid OpenSearch DSL.
 //
 // 3. Error Handling & Response Utilities
@@ -86,21 +88,20 @@ import (
 	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 )
 
-// textFields indicates which fields are known to be "text" and thus have a ".keyword" subfield.
+// textFields indicates which fields are "text" and can be used with match queries, .keyword, etc.
 var textFields = map[string]bool{
 	"Description.Name":          true,
 	"Description.NameWithOwner": true,
-	// Add more as needed...
+	// add more fields as needed...
 }
 
-// containsSpecialSymbol checks for punctuation that might need dual (field vs. .keyword).
+// containsSpecialSymbol checks for punctuation that might need a dual approach for "=".
 func containsSpecialSymbol(val string) bool {
 	specialChars := "/\\<>,-_()[]="
 	return strings.ContainsAny(val, specialChars)
 }
 
-// BuildTermCaseInsensitive is used for normal "=" on text fields, producing
-// a single text term with "case_insensitive": true.
+// buildTermCaseInsensitive for normal "=" on text fields.
 func buildTermCaseInsensitive(field, value string) map[string]any {
 	return map[string]any{
 		field: map[string]any{
@@ -110,7 +111,7 @@ func buildTermCaseInsensitive(field, value string) map[string]any {
 	}
 }
 
-// CloseSafe reads and closes the response body to free resources.
+// CloseSafe ...
 func CloseSafe(resp *opensearchapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
@@ -118,7 +119,7 @@ func CloseSafe(resp *opensearchapi.Response) {
 	}
 }
 
-// ESCloseSafe is similar but for go-elasticsearch/v7 esapi.Response.
+// ESCloseSafe ...
 func ESCloseSafe(resp *esapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
@@ -126,7 +127,7 @@ func ESCloseSafe(resp *esapi.Response) {
 	}
 }
 
-// CheckError checks if resp is an error.
+// CheckError ...
 func CheckError(resp *opensearchapi.Response) error {
 	if !resp.IsError() {
 		return nil
@@ -196,15 +197,13 @@ func ESCheckError(resp *esapi.Response) error {
 // IsIndexNotFoundErr ...
 func IsIndexNotFoundErr(err error) bool {
 	var e ErrorResponse
-	return errors.As(err, &e) &&
-		strings.EqualFold(e.Info.Type, "index_not_found_exception")
+	return errors.As(err, &e) && strings.EqualFold(e.Info.Type, "index_not_found_exception")
 }
 
 // IsIndexAlreadyExistsErr ...
 func IsIndexAlreadyExistsErr(err error) bool {
 	var e ErrorResponse
-	return errors.As(err, &e) &&
-		strings.Contains(e.Info.Type, "index_already_exists_exception")
+	return errors.As(err, &e) && strings.Contains(e.Info.Type, "index_already_exists_exception")
 }
 
 // BoolFilter ...
@@ -213,18 +212,24 @@ type BoolFilter interface {
 }
 
 // BuildFilter ...
-func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
-	filtersQuals map[string]string, integrationID *string,
-	encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
+func BuildFilter(ctx context.Context,
+	queryContext *plugin.QueryContext,
+	filtersQuals map[string]string,
+	integrationID *string,
+	encodedResourceGroupFilters *string,
+	clientType *string) []BoolFilter {
 
 	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals,
 		integrationID, encodedResourceGroupFilters, clientType, false)
 }
 
 // BuildFilterWithDefaultFieldName ...
-func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext,
-	filtersQuals map[string]string, integrationID *string,
-	encodedResourceGroupFilters *string, clientType *string,
+func BuildFilterWithDefaultFieldName(ctx context.Context,
+	queryContext *plugin.QueryContext,
+	filtersQuals map[string]string,
+	integrationID *string,
+	encodedResourceGroupFilters *string,
+	clientType *string,
 	useDefaultFieldName bool) []BoolFilter {
 
 	var filters []BoolFilter
@@ -250,14 +255,19 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 				oprStr = strOpr.StringValue
 			}
 
-			// if operator is "==", produce a special "TermFilter" with a flag
-			// meaning "use EXACT KEYWORD match" (case-sensitive).
+			// 1) If operator is "==", produce an EXACT KEYWORD match.
 			if oprStr == "==" {
 				filters = append(filters, NewTermFilterWithExact(fieldName, qualValue(qual.GetValue())))
 				continue
 			}
 
-			// For the normal "=", ">" etc...
+			// 2) If operator is "LIKE", produce "match" query (only if text).
+			if oprStr == "LIKE" {
+				filters = append(filters, NewMatchFilter(fieldName, qualValue(qual.GetValue())))
+				continue
+			}
+
+			// 3) Normal "=" => either TermsFilter if it's a list, or TermFilter single
 			if oprStr == "=" {
 				if qual.GetValue().GetListValue() != nil {
 					vals := qual.GetValue().GetListValue().GetValues()
@@ -270,6 +280,8 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 					filters = append(filters, NewTermFilter(fieldName, qualValue(qual.GetValue())))
 				}
 			}
+
+			// 4) Ranges...
 			if oprStr == ">" {
 				filters = append(filters, NewRangeFilter(fieldName, qualValue(qual.GetValue()), "", "", ""))
 			}
@@ -289,7 +301,8 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		filters = append(filters, NewTermFilter("integration_id", *integrationID))
 	}
 
-	// resource group filters logic ...
+	// The following code remains the same: building resourceGroupFilters, etc.
+
 	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
 		resourceGroupFiltersJson, err := base64.StdEncoding.DecodeString(*encodedResourceGroupFilters)
 		if err != nil {
@@ -364,12 +377,12 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 	}
 
 	jsonFilters, _ := json.Marshal(filters)
-	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters,
-		"jsonFilters", string(jsonFilters))
+	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters, "jsonFilters", string(jsonFilters))
 
 	return filters
 }
 
+// qualValue ...
 func qualValue(qual *proto.QualValue) string {
 	var valStr string
 	val := qual.Value
@@ -392,40 +405,46 @@ func qualValue(qual *proto.QualValue) string {
 	return valStr
 }
 
-// TermFilter => for normal "=" logic
+// TermFilter => for normal "="
 type TermFilter struct {
 	field string
 	value string
 }
 
 func NewTermFilter(field, value string) BoolFilter {
-	return TermFilter{
-		field: field,
-		value: value,
-	}
+	return TermFilter{field: field, value: value}
 }
 
-// TermFilterExact => used if operator is "==" for text fields => EXACT KEYWORD match
+// TermFilterExact => for "=="
 type TermFilterExact struct {
 	field string
 	value string
 }
 
-// NewTermFilterWithExact => used in BuildFilter if operator is "=="
 func NewTermFilterWithExact(field, value string) BoolFilter {
-	return TermFilterExact{
-		field: field,
-		value: value,
-	}
+	return TermFilterExact{field: field, value: value}
 }
 
-// MarshalJSON for normal "=" logic
+// MatchFilter => for "LIKE"
+type MatchFilter struct {
+	field string
+	value string
+}
+
+func NewMatchFilter(field, value string) BoolFilter {
+	return MatchFilter{field: field, value: value}
+}
+
+// -------------------------------------------------------------------
+// TermFilter: for normal "="
+// -------------------------------------------------------------------
 func (t TermFilter) MarshalJSON() ([]byte, error) {
 	isText := textFields[t.field]
 
 	if isText {
-		// same logic as your existing code: case_insensitive + possibly dual approach
+		// same case_insensitive or dual approach logic:
 		if containsSpecialSymbol(t.value) {
+			// dual approach => bool.should => field & field.keyword
 			return json.Marshal(map[string]any{
 				"bool": map[string]any{
 					"should": []map[string]any{
@@ -440,7 +459,8 @@ func (t TermFilter) MarshalJSON() ([]byte, error) {
 				},
 			})
 		}
-		// single text approach => case_insensitive
+
+		// single => text approach => "case_insensitive": true
 		return json.Marshal(map[string]any{
 			"term": buildTermCaseInsensitive(t.field, t.value),
 		})
@@ -456,22 +476,20 @@ func (t TermFilter) MarshalJSON() ([]byte, error) {
 
 func (t TermFilter) IsBoolFilter() {}
 
-// MarshalJSON for "==", we do EXACT match on field.keyword only if it's text
+// -------------------------------------------------------------------
+// TermFilterExact => for "==", if text => field.keyword only, case-sensitive
+// -------------------------------------------------------------------
 func (te TermFilterExact) MarshalJSON() ([]byte, error) {
 	isText := textFields[te.field]
-
 	if isText {
-		// For "==", we do EXACT match => field.keyword => case-sensitive
-		// e.g. { "term": { "Description.Name.keyword": "<value>" } }
 		keywordField := te.field + ".keyword"
 		return json.Marshal(map[string]any{
 			"term": map[string]any{
-				keywordField: te.value,
+				keywordField: te.value, // case-sensitive exact
 			},
 		})
 	}
-
-	// If not text => fallback to normal single term
+	// fallback for non-text => normal single term
 	return json.Marshal(map[string]any{
 		"term": map[string]string{
 			te.field: te.value,
@@ -481,16 +499,46 @@ func (te TermFilterExact) MarshalJSON() ([]byte, error) {
 
 func (te TermFilterExact) IsBoolFilter() {}
 
+// -------------------------------------------------------------------
+// MatchFilter => for "LIKE". If field is text, we produce
+// { "match": { "<field>": { "query": "<value>" } } }
+// for partial text search. If not text => fallback single term?
+// Some might prefer an error or wildcard query, up to you.
+// -------------------------------------------------------------------
+func (m MatchFilter) MarshalJSON() ([]byte, error) {
+	isText := textFields[m.field]
+	if isText {
+		// For partial text matching, let's do "match" query.
+		// If you prefer a "match_phrase" or "wildcard" approach, adapt accordingly.
+		return json.Marshal(map[string]any{
+			"match": map[string]any{
+				m.field: map[string]any{
+					"query": m.value,
+					// you can add "operator": "and", "fuzziness": etc. as you like.
+				},
+			},
+		})
+	}
+
+	// if not text => fallback or produce normal single term
+	return json.Marshal(map[string]any{
+		"term": map[string]string{
+			m.field: m.value,
+		},
+	})
+}
+
+func (m MatchFilter) IsBoolFilter() {}
+
+// The rest remain unchanged: TermsFilter, TermsSetMatchAllFilter, RangeFilter, etc.
+
 type TermsFilter struct {
 	field  string
 	values []string
 }
 
 func NewTermsFilter(field string, values []string) BoolFilter {
-	return TermsFilter{
-		field:  field,
-		values: values,
-	}
+	return TermsFilter{field: field, values: values}
 }
 
 func (t TermsFilter) MarshalJSON() ([]byte, error) {
@@ -508,10 +556,7 @@ type TermsSetMatchAllFilter struct {
 }
 
 func NewTermsSetMatchAllFilter(field string, values []string) BoolFilter {
-	return TermsSetMatchAllFilter{
-		field:  field,
-		values: values,
-	}
+	return TermsSetMatchAllFilter{field: field, values: values}
 }
 
 func (t TermsSetMatchAllFilter) MarshalJSON() ([]byte, error) {
@@ -537,13 +582,7 @@ type RangeFilter struct {
 }
 
 func NewRangeFilter(field, gt, gte, lt, lte string) BoolFilter {
-	return RangeFilter{
-		field: field,
-		gt:    gt,
-		gte:   gte,
-		lt:    lt,
-		lte:   lte,
-	}
+	return RangeFilter{field: field, gt: gt, gte: gte, lt: lt, lte: lte}
 }
 
 func (t RangeFilter) MarshalJSON() ([]byte, error) {
@@ -560,7 +599,6 @@ func (t RangeFilter) MarshalJSON() ([]byte, error) {
 	if len(t.lte) > 0 {
 		fieldMap["lte"] = t.lte
 	}
-
 	return json.Marshal(map[string]interface{}{
 		"range": map[string]interface{}{
 			t.field: fieldMap,
@@ -574,9 +612,7 @@ type BoolShouldFilter struct {
 }
 
 func NewBoolShouldFilter(filters ...BoolFilter) BoolFilter {
-	return BoolShouldFilter{
-		filters: filters,
-	}
+	return BoolShouldFilter{filters: filters}
 }
 
 func (t BoolShouldFilter) MarshalJSON() ([]byte, error) {
@@ -593,9 +629,7 @@ type BoolMustFilter struct {
 }
 
 func NewBoolMustFilter(filters ...BoolFilter) BoolFilter {
-	return BoolMustFilter{
-		filters: filters,
-	}
+	return BoolMustFilter{filters: filters}
 }
 
 func (t BoolMustFilter) MarshalJSON() ([]byte, error) {
@@ -612,9 +646,7 @@ type BoolMustNotFilter struct {
 }
 
 func NewBoolMustNotFilter(filters ...BoolFilter) BoolFilter {
-	return BoolMustNotFilter{
-		filters: filters,
-	}
+	return BoolMustNotFilter{filters: filters}
 }
 
 func (t BoolMustNotFilter) MarshalJSON() ([]byte, error) {
@@ -632,10 +664,7 @@ type NestedFilter struct {
 }
 
 func NewNestedFilter(path string, query BoolFilter) BoolFilter {
-	return NestedFilter{
-		path:  path,
-		query: query,
-	}
+	return NestedFilter{path: path, query: query}
 }
 
 func (t NestedFilter) MarshalJSON() ([]byte, error) {
@@ -648,6 +677,7 @@ func (t NestedFilter) MarshalJSON() ([]byte, error) {
 }
 func (t NestedFilter) IsBoolFilter() {}
 
+// Healthcheck ...
 func (c Client) Healthcheck(ctx context.Context) error {
 	opts := []func(request *opensearchapi.ClusterHealthRequest){
 		c.es.Cluster.Health.WithContext(ctx),
@@ -662,7 +692,6 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	if res.StatusCode != http.StatusOK {
 		return errors.New("failed to get cluster health")
 	}
-
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("read body: %v", err)
@@ -671,13 +700,13 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	if err := json.Unmarshal(b, &js); err != nil {
 		return fmt.Errorf("unmarshal: %v", err)
 	}
-
 	if js["status"] != "green" && js["status"] != "yellow" {
 		return errors.New("unhealthy cluster status")
 	}
 	return nil
 }
 
+// CreateIndexTemplate ...
 func (c Client) CreateIndexTemplate(ctx context.Context, name string, body string) error {
 	opts := []func(request *opensearchapi.IndicesPutIndexTemplateRequest){
 		c.es.Indices.PutIndexTemplate.WithContext(ctx),
@@ -695,6 +724,7 @@ func (c Client) CreateIndexTemplate(ctx context.Context, name string, body strin
 	return nil
 }
 
+// CreateComponentTemplate ...
 func (c Client) CreateComponentTemplate(ctx context.Context, name string, body string) error {
 	opts := []func(request *opensearchapi.ClusterPutComponentTemplateRequest){
 		c.es.Cluster.PutComponentTemplate.WithContext(ctx),
@@ -706,7 +736,6 @@ func (c Client) CreateComponentTemplate(ctx context.Context, name string, body s
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create component template")
 	}
@@ -732,8 +761,10 @@ type DeleteByQueryResponse struct {
 	Failures             []any   `json:"failures"`
 }
 
-func DeleteByQuery(ctx context.Context, es *opensearch.Client, indices []string,
-	query any, opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+// DeleteByQuery ...
+func DeleteByQuery(ctx context.Context, es *opensearch.Client,
+	indices []string, query any,
+	opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
 
 	defaultOpts := []func(*opensearchapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
