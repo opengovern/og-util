@@ -86,8 +86,48 @@ import (
 	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 )
 
-// CloseSafe reads and closes the response body to free resources,
-// avoiding "connection leak" issues in the OpenSearch client.
+// -------------------------------------------------------------------
+// Indicate which fields are "text" and thus presumably have .keyword
+// and can safely use "case_insensitive": true
+// (You can fill or generate this map based on your mappings.)
+// -------------------------------------------------------------------
+var textFields = map[string]bool{
+	"Description.NameWithOwner": true,
+	"Description.Name":          true,
+	// Add more text fields as needed
+}
+
+// containsSpecialSymbol checks for punctuation that might need a dual approach (field & .keyword).
+func containsSpecialSymbol(val string) bool {
+	specialChars := "/\\<>,-_()[]="
+	return strings.ContainsAny(val, specialChars)
+}
+
+// -------------------------------------------------------------------
+// Utility: Single text "term" object, with "value" & "case_insensitive".
+// Only used if isText == true. E.g.:
+//
+//  {
+//    "<field>": {
+//      "value": "<val>",
+//      "case_insensitive": true
+//    }
+//  }
+// -------------------------------------------------------------------
+func buildCaseInsensitiveTerm(field, value string) map[string]any {
+	return map[string]any{
+		field: map[string]any{
+			"value":            value,
+			"case_insensitive": true,
+		},
+	}
+}
+
+// -------------------------------------------------------------------
+// The rest: standard code from your snippet
+// -------------------------------------------------------------------
+
+// CloseSafe ...
 func CloseSafe(resp *opensearchapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
@@ -95,7 +135,7 @@ func CloseSafe(resp *opensearchapi.Response) {
 	}
 }
 
-// ESCloseSafe is similar to CloseSafe but for the "go-elasticsearch/v7" esapi.Response type.
+// ESCloseSafe ...
 func ESCloseSafe(resp *esapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
@@ -103,8 +143,7 @@ func ESCloseSafe(resp *esapi.Response) {
 	}
 }
 
-// CheckError inspects an opensearchapi.Response to see if it's an error response.
-// If so, it unmarshals the body into an ErrorResponse for further inspection.
+// CheckError ...
 func CheckError(resp *opensearchapi.Response) error {
 	if !resp.IsError() {
 		return nil
@@ -117,20 +156,16 @@ func CheckError(resp *opensearchapi.Response) error {
 
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
-		// If we fail to unmarshal, we return the raw body for debugging.
 		return fmt.Errorf("%s: %s", resp.String(), string(data))
 	}
 
-	// If the error type/reason is empty, just return the body text.
 	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
 		return fmt.Errorf("%s: %s", resp.String(), string(data))
 	}
-
 	return e
 }
 
-// LogWarn is a helper function for consistent logging of warnings. If no logger is found
-// in the context, it falls back to fmt.Println.
+// LogWarn ...
 func LogWarn(ctx context.Context, data string) {
 	if ctx.Value(context_key.Logger) == nil {
 		fmt.Println(data)
@@ -139,8 +174,7 @@ func LogWarn(ctx context.Context, data string) {
 	}
 }
 
-// CheckErrorWithContext does the same error check as CheckError but also logs
-// the error body in the event an error is present.
+// CheckErrorWithContext ...
 func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) error {
 	if !resp.IsError() {
 		return nil
@@ -150,7 +184,6 @@ func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) er
 	if err != nil {
 		return fmt.Errorf("read error: %w", err)
 	}
-
 	LogWarn(ctx, fmt.Sprintf("CheckErr data: %s", string(data)))
 
 	var e ErrorResponse
@@ -160,22 +193,18 @@ func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) er
 	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
 		return fmt.Errorf(string(data))
 	}
-
 	return e
 }
 
-// ESCheckError is similar to CheckError, but it works with the go-elasticsearch/v7
-// esapi.Response instead of opensearchapi.Response.
+// ESCheckError ...
 func ESCheckError(resp *esapi.Response) error {
 	if !resp.IsError() {
 		return nil
 	}
-
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read error: %w", err)
 	}
-
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
 		return fmt.Errorf(string(data))
@@ -183,77 +212,68 @@ func ESCheckError(resp *esapi.Response) error {
 	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
 		return fmt.Errorf(string(data))
 	}
-
 	return e
 }
 
-// IsIndexNotFoundErr returns true if the given error is an index_not_found_exception
-// from OpenSearch.
+// IsIndexNotFoundErr ...
 func IsIndexNotFoundErr(err error) bool {
 	var e ErrorResponse
 	return errors.As(err, &e) &&
 		strings.EqualFold(e.Info.Type, "index_not_found_exception")
 }
 
-// IsIndexAlreadyExistsErr checks if the error indicates the index already exists.
+// IsIndexAlreadyExistsErr ...
 func IsIndexAlreadyExistsErr(err error) bool {
 	var e ErrorResponse
 	return errors.As(err, &e) &&
 		strings.Contains(e.Info.Type, "index_already_exists_exception")
 }
 
-// BoolFilter is a common interface for all filter objects that can be marshaled
-// into part of a JSON "bool" query. This includes TermFilter, RangeFilter, etc.
+// BoolFilter ...
 type BoolFilter interface {
 	IsBoolFilter()
 }
 
-// BuildFilter is the main entry point used by integrators (like Steampipe, or OpenComply modules).
-// It reads the queryContext (which includes WHERE clauses) and transforms them
-// into an array of BoolFilter objects. The filtersQuals map indicates how to map
-// each column name to an actual field path in ES.
+// BuildFilter ...
 func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
-	filtersQuals map[string]string, integrationID *string, encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
-	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals, integrationID, encodedResourceGroupFilters, clientType, false)
+	filtersQuals map[string]string, integrationID *string,
+	encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
+
+	return BuildFilterWithDefaultFieldName(ctx, queryContext, filtersQuals,
+		integrationID, encodedResourceGroupFilters, clientType, false)
 }
 
-// BuildFilterWithDefaultFieldName is a variant of BuildFilter that optionally uses the
-// field name directly (useDefaultFieldName = true) if it's not found in filtersQuals.
+// BuildFilterWithDefaultFieldName ...
 func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext,
-	filtersQuals map[string]string, integrationID *string, encodedResourceGroupFilters *string, clientType *string,
+	filtersQuals map[string]string, integrationID *string,
+	encodedResourceGroupFilters *string, clientType *string,
 	useDefaultFieldName bool) []BoolFilter {
 
 	var filters []BoolFilter
 	plugin.Logger(ctx).Trace("BuildFilter", "queryContext.UnsafeQuals", queryContext.UnsafeQuals)
 
-	// Loop through each set of Quals from the Steampipe/Integrations query
 	for _, quals := range queryContext.UnsafeQuals {
 		if quals == nil {
 			continue
 		}
-
 		for _, qual := range quals.GetQuals() {
 			fn := qual.GetFieldName()
 			fieldName, ok := filtersQuals[fn]
 			if !ok {
-				// If the user wants default field usage, fallback to fn
 				if useDefaultFieldName {
 					fieldName = fn
 				} else {
 					continue
 				}
 			}
-
-			// Convert the operator to string form
 			var oprStr string
 			opr := qual.GetOperator()
 			if strOpr, ok := opr.(*proto.Qual_StringValue); ok {
 				oprStr = strOpr.StringValue
 			}
 
-			// Based on the operator, build the corresponding filter type
+			// For =, if it's a list => TermsFilter, else single TermFilter
 			if oprStr == "=" {
-				// If the value is a list, use TermsFilter, else TermFilter
 				if qual.GetValue().GetListValue() != nil {
 					vals := qual.GetValue().GetListValue().GetValues()
 					values := make([]string, 0, len(vals))
@@ -280,12 +300,13 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		}
 	}
 
-	// If an integrationID is specified (and it's not "all"), add a TermFilter for that
 	if integrationID != nil && len(*integrationID) > 0 && *integrationID != "all" {
 		filters = append(filters, NewTermFilter("integration_id", *integrationID))
 	}
 
-	// If there's a resourceGroupFilters string, decode and build filters for it
+	// Resource group filters or any other logic remains unchanged:
+	// ...
+	// (Retaining your code for building esResourceGroupFilters if needed.)
 	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
 		resourceGroupFiltersJson, err := base64.StdEncoding.DecodeString(*encodedResourceGroupFilters)
 		if err != nil {
@@ -298,8 +319,9 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 			} else {
 				esResourceGroupFilters := make([]BoolFilter, 0, len(resourceGroupFilters)+1)
 
-				if clientType != nil && len(*clientType) > 0 && *clientType == "compliance" {
-					taglessTypes := make([]string, 0, len(awsTaglessResourceTypes)+len(azureTaglessResourceTypes))
+				if clientType != nil && *clientType == "compliance" {
+					taglessTypes := make([]string, 0,
+						len(awsTaglessResourceTypes)+len(azureTaglessResourceTypes))
 					for _, awsTaglessResourceType := range awsTaglessResourceTypes {
 						taglessTypes = append(taglessTypes, strings.ToLower(awsTaglessResourceType))
 					}
@@ -307,33 +329,32 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 						taglessTypes = append(taglessTypes, strings.ToLower(azureTaglessResourceType))
 					}
 					taglessTermsFilter := NewTermsFilter("metadata.ResourceType", taglessTypes)
-					esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(taglessTermsFilter))
+					esResourceGroupFilters = append(esResourceGroupFilters,
+						NewBoolMustFilter(taglessTermsFilter))
 				}
 
-				for _, resourceGroupFilter := range resourceGroupFilters {
+				for _, rgf := range resourceGroupFilters {
 					andFilters := make([]BoolFilter, 0, 5)
 
-					if len(resourceGroupFilter.Connectors) > 0 {
-						andFilters = append(andFilters, NewTermsFilter("source_type", resourceGroupFilter.Connectors))
+					if len(rgf.Connectors) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("source_type", rgf.Connectors))
 					}
-					if len(resourceGroupFilter.AccountIDs) > 0 {
-						andFilters = append(andFilters, NewTermsFilter("metadata.AccountID", resourceGroupFilter.AccountIDs))
+					if len(rgf.AccountIDs) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("metadata.AccountID", rgf.AccountIDs))
 					}
-					if len(resourceGroupFilter.ResourceTypes) > 0 {
-						andFilters = append(andFilters, NewTermsFilter("metadata.ResourceType", resourceGroupFilter.ResourceTypes))
+					if len(rgf.ResourceTypes) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("metadata.ResourceType", rgf.ResourceTypes))
 					}
-
-					if len(resourceGroupFilter.Regions) > 0 {
+					if len(rgf.Regions) > 0 {
 						andFilters = append(andFilters,
 							NewBoolShouldFilter(
-								NewTermsFilter("metadata.Region", resourceGroupFilter.Regions),
-								NewTermsFilter("metadata.Location", resourceGroupFilter.Regions),
+								NewTermsFilter("metadata.Region", rgf.Regions),
+								NewTermsFilter("metadata.Location", rgf.Regions),
 							),
 						)
 					}
-
-					if len(resourceGroupFilter.Tags) > 0 {
-						for k, v := range resourceGroupFilter.Tags {
+					if len(rgf.Tags) > 0 {
+						for k, v := range rgf.Tags {
 							k := strings.ToLower(k)
 							v := strings.ToLower(v)
 							andFilters = append(andFilters,
@@ -346,27 +367,26 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 							)
 						}
 					}
-
 					if len(andFilters) > 0 {
-						esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(andFilters...))
+						esResourceGroupFilters = append(esResourceGroupFilters,
+							NewBoolMustFilter(andFilters...))
 					}
 				}
-
 				if len(esResourceGroupFilters) > 0 {
-					filters = append(filters, NewBoolShouldFilter(esResourceGroupFilters...))
+					filters = append(filters,
+						NewBoolShouldFilter(esResourceGroupFilters...))
 				}
 			}
 		}
 	}
 
 	jsonFilters, _ := json.Marshal(filters)
-	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters, "jsonFilters", string(jsonFilters))
+	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters,
+		"jsonFilters", string(jsonFilters))
 
 	return filters
 }
 
-// qualValue extracts the actual string value from a proto.QualValue (Steampipe representation)
-// and converts it to a simple string for ES queries.
 func qualValue(qual *proto.QualValue) string {
 	var valStr string
 	val := qual.Value
@@ -389,32 +409,16 @@ func qualValue(qual *proto.QualValue) string {
 	return valStr
 }
 
-// containsSpecialSymbol checks if the value has punctuation that might cause tokenization
-// or partial matching in a text field. If found, we produce a dual (field + field.keyword) query.
-func containsSpecialSymbol(val string) bool {
-	// Some special chars: / \ < > , - _ ( ) [ ] =
-	specialChars := "/\\<>,-_()[]:;="
-	return strings.ContainsAny(val, specialChars)
-}
-
-// buildTermObject is a helper that returns the JSON needed under "term": { field: { ... } }
-// ensuring we always include "case_insensitive": true.
-func buildTermObject(field, value string) map[string]any {
-	return map[string]any{
-		field: map[string]any{
-			"value":            value,
-			"case_insensitive": true, // <-- new
-		},
-	}
-}
-
-// TermFilter represents a single or dual-term approach (if special symbol is found).
+// -------------------------------------------------------------------
+// TermFilter: Only do "case_insensitive" + .keyword logic if
+// the field is known to be text (via textFields[field] == true).
+// If not text => single standard term query, no case_insensitive.
+// -------------------------------------------------------------------
 type TermFilter struct {
 	field string
 	value string
 }
 
-// NewTermFilter constructs a BoolFilter for an exact match on a single field/value.
 func NewTermFilter(field, value string) BoolFilter {
 	return TermFilter{
 		field: field,
@@ -422,36 +426,47 @@ func NewTermFilter(field, value string) BoolFilter {
 	}
 }
 
-// MarshalJSON auto-checks for special symbols. If found, produce a bool.should of
-// field vs. field.keyword, each having "case_insensitive": true. Otherwise, single term.
 func (t TermFilter) MarshalJSON() ([]byte, error) {
-	if containsSpecialSymbol(t.value) {
-		// Dual query
-		return json.Marshal(map[string]any{
-			"bool": map[string]any{
-				"should": []map[string]any{
-					{
-						"term": buildTermObject(t.field, t.value),
+	isText := textFields[t.field]
+
+	// If field is a known text field
+	if isText {
+		// Check for special punctuation => might do "field" OR "field.keyword"
+		if containsSpecialSymbol(t.value) {
+			// dual approach with case_insensitive
+			return json.Marshal(map[string]any{
+				"bool": map[string]any{
+					"should": []map[string]any{
+						{
+							"term": buildCaseInsensitiveTerm(t.field, t.value),
+						},
+						{
+							"term": buildCaseInsensitiveTerm(t.field+".keyword", t.value),
+						},
 					},
-					{
-						"term": buildTermObject(t.field+".keyword", t.value),
-					},
+					"minimum_should_match": 1,
 				},
-				"minimum_should_match": 1,
-			},
-		})
+			})
+		} else {
+			// single text approach (with case_insensitive)
+			return json.Marshal(map[string]any{
+				"term": buildCaseInsensitiveTerm(t.field, t.value),
+			})
+		}
 	}
 
-	// Single term
+	// If not text => do the old single-term approach
+	// e.g. "term": { "someIntField": "123" }
 	return json.Marshal(map[string]any{
-		"term": buildTermObject(t.field, t.value),
+		"term": map[string]string{
+			t.field: t.value,
+		},
 	})
 }
 
-// IsBoolFilter ensures TermFilter implements the BoolFilter interface.
 func (t TermFilter) IsBoolFilter() {}
 
-// TermsFilter is for multi-value queries: "terms": { field: [ val1, val2 ] }
+// TermsFilter ...
 type TermsFilter struct {
 	field  string
 	values []string
@@ -464,8 +479,8 @@ func NewTermsFilter(field string, values []string) BoolFilter {
 	}
 }
 
-// MarshalJSON for TermsFilter. (No "case_insensitive" in ES yet for "terms" queries.)
 func (t TermsFilter) MarshalJSON() ([]byte, error) {
+	// standard "terms"
 	return json.Marshal(map[string]any{
 		"terms": map[string][]string{
 			t.field: t.values,
@@ -474,7 +489,6 @@ func (t TermsFilter) MarshalJSON() ([]byte, error) {
 }
 func (t TermsFilter) IsBoolFilter() {}
 
-// TermsSetMatchAllFilter is used for match-all within an array field.
 type TermsSetMatchAllFilter struct {
 	field  string
 	values []string
@@ -501,7 +515,7 @@ func (t TermsSetMatchAllFilter) MarshalJSON() ([]byte, error) {
 }
 func (t TermsSetMatchAllFilter) IsBoolFilter() {}
 
-// RangeFilter for >, >=, <, <=
+// RangeFilter ...
 type RangeFilter struct {
 	field string
 	gt    string
@@ -534,7 +548,6 @@ func (t RangeFilter) MarshalJSON() ([]byte, error) {
 	if len(t.lte) > 0 {
 		fieldMap["lte"] = t.lte
 	}
-
 	return json.Marshal(map[string]interface{}{
 		"range": map[string]interface{}{
 			t.field: fieldMap,
@@ -543,7 +556,7 @@ func (t RangeFilter) MarshalJSON() ([]byte, error) {
 }
 func (t RangeFilter) IsBoolFilter() {}
 
-// BoolShouldFilter => "bool": { "should": [ ... ] }
+// BoolShouldFilter ...
 type BoolShouldFilter struct {
 	filters []BoolFilter
 }
@@ -563,7 +576,6 @@ func (t BoolShouldFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolShouldFilter) IsBoolFilter() {}
 
-// BoolMustFilter => "bool": { "must": [ ... ] }
 type BoolMustFilter struct {
 	filters []BoolFilter
 }
@@ -583,7 +595,6 @@ func (t BoolMustFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolMustFilter) IsBoolFilter() {}
 
-// BoolMustNotFilter => "bool": { "must_not": [ ... ] }
 type BoolMustNotFilter struct {
 	filters []BoolFilter
 }
@@ -603,7 +614,7 @@ func (t BoolMustNotFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolMustNotFilter) IsBoolFilter() {}
 
-// NestedFilter => "nested": { "path": "...", "query": { ... } }
+// NestedFilter ...
 type NestedFilter struct {
 	path  string
 	query BoolFilter
@@ -626,12 +637,11 @@ func (t NestedFilter) MarshalJSON() ([]byte, error) {
 }
 func (t NestedFilter) IsBoolFilter() {}
 
-// Healthcheck checks cluster health (green or yellow is acceptable).
+// Healthcheck ...
 func (c Client) Healthcheck(ctx context.Context) error {
 	opts := []func(request *opensearchapi.ClusterHealthRequest){
 		c.es.Cluster.Health.WithContext(ctx),
 	}
-
 	res, err := c.es.Cluster.Health(opts...)
 	defer CloseSafe(res)
 	if err != nil {
@@ -639,34 +649,28 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	} else if err := CheckError(res); err != nil {
 		return fmt.Errorf("CheckError: %v", err)
 	}
-
 	if res.StatusCode != http.StatusOK {
 		return errors.New("failed to get cluster health")
 	}
-
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read body due to %v", err)
 	}
-
 	var js map[string]interface{}
 	if err := json.Unmarshal(b, &js); err != nil {
 		return fmt.Errorf("failed to unmarshal due to %v", err)
 	}
-
 	if js["status"] != "green" && js["status"] != "yellow" {
 		return errors.New("unhealthy")
 	}
-
 	return nil
 }
 
-// CreateIndexTemplate sets up an index template in OpenSearch with the provided name/body.
+// CreateIndexTemplate ...
 func (c Client) CreateIndexTemplate(ctx context.Context, name string, body string) error {
 	opts := []func(request *opensearchapi.IndicesPutIndexTemplateRequest){
 		c.es.Indices.PutIndexTemplate.WithContext(ctx),
 	}
-
 	res, err := c.es.Indices.PutIndexTemplate(name, strings.NewReader(body), opts...)
 	defer CloseSafe(res)
 	if err != nil {
@@ -674,20 +678,17 @@ func (c Client) CreateIndexTemplate(ctx context.Context, name string, body strin
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create index template")
 	}
-
 	return nil
 }
 
-// CreateComponentTemplate sets up a component template in OpenSearch.
+// CreateComponentTemplate ...
 func (c Client) CreateComponentTemplate(ctx context.Context, name string, body string) error {
 	opts := []func(request *opensearchapi.ClusterPutComponentTemplateRequest){
 		c.es.Cluster.PutComponentTemplate.WithContext(ctx),
 	}
-
 	res, err := c.es.Cluster.PutComponentTemplate(name, strings.NewReader(body), opts...)
 	defer CloseSafe(res)
 	if err != nil {
@@ -695,15 +696,13 @@ func (c Client) CreateComponentTemplate(ctx context.Context, name string, body s
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create component template")
 	}
-
 	return nil
 }
 
-// DeleteByQueryResponse captures the JSON from the _delete_by_query API.
+// DeleteByQueryResponse ...
 type DeleteByQueryResponse struct {
 	Took             int  `json:"took"`
 	TimedOut         bool `json:"timed_out"`
@@ -722,19 +721,15 @@ type DeleteByQueryResponse struct {
 	Failures             []any   `json:"failures"`
 }
 
-// DeleteByQuery runs _delete_by_query on the specified indices using the given JSON query.
-func DeleteByQuery(
-	ctx context.Context,
-	es *opensearch.Client,
-	indices []string,
-	query any,
-	opts ...func(*opensearchapi.DeleteByQueryRequest),
-) (DeleteByQueryResponse, error) {
+// DeleteByQuery ...
+func DeleteByQuery(ctx context.Context, es *opensearch.Client,
+	indices []string, query any,
+	opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+
 	defaultOpts := []func(*opensearchapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
 	}
-
 	resp, err := es.DeleteByQuery(
 		indices,
 		opensearchutil.NewJSONReader(query),
@@ -749,12 +744,10 @@ func DeleteByQuery(
 		}
 		return DeleteByQueryResponse{}, err
 	}
-
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return DeleteByQueryResponse{}, fmt.Errorf("read response: %w", err)
 	}
-
 	var response DeleteByQueryResponse
 	if err := json.Unmarshal(b, &response); err != nil {
 		return DeleteByQueryResponse{}, fmt.Errorf("unmarshal response: %w", err)
