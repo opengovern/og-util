@@ -86,52 +86,11 @@ import (
 	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 )
 
-// -------------------------------------------------------------------
-// Indicate which fields are "text" and thus presumably have .keyword
-// and can safely use "case_insensitive": true
-// (You can fill or generate this map based on your mappings.)
-// -------------------------------------------------------------------
-var textFields = map[string]bool{
-	"Description.NameWithOwner": true,
-	"Description.Name":          true,
-	// Add more text fields as needed
-}
-
-// containsSpecialSymbol checks for punctuation that might need a dual approach (field & .keyword).
-func containsSpecialSymbol(val string) bool {
-	specialChars := "/\\<>,-_()[]="
-	return strings.ContainsAny(val, specialChars)
-}
-
-// -------------------------------------------------------------------
-// Utility: Single text "term" object, with "value" & "case_insensitive".
-// Only used if isText == true. E.g.:
-//
-//  {
-//    "<field>": {
-//      "value": "<val>",
-//      "case_insensitive": true
-//    }
-//  }
-// -------------------------------------------------------------------
-func buildCaseInsensitiveTerm(field, value string) map[string]any {
-	return map[string]any{
-		field: map[string]any{
-			"value":            value,
-			"case_insensitive": true,
-		},
-	}
-}
-
-// -------------------------------------------------------------------
-// The rest: standard code from your snippet
-// -------------------------------------------------------------------
-
 // CloseSafe ...
 func CloseSafe(resp *opensearchapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
-		resp.Body.Close() //nolint:gosec
+		resp.Body.Close()
 	}
 }
 
@@ -139,7 +98,7 @@ func CloseSafe(resp *opensearchapi.Response) {
 func ESCloseSafe(resp *esapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
-		resp.Body.Close() //nolint:gosec
+		resp.Body.Close()
 	}
 }
 
@@ -148,17 +107,14 @@ func CheckError(resp *opensearchapi.Response) error {
 	if !resp.IsError() {
 		return nil
 	}
-
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read error: %w", err)
 	}
-
 	var e ErrorResponse
 	if err := json.Unmarshal(data, &e); err != nil {
 		return fmt.Errorf("%s: %s", resp.String(), string(data))
 	}
-
 	if strings.TrimSpace(e.Info.Type) == "" && strings.TrimSpace(e.Info.Reason) == "" {
 		return fmt.Errorf("%s: %s", resp.String(), string(data))
 	}
@@ -179,7 +135,6 @@ func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) er
 	if !resp.IsError() {
 		return nil
 	}
-
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read error: %w", err)
@@ -272,7 +227,6 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 				oprStr = strOpr.StringValue
 			}
 
-			// For =, if it's a list => TermsFilter, else single TermFilter
 			if oprStr == "=" {
 				if qual.GetValue().GetListValue() != nil {
 					vals := qual.GetValue().GetListValue().GetValues()
@@ -304,9 +258,7 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		filters = append(filters, NewTermFilter("integration_id", *integrationID))
 	}
 
-	// Resource group filters or any other logic remains unchanged:
-	// ...
-	// (Retaining your code for building esResourceGroupFilters if needed.)
+	// Resource group filters logic remains unchanged (if present in your code)...
 	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
 		resourceGroupFiltersJson, err := base64.StdEncoding.DecodeString(*encodedResourceGroupFilters)
 		if err != nil {
@@ -387,6 +339,7 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 	return filters
 }
 
+// qualValue ...
 func qualValue(qual *proto.QualValue) string {
 	var valStr string
 	val := qual.Value
@@ -409,11 +362,23 @@ func qualValue(qual *proto.QualValue) string {
 	return valStr
 }
 
-// -------------------------------------------------------------------
-// TermFilter: Only do "case_insensitive" + .keyword logic if
-// the field is known to be text (via textFields[field] == true).
-// If not text => single standard term query, no case_insensitive.
-// -------------------------------------------------------------------
+// containsSpecialSymbol checks for punctuation if we want to do dual (field, field.keyword)
+func containsSpecialSymbol(val string) bool {
+	specialChars := "/\\<>,-_()[]:;="
+	return strings.ContainsAny(val, specialChars)
+}
+
+// buildCaseInsensitiveTerm builds a "term" for string fields with "case_insensitive"
+func buildCaseInsensitiveTerm(field, value string) map[string]any {
+	return map[string]any{
+		field: map[string]any{
+			"value":            value,
+			"case_insensitive": true,
+		},
+	}
+}
+
+// TermFilter => either text approach (string) with optional .keyword, or single-term for numeric/bool
 type TermFilter struct {
 	field string
 	value string
@@ -427,40 +392,62 @@ func NewTermFilter(field, value string) BoolFilter {
 }
 
 func (t TermFilter) MarshalJSON() ([]byte, error) {
-	isText := textFields[t.field]
+	// Check if the QualValue is string, by seeing if it has special symbols or not.
+	// But first we only do case_insensitive if it is truly a string from the QualValue
+	// (We can't query that here directly, but we can do a simple heuristic:
+	//   If the value is numeric-like, skip. If we see a non-digit, treat as string. Or:
+	//   We rely on the user not to supply numeric to a text field. 
+	// For demonstration, let's do a quick check if the value is integer-like:
 
-	// If field is a known text field
-	if isText {
-		// Check for special punctuation => might do "field" OR "field.keyword"
-		if containsSpecialSymbol(t.value) {
-			// dual approach with case_insensitive
-			return json.Marshal(map[string]any{
-				"bool": map[string]any{
-					"should": []map[string]any{
-						{
-							"term": buildCaseInsensitiveTerm(t.field, t.value),
-						},
-						{
-							"term": buildCaseInsensitiveTerm(t.field+".keyword", t.value),
-						},
-					},
-					"minimum_should_match": 1,
-				},
-			})
-		} else {
-			// single text approach (with case_insensitive)
-			return json.Marshal(map[string]any{
-				"term": buildCaseInsensitiveTerm(t.field, t.value),
-			})
+	// Simple numeric heuristic:
+	isAllDigits := true
+	for _, c := range t.value {
+		if c < '0' || c > '9' {
+			isAllDigits = false
+			break
 		}
 	}
+	if isAllDigits {
+		// treat as numeric => single term, no case_insensitive
+		return json.Marshal(map[string]any{
+			"term": map[string]string{
+				t.field: t.value,
+			},
+		})
+	}
 
-	// If not text => do the old single-term approach
-	// e.g. "term": { "someIntField": "123" }
+	// Alternatively, if the user typed "true" or "false" => treat as bool
+	lower := strings.ToLower(t.value)
+	if lower == "true" || lower == "false" {
+		// single term, no case_insensitive
+		return json.Marshal(map[string]any{
+			"term": map[string]string{
+				t.field: t.value,
+			},
+		})
+	}
+
+	// Otherwise, we treat as text => add case_insensitive.
+	// If special punctuation => dual approach with .keyword
+	if containsSpecialSymbol(t.value) {
+		return json.Marshal(map[string]any{
+			"bool": map[string]any{
+				"should": []map[string]any{
+					{
+						"term": buildCaseInsensitiveTerm(t.field, t.value),
+					},
+					{
+						"term": buildCaseInsensitiveTerm(t.field+".keyword", t.value),
+					},
+				},
+				"minimum_should_match": 1,
+			},
+		})
+	}
+
+	// single text approach with case_insensitive
 	return json.Marshal(map[string]any{
-		"term": map[string]string{
-			t.field: t.value,
-		},
+		"term": buildCaseInsensitiveTerm(t.field, t.value),
 	})
 }
 
@@ -480,7 +467,6 @@ func NewTermsFilter(field string, values []string) BoolFilter {
 }
 
 func (t TermsFilter) MarshalJSON() ([]byte, error) {
-	// standard "terms"
 	return json.Marshal(map[string]any{
 		"terms": map[string][]string{
 			t.field: t.values,
@@ -489,6 +475,7 @@ func (t TermsFilter) MarshalJSON() ([]byte, error) {
 }
 func (t TermsFilter) IsBoolFilter() {}
 
+// TermsSetMatchAllFilter ...
 type TermsSetMatchAllFilter struct {
 	field  string
 	values []string
@@ -614,7 +601,6 @@ func (t BoolMustNotFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolMustNotFilter) IsBoolFilter() {}
 
-// NestedFilter ...
 type NestedFilter struct {
 	path  string
 	query BoolFilter
@@ -645,7 +631,7 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	res, err := c.es.Cluster.Health(opts...)
 	defer CloseSafe(res)
 	if err != nil {
-		return fmt.Errorf("failed to get cluster health due to %v", err)
+		return fmt.Errorf("failed to get cluster health: %v", err)
 	} else if err := CheckError(res); err != nil {
 		return fmt.Errorf("CheckError: %v", err)
 	}
@@ -654,11 +640,11 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	}
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read body due to %v", err)
+		return fmt.Errorf("failed to read body: %v", err)
 	}
 	var js map[string]interface{}
 	if err := json.Unmarshal(b, &js); err != nil {
-		return fmt.Errorf("failed to unmarshal due to %v", err)
+		return fmt.Errorf("failed to unmarshal: %v", err)
 	}
 	if js["status"] != "green" && js["status"] != "yellow" {
 		return errors.New("unhealthy")
@@ -678,7 +664,8 @@ func (c Client) CreateIndexTemplate(ctx context.Context, name string, body strin
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated &&
+		res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create index template")
 	}
 	return nil
@@ -696,7 +683,8 @@ func (c Client) CreateComponentTemplate(ctx context.Context, name string, body s
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated &&
+		res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create component template")
 	}
 	return nil
@@ -722,17 +710,14 @@ type DeleteByQueryResponse struct {
 }
 
 // DeleteByQuery ...
-func DeleteByQuery(ctx context.Context, es *opensearch.Client,
-	indices []string, query any,
-	opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+func DeleteByQuery(ctx context.Context, es *opensearch.Client, indices []string,
+	query any, opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
 
 	defaultOpts := []func(*opensearchapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
 	}
-	resp, err := es.DeleteByQuery(
-		indices,
-		opensearchutil.NewJSONReader(query),
+	resp, err := es.DeleteByQuery(indices, opensearchutil.NewJSONReader(query),
 		append(defaultOpts, opts...)...,
 	)
 	defer CloseSafe(resp)
