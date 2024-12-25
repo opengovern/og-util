@@ -7,59 +7,15 @@
 // Licensed under the Elastic License v2.0. You may not use this file except in compliance with the Elastic License v2.0. You may obtain a copy of the Elastic License v2.0 at
 //
 // https://www.elastic.co/licensing/elastic-license
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+// BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+// OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 // -------------------------------------------------------------------------------------------------------
-// Overview:
 //
-// This file is part of the OpenComply platform and its related integrations, serving as a core
-// mechanism for querying data in OpenSearch. Through a set of well-defined filter objects and
-// helper functions, it converts external "WHERE" clauses or other query expressions (coming from
-// integrators such as the AWS or GitHub modules, or from plugin systems like Steampipe) into
-// valid JSON for OpenSearch.
-//
-// 1. Integration with OpenComply
-//    - OpenComply orchestrates compliance data collection from multiple sources (AWS, GitHub, or
-//      other custom services). Each integration passes high-level filters to this file, which
-//      transforms them into OpenSearch queries. That allows OpenComply to unify search, indexing,
-//      and compliance checks across diverse data sets.
-//
-// 2. Query Building and Filter Types
-//    - BuildFilter / BuildFilterWithDefaultFieldName
-//      Translates external query context (e.g., from Steampipe, or from the integrator’s code) into
-//      “BoolFilter” objects like TermFilter, TermsFilter, RangeFilter, etc.
-//    - Filter Structs
-//       * TermFilter        => Single exact match (e.g. `"term": {"field": "value"}`)
-//       * TermsFilter       => Multi-value match (`"terms": {"field": [...]}`)
-//       * RangeFilter       => Range queries (`"range": {...}` supporting `gt`, `gte`, `lt`, `lte`)
-//       * BoolMustFilter    => AND relationships (`"must": [...]`)
-//       * BoolShouldFilter  => OR relationships (`"should": [...]`)
-//       * BoolMustNotFilter => NOT relationships (`"must_not": [...]`)
-//       * NestedFilter      => Nested field queries (`"nested": {...}`)
-//      Each filter object implements MarshalJSON() to produce valid OpenSearch DSL.
-//
-// 3. Error Handling & Response Utilities
-//    - CheckError, CheckErrorWithContext, ESCheckError parse responses for OpenSearch errors
-//      (`index_not_found_exception`, etc.).
-//    - CloseSafe / ESCloseSafe ensure the response body is consumed and closed to prevent
-//      connection leaks.
-//
-// 4. Additional Operations
-//    - Healthcheck checks cluster health, returning an error if "red" or otherwise failing.
-//    - CreateIndexTemplate / CreateComponentTemplate set up index or component templates in
-//      OpenSearch.
-//    - DeleteByQuery wraps `_delete_by_query`, removing documents that match a specific JSON query.
-//
-// 5. Serving Integrations & External Queries
-//    - Various integrators or direct OpenComply modules rely on BuildFilter() to take user-driven
-//      or automated compliance queries and transform them into concrete OpenSearch DSL. By
-//      handling all DSL generation and error-checking in one place, each integration (AWS, GitHub,
-//      custom) can plug into OpenComply’s unified search backend without duplicating logic.
-//
-// Overall, this file serves as the central bridge between the OpenComply platform’s external queries
-// (and integrators) and the data source. By wrapping error-handling, query-building, and
-// resource-cleanup in one place, it ensures consistent, reliable interactions with OpenSearch,
-// enabling OpenComply and its modules to manage compliance data seamlessly.
+// This file is part of the OpenComply platform. It transforms external query expressions
+// (from integrators like Steampipe) into OpenSearch queries.
 //
 // -------------------------------------------------------------------------------------------------------
 
@@ -86,7 +42,49 @@ import (
 	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 )
 
-// CloseSafe ...
+// containsSpecialSymbol checks for punctuation that might cause
+// partial tokenization in a text field, thus needing the dual approach (field & field.keyword).
+func containsSpecialSymbol(val string) bool {
+	specialChars := "/\\<>,-_()[]="
+	return strings.ContainsAny(val, specialChars)
+}
+
+// buildCaseInsensitiveTerm constructs:
+// "term": {
+//   "<field>": {
+//     "value": "<value>",
+//     "case_insensitive": true
+//   }
+// }
+func buildCaseInsensitiveTerm(field, value string) map[string]any {
+	return map[string]any{
+		field: map[string]any{
+			"value":            value,
+			"case_insensitive": true,
+		},
+	}
+}
+
+// attemptParseDate tries multiple date/time formats, including time zone variants.
+// Returns (true, theParsedTime) if success, or (false, time.Time{}) if not.
+func attemptParseDate(val string) (bool, time.Time) {
+	formats := []string{
+		time.RFC3339,                  // 2006-01-02T15:04:05Z07:00
+		time.RFC3339Nano,             // includes fractions of seconds
+		"2006-01-02",                 // date only
+		"2006-01-02 15:04:05",        // date + time
+		"2006-01-02T15:04:05.999999Z",// more variants
+		"2006-01-02T15:04:05Z07:00",   // date/time + offset
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, val); err == nil {
+			return true, t
+		}
+	}
+	return false, time.Time{}
+}
+
+// CloseSafe reads & closes the response body to avoid leaks.
 func CloseSafe(resp *opensearchapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
@@ -94,7 +92,7 @@ func CloseSafe(resp *opensearchapi.Response) {
 	}
 }
 
-// ESCloseSafe ...
+// ESCloseSafe does the same for go-elasticsearch/v7 esapi.Response.
 func ESCloseSafe(resp *esapi.Response) {
 	if resp != nil && resp.Body != nil {
 		_, _ = io.ReadAll(resp.Body)
@@ -102,7 +100,7 @@ func ESCloseSafe(resp *esapi.Response) {
 	}
 }
 
-// CheckError ...
+// CheckError reads an opensearchapi.Response and tries to decode an error.
 func CheckError(resp *opensearchapi.Response) error {
 	if !resp.IsError() {
 		return nil
@@ -121,7 +119,7 @@ func CheckError(resp *opensearchapi.Response) error {
 	return e
 }
 
-// LogWarn ...
+// LogWarn logs a warning either via plugin.Logger() or fmt.Println if none.
 func LogWarn(ctx context.Context, data string) {
 	if ctx.Value(context_key.Logger) == nil {
 		fmt.Println(data)
@@ -130,7 +128,7 @@ func LogWarn(ctx context.Context, data string) {
 	}
 }
 
-// CheckErrorWithContext ...
+// CheckErrorWithContext logs error details and returns an error if found.
 func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) error {
 	if !resp.IsError() {
 		return nil
@@ -151,7 +149,7 @@ func CheckErrorWithContext(resp *opensearchapi.Response, ctx context.Context) er
 	return e
 }
 
-// ESCheckError ...
+// ESCheckError does the same for the esapi.Response type.
 func ESCheckError(resp *esapi.Response) error {
 	if !resp.IsError() {
 		return nil
@@ -170,26 +168,24 @@ func ESCheckError(resp *esapi.Response) error {
 	return e
 }
 
-// IsIndexNotFoundErr ...
+// IsIndexNotFoundErr checks if error is index_not_found_exception
 func IsIndexNotFoundErr(err error) bool {
 	var e ErrorResponse
-	return errors.As(err, &e) &&
-		strings.EqualFold(e.Info.Type, "index_not_found_exception")
+	return errors.As(err, &e) && strings.EqualFold(e.Info.Type, "index_not_found_exception")
 }
 
-// IsIndexAlreadyExistsErr ...
+// IsIndexAlreadyExistsErr checks if error says index is already created
 func IsIndexAlreadyExistsErr(err error) bool {
 	var e ErrorResponse
-	return errors.As(err, &e) &&
-		strings.Contains(e.Info.Type, "index_already_exists_exception")
+	return errors.As(err, &e) && strings.Contains(e.Info.Type, "index_already_exists_exception")
 }
 
-// BoolFilter ...
+// BoolFilter is an interface for all filters (TermFilter, RangeFilter, etc.)
 type BoolFilter interface {
 	IsBoolFilter()
 }
 
-// BuildFilter ...
+// BuildFilter is the main entry used by integrators, producing a slice of BoolFilter.
 func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
 	filtersQuals map[string]string, integrationID *string,
 	encodedResourceGroupFilters *string, clientType *string) []BoolFilter {
@@ -198,7 +194,7 @@ func BuildFilter(ctx context.Context, queryContext *plugin.QueryContext,
 		integrationID, encodedResourceGroupFilters, clientType, false)
 }
 
-// BuildFilterWithDefaultFieldName ...
+// BuildFilterWithDefaultFieldName optionally falls back to the user’s field name.
 func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.QueryContext,
 	filtersQuals map[string]string, integrationID *string,
 	encodedResourceGroupFilters *string, clientType *string,
@@ -230,26 +226,31 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 			if oprStr == "=" {
 				if qual.GetValue().GetListValue() != nil {
 					vals := qual.GetValue().GetListValue().GetValues()
-					values := make([]string, 0, len(vals))
-					for _, value := range vals {
-						values = append(values, qualValue(value))
+					stringVals := make([]string, 0, len(vals))
+					for _, v := range vals {
+						stringVals = append(stringVals, qualValue(v))
 					}
-					filters = append(filters, NewTermsFilter(fieldName, values))
+					filters = append(filters, NewTermsFilter(fieldName, stringVals))
 				} else {
-					filters = append(filters, NewTermFilter(fieldName, qualValue(qual.GetValue())))
+					val := qualValue(qual.GetValue())
+					filters = append(filters, NewTermFilter(fieldName, val))
 				}
 			}
 			if oprStr == ">" {
-				filters = append(filters, NewRangeFilter(fieldName, qualValue(qual.GetValue()), "", "", ""))
+				filters = append(filters, NewRangeFilter(fieldName,
+					qualValue(qual.GetValue()), "", "", ""))
 			}
 			if oprStr == ">=" {
-				filters = append(filters, NewRangeFilter(fieldName, "", qualValue(qual.GetValue()), "", ""))
+				filters = append(filters, NewRangeFilter(fieldName, "",
+					qualValue(qual.GetValue()), "", ""))
 			}
 			if oprStr == "<" {
-				filters = append(filters, NewRangeFilter(fieldName, "", "", qualValue(qual.GetValue()), ""))
+				filters = append(filters, NewRangeFilter(fieldName, "", "",
+					qualValue(qual.GetValue()), ""))
 			}
 			if oprStr == "<=" {
-				filters = append(filters, NewRangeFilter(fieldName, "", "", "", qualValue(qual.GetValue())))
+				filters = append(filters, NewRangeFilter(fieldName, "", "", "",
+					qualValue(qual.GetValue())))
 			}
 		}
 	}
@@ -258,7 +259,7 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		filters = append(filters, NewTermFilter("integration_id", *integrationID))
 	}
 
-	// Resource group filters logic remains unchanged (if present in your code)...
+	// If there's an encodedResourceGroupFilters => decode & handle
 	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
 		resourceGroupFiltersJson, err := base64.StdEncoding.DecodeString(*encodedResourceGroupFilters)
 		if err != nil {
@@ -272,19 +273,16 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 				esResourceGroupFilters := make([]BoolFilter, 0, len(resourceGroupFilters)+1)
 
 				if clientType != nil && *clientType == "compliance" {
-					taglessTypes := make([]string, 0,
-						len(awsTaglessResourceTypes)+len(azureTaglessResourceTypes))
+					taglessTypes := make([]string, 0, len(awsTaglessResourceTypes)+len(azureTaglessResourceTypes))
 					for _, awsTaglessResourceType := range awsTaglessResourceTypes {
 						taglessTypes = append(taglessTypes, strings.ToLower(awsTaglessResourceType))
 					}
 					for _, azureTaglessResourceType := range azureTaglessResourceTypes {
 						taglessTypes = append(taglessTypes, strings.ToLower(azureTaglessResourceType))
 					}
-					taglessTermsFilter := NewTermsFilter("metadata.ResourceType", taglessTypes)
 					esResourceGroupFilters = append(esResourceGroupFilters,
-						NewBoolMustFilter(taglessTermsFilter))
+						NewBoolMustFilter(NewTermsFilter("metadata.ResourceType", taglessTypes)))
 				}
-
 				for _, rgf := range resourceGroupFilters {
 					andFilters := make([]BoolFilter, 0, 5)
 
@@ -307,13 +305,13 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 					}
 					if len(rgf.Tags) > 0 {
 						for k, v := range rgf.Tags {
-							k := strings.ToLower(k)
-							v := strings.ToLower(v)
+							kLower := strings.ToLower(k)
+							vLower := strings.ToLower(v)
 							andFilters = append(andFilters,
 								NewNestedFilter("canonical_tags",
 									NewBoolMustFilter(
-										NewTermFilter("canonical_tags.key", k),
-										NewTermFilter("canonical_tags.value", v),
+										NewTermFilter("canonical_tags.key", kLower),
+										NewTermFilter("canonical_tags.value", vLower),
 									),
 								),
 							)
@@ -325,21 +323,18 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 					}
 				}
 				if len(esResourceGroupFilters) > 0 {
-					filters = append(filters,
-						NewBoolShouldFilter(esResourceGroupFilters...))
+					filters = append(filters, NewBoolShouldFilter(esResourceGroupFilters...))
 				}
 			}
 		}
 	}
 
 	jsonFilters, _ := json.Marshal(filters)
-	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters,
-		"jsonFilters", string(jsonFilters))
-
+	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters, "jsonFilters", string(jsonFilters))
 	return filters
 }
 
-// qualValue ...
+// qualValue reuses your function, unchanged:
 func qualValue(qual *proto.QualValue) string {
 	var valStr string
 	val := qual.Value
@@ -355,6 +350,7 @@ func qualValue(qual *proto.QualValue) string {
 	case *proto.QualValue_InetValue:
 		valStr = fmt.Sprintf("%v", v.InetValue.GetCidr())
 	case *proto.QualValue_TimestampValue:
+		// convert e.g. 2006-01-02T15:04:05Z07:00
 		valStr = fmt.Sprintf("%v", v.TimestampValue.AsTime().Format(time.RFC3339))
 	default:
 		valStr = qual.String()
@@ -362,23 +358,7 @@ func qualValue(qual *proto.QualValue) string {
 	return valStr
 }
 
-// containsSpecialSymbol checks for punctuation if we want to do dual (field, field.keyword)
-func containsSpecialSymbol(val string) bool {
-	specialChars := "/\\<>,-_()[]:;="
-	return strings.ContainsAny(val, specialChars)
-}
-
-// buildCaseInsensitiveTerm builds a "term" for string fields with "case_insensitive"
-func buildCaseInsensitiveTerm(field, value string) map[string]any {
-	return map[string]any{
-		field: map[string]any{
-			"value":            value,
-			"case_insensitive": true,
-		},
-	}
-}
-
-// TermFilter => either text approach (string) with optional .keyword, or single-term for numeric/bool
+// TermFilter: we do type inference with new logic around leading zeros, date/time parse, etc.
 type TermFilter struct {
 	field string
 	value string
@@ -392,52 +372,49 @@ func NewTermFilter(field, value string) BoolFilter {
 }
 
 func (t TermFilter) MarshalJSON() ([]byte, error) {
-	// Check if the QualValue is string, by seeing if it has special symbols or not.
-	// But first we only do case_insensitive if it is truly a string from the QualValue
-	// (We can't query that here directly, but we can do a simple heuristic:
-	//   If the value is numeric-like, skip. If we see a non-digit, treat as string. Or:
-	//   We rely on the user not to supply numeric to a text field. 
-	// For demonstration, let's do a quick check if the value is integer-like:
+	val := t.value
 
-	// Simple numeric heuristic:
-	isAllDigits := true
-	for _, c := range t.value {
-		if c < '0' || c > '9' {
-			isAllDigits = false
-			break
-		}
-	}
-	if isAllDigits {
-		// treat as numeric => single term, no case_insensitive
-		return json.Marshal(map[string]any{
-			"term": map[string]string{
-				t.field: t.value,
-			},
-		})
-	}
-
-	// Alternatively, if the user typed "true" or "false" => treat as bool
-	lower := strings.ToLower(t.value)
+	// 1) Check for bool: "true"/"false"
+	lower := strings.ToLower(val)
 	if lower == "true" || lower == "false" {
-		// single term, no case_insensitive
-		return json.Marshal(map[string]any{
-			"term": map[string]string{
-				t.field: t.value,
-			},
-		})
+		// single term => no case_insensitive
+		return singleTerm(t.field, val), nil
 	}
 
-	// Otherwise, we treat as text => add case_insensitive.
-	// If special punctuation => dual approach with .keyword
-	if containsSpecialSymbol(t.value) {
+	// 2) Attempt date/time parse
+	okDate, _ := attemptParseDate(val)
+	if okDate {
+		// single term => no case_insensitive
+		return singleTerm(t.field, val), nil
+	}
+
+	// 3) Check if numeric, ignoring leading zeros => if "0", "1", etc. is fine. But "0001" => treat as text
+	// We'll define "numeric" as all digits & either length == 1 or no leading zero.
+	if isAllDigits(val) {
+		if len(val) == 1 {
+			// e.g. "7", that is numeric
+			return singleTerm(t.field, val), nil
+		}
+		// length > 1 => check leading digit
+		if val[0] != '0' {
+			// e.g. "1234" => numeric
+			return singleTerm(t.field, val), nil
+		}
+		// else => "0001" => treat as text
+	}
+
+	// 4) Treat as text => do "case_insensitive"
+	// If special punctuation => add .keyword as well
+	if containsSpecialSymbol(val) {
+		// dual approach
 		return json.Marshal(map[string]any{
 			"bool": map[string]any{
 				"should": []map[string]any{
 					{
-						"term": buildCaseInsensitiveTerm(t.field, t.value),
+						"term": buildCaseInsensitiveTerm(t.field, val),
 					},
 					{
-						"term": buildCaseInsensitiveTerm(t.field+".keyword", t.value),
+						"term": buildCaseInsensitiveTerm(t.field+".keyword", val),
 					},
 				},
 				"minimum_should_match": 1,
@@ -445,15 +422,39 @@ func (t TermFilter) MarshalJSON() ([]byte, error) {
 		})
 	}
 
-	// single text approach with case_insensitive
-	return json.Marshal(map[string]any{
-		"term": buildCaseInsensitiveTerm(t.field, t.value),
+	// single text approach
+	b, _ := json.Marshal(map[string]any{
+		"term": buildCaseInsensitiveTerm(t.field, val),
 	})
+	return b, nil
 }
 
 func (t TermFilter) IsBoolFilter() {}
 
-// TermsFilter ...
+// isAllDigits checks if the entire string is 0-9
+func isAllDigits(val string) bool {
+	if val == "" {
+		return false
+	}
+	for _, c := range val {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// singleTerm is a helper returning:  { "term": { field: "<val>" } } as JSON
+func singleTerm(field, val string) []byte {
+	data, _ := json.Marshal(map[string]any{
+		"term": map[string]string{
+			field: val,
+		},
+	})
+	return data
+}
+
+// TermsFilter remains the same
 type TermsFilter struct {
 	field  string
 	values []string
@@ -475,7 +476,6 @@ func (t TermsFilter) MarshalJSON() ([]byte, error) {
 }
 func (t TermsFilter) IsBoolFilter() {}
 
-// TermsSetMatchAllFilter ...
 type TermsSetMatchAllFilter struct {
 	field  string
 	values []string
@@ -520,22 +520,21 @@ func NewRangeFilter(field, gt, gte, lt, lte string) BoolFilter {
 		lte:   lte,
 	}
 }
-
 func (t RangeFilter) MarshalJSON() ([]byte, error) {
 	fieldMap := map[string]interface{}{}
-	if len(t.gt) > 0 {
+	if t.gt != "" {
 		fieldMap["gt"] = t.gt
 	}
-	if len(t.gte) > 0 {
+	if t.gte != "" {
 		fieldMap["gte"] = t.gte
 	}
-	if len(t.lt) > 0 {
+	if t.lt != "" {
 		fieldMap["lt"] = t.lt
 	}
-	if len(t.lte) > 0 {
+	if t.lte != "" {
 		fieldMap["lte"] = t.lte
 	}
-	return json.Marshal(map[string]interface{}{
+	return json.Marshal(map[string]any{
 		"range": map[string]interface{}{
 			t.field: fieldMap,
 		},
@@ -572,7 +571,6 @@ func NewBoolMustFilter(filters ...BoolFilter) BoolFilter {
 		filters: filters,
 	}
 }
-
 func (t BoolMustFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"bool": map[string][]BoolFilter{
@@ -591,7 +589,6 @@ func NewBoolMustNotFilter(filters ...BoolFilter) BoolFilter {
 		filters: filters,
 	}
 }
-
 func (t BoolMustNotFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"bool": map[string][]BoolFilter{
@@ -612,7 +609,6 @@ func NewNestedFilter(path string, query BoolFilter) BoolFilter {
 		query: query,
 	}
 }
-
 func (t NestedFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"nested": map[string]any{
@@ -664,8 +660,7 @@ func (c Client) CreateIndexTemplate(ctx context.Context, name string, body strin
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated &&
-		res.StatusCode != http.StatusNoContent {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create index template")
 	}
 	return nil
@@ -683,8 +678,7 @@ func (c Client) CreateComponentTemplate(ctx context.Context, name string, body s
 	} else if err := CheckError(res); err != nil {
 		return err
 	}
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated &&
-		res.StatusCode != http.StatusNoContent {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated && res.StatusCode != http.StatusNoContent {
 		return errors.New("failed to create component template")
 	}
 	return nil
@@ -710,31 +704,36 @@ type DeleteByQueryResponse struct {
 }
 
 // DeleteByQuery ...
-func DeleteByQuery(ctx context.Context, es *opensearch.Client, indices []string,
-	query any, opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+func DeleteByQuery(ctx context.Context,
+	es *opensearch.Client,
+	indices []string,
+	query any,
+	opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
 
 	defaultOpts := []func(*opensearchapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
 	}
-	resp, err := es.DeleteByQuery(indices, opensearchutil.NewJSONReader(query),
+	resp, err := es.DeleteByQuery(
+		indices,
+		opensearchutil.NewJSONReader(query),
 		append(defaultOpts, opts...)...,
 	)
 	defer CloseSafe(resp)
 	if err != nil {
 		return DeleteByQueryResponse{}, err
-	} else if err := CheckError(resp); err != nil {
-		if IsIndexNotFoundErr(err) {
+	} else if cerr := CheckError(resp); cerr != nil {
+		if IsIndexNotFoundErr(cerr) {
 			return DeleteByQueryResponse{}, nil
 		}
-		return DeleteByQueryResponse{}, err
+		return DeleteByQueryResponse{}, cerr
 	}
-	b, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return DeleteByQueryResponse{}, fmt.Errorf("read response: %w", err)
 	}
 	var response DeleteByQueryResponse
-	if err := json.Unmarshal(b, &response); err != nil {
+	if err := json.Unmarshal(body, &response); err != nil {
 		return DeleteByQueryResponse{}, fmt.Errorf("unmarshal response: %w", err)
 	}
 	return response, nil
