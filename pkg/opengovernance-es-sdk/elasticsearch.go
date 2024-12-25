@@ -29,7 +29,7 @@
 //      Translates external query context (e.g., from Steampipe, or from the integrator’s code) into
 //      “BoolFilter” objects like TermFilter, TermsFilter, RangeFilter, etc.
 //    - Filter Structs
-//       * TermFilter        => Single exact match (e.g. `"term": {"field": { "value": ... }}` )
+//       * TermFilter        => Single exact match (e.g. `"term": {"field": "value"}`)
 //       * TermsFilter       => Multi-value match (`"terms": {"field": [...]}`)
 //       * RangeFilter       => Range queries (`"range": {...}` supporting `gt`, `gte`, `lt`, `lte`)
 //       * BoolMustFilter    => AND relationships (`"must": [...]`)
@@ -67,6 +67,7 @@ package opengovernance
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -284,8 +285,82 @@ func BuildFilterWithDefaultFieldName(ctx context.Context, queryContext *plugin.Q
 		filters = append(filters, NewTermFilter("integration_id", *integrationID))
 	}
 
-	// ... Potential resourceGroupFilters logic omitted for brevity, same as original ...
-	// For example, if you have that code, keep or remove as needed.
+	// If there's a resourceGroupFilters string, decode and build filters for it
+	if encodedResourceGroupFilters != nil && len(*encodedResourceGroupFilters) > 0 {
+		resourceGroupFiltersJson, err := base64.StdEncoding.DecodeString(*encodedResourceGroupFilters)
+		if err != nil {
+			plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
+		} else {
+			var resourceGroupFilters []ResourceCollectionFilter
+			err = json.Unmarshal(resourceGroupFiltersJson, &resourceGroupFilters)
+			if err != nil {
+				plugin.Logger(ctx).Error("BuildFilter", "resourceGroupFiltersJson", "err", err)
+			} else {
+				esResourceGroupFilters := make([]BoolFilter, 0, len(resourceGroupFilters)+1)
+
+				if clientType != nil && len(*clientType) > 0 && *clientType == "compliance" {
+					taglessTypes := make([]string, 0, len(awsTaglessResourceTypes)+len(azureTaglessResourceTypes))
+					for _, awsTaglessResourceType := range awsTaglessResourceTypes {
+						taglessTypes = append(taglessTypes, strings.ToLower(awsTaglessResourceType))
+					}
+					for _, azureTaglessResourceType := range azureTaglessResourceTypes {
+						taglessTypes = append(taglessTypes, strings.ToLower(azureTaglessResourceType))
+					}
+					taglessTermsFilter := NewTermsFilter("metadata.ResourceType", taglessTypes)
+					esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(taglessTermsFilter))
+				}
+
+				for _, resourceGroupFilter := range resourceGroupFilters {
+					andFilters := make([]BoolFilter, 0, 5)
+
+					if len(resourceGroupFilter.Connectors) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("source_type", resourceGroupFilter.Connectors))
+					}
+					if len(resourceGroupFilter.AccountIDs) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("metadata.AccountID", resourceGroupFilter.AccountIDs))
+					}
+					if len(resourceGroupFilter.ResourceTypes) > 0 {
+						andFilters = append(andFilters, NewTermsFilter("metadata.ResourceType", resourceGroupFilter.ResourceTypes))
+					}
+
+					if len(resourceGroupFilter.Regions) > 0 {
+						andFilters = append(andFilters,
+							NewBoolShouldFilter(
+								NewTermsFilter("metadata.Region", resourceGroupFilter.Regions),
+								NewTermsFilter("metadata.Location", resourceGroupFilter.Regions),
+							),
+						)
+					}
+
+					if len(resourceGroupFilter.Tags) > 0 {
+						for k, v := range resourceGroupFilter.Tags {
+							k := strings.ToLower(k)
+							v := strings.ToLower(v)
+							andFilters = append(andFilters,
+								NewNestedFilter("canonical_tags",
+									NewBoolMustFilter(
+										NewTermFilter("canonical_tags.key", k),
+										NewTermFilter("canonical_tags.value", v),
+									),
+								),
+							)
+						}
+					}
+
+					if len(andFilters) > 0 {
+						esResourceGroupFilters = append(esResourceGroupFilters, NewBoolMustFilter(andFilters...))
+					}
+				}
+
+				if len(esResourceGroupFilters) > 0 {
+					filters = append(filters, NewBoolShouldFilter(esResourceGroupFilters...))
+				}
+			}
+		}
+	}
+
+	jsonFilters, _ := json.Marshal(filters)
+	plugin.Logger(ctx).Trace("BuildFilter", "filters", filters, "jsonFilters", string(jsonFilters))
 
 	return filters
 }
@@ -314,35 +389,32 @@ func qualValue(qual *proto.QualValue) string {
 	return valStr
 }
 
-// ----------------------------------------------------------
-// Helper: Add "case_insensitive": true to each term
-// ----------------------------------------------------------
-
-// buildTermObject returns the JSON object you'd put under "term": { field: { ... } }
-func buildTermObject(field, value string) map[string]any {
-	// We always add "value", "case_insensitive", plus optionally "boost" if needed
-	return map[string]any{
-		field: map[string]any{
-			"value":            value,
-			"case_insensitive": true, // << the new flag
-		},
-	}
-}
-
-// Check for special punctuation that indicates we might want to do field OR field.keyword
+// containsSpecialSymbol checks if the value has punctuation that might cause tokenization
+// or partial matching in a text field. If found, we produce a dual (field + field.keyword) query.
 func containsSpecialSymbol(val string) bool {
+	// Some special chars: / \ < > , - _ ( ) [ ] =
 	specialChars := "/\\<>,-_()[]="
 	return strings.ContainsAny(val, specialChars)
 }
 
-// ----------------------------------------------------------
-// TermFilter: Single or dual term queries with "case_insensitive": true
-// ----------------------------------------------------------
+// buildTermObject is a helper that returns the JSON needed under "term": { field: { ... } }
+// ensuring we always include "case_insensitive": true.
+func buildTermObject(field, value string) map[string]any {
+	return map[string]any{
+		field: map[string]any{
+			"value":            value,
+			"case_insensitive": true, // <-- new
+		},
+	}
+}
+
+// TermFilter represents a single or dual-term approach (if special symbol is found).
 type TermFilter struct {
 	field string
 	value string
 }
 
+// NewTermFilter constructs a BoolFilter for an exact match on a single field/value.
 func NewTermFilter(field, value string) BoolFilter {
 	return TermFilter{
 		field: field,
@@ -350,13 +422,11 @@ func NewTermFilter(field, value string) BoolFilter {
 	}
 }
 
-// MarshalJSON automatically checks for special symbols in the value. If found,
-// we generate a bool.should with "field" and "field.keyword". Otherwise, a normal term filter.
-//
-// *** BOTH paths add "case_insensitive": true ***
+// MarshalJSON auto-checks for special symbols. If found, produce a bool.should of
+// field vs. field.keyword, each having "case_insensitive": true. Otherwise, single term.
 func (t TermFilter) MarshalJSON() ([]byte, error) {
 	if containsSpecialSymbol(t.value) {
-		// produce OR (field vs. field.keyword), each with case_insensitive
+		// Dual query
 		return json.Marshal(map[string]any{
 			"bool": map[string]any{
 				"should": []map[string]any{
@@ -372,19 +442,16 @@ func (t TermFilter) MarshalJSON() ([]byte, error) {
 		})
 	}
 
-	// Otherwise, single term with case_insensitive
+	// Single term
 	return json.Marshal(map[string]any{
 		"term": buildTermObject(t.field, t.value),
 	})
 }
 
+// IsBoolFilter ensures TermFilter implements the BoolFilter interface.
 func (t TermFilter) IsBoolFilter() {}
 
-// ----------------------------------------------------------
-// The rest of your filter types remain unchanged
-// (just add "case_insensitive" if you also want it in TermsFilter, etc.)
-// ----------------------------------------------------------
-
+// TermsFilter is for multi-value queries: "terms": { field: [ val1, val2 ] }
 type TermsFilter struct {
 	field  string
 	values []string
@@ -397,6 +464,7 @@ func NewTermsFilter(field string, values []string) BoolFilter {
 	}
 }
 
+// MarshalJSON for TermsFilter. (No "case_insensitive" in ES yet for "terms" queries.)
 func (t TermsFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"terms": map[string][]string{
@@ -406,6 +474,34 @@ func (t TermsFilter) MarshalJSON() ([]byte, error) {
 }
 func (t TermsFilter) IsBoolFilter() {}
 
+// TermsSetMatchAllFilter is used for match-all within an array field.
+type TermsSetMatchAllFilter struct {
+	field  string
+	values []string
+}
+
+func NewTermsSetMatchAllFilter(field string, values []string) BoolFilter {
+	return TermsSetMatchAllFilter{
+		field:  field,
+		values: values,
+	}
+}
+
+func (t TermsSetMatchAllFilter) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"terms_set": map[string]any{
+			t.field: map[string]any{
+				"terms": t.values,
+				"minimum_should_match_script": map[string]string{
+					"source": "params.num_terms",
+				},
+			},
+		},
+	})
+}
+func (t TermsSetMatchAllFilter) IsBoolFilter() {}
+
+// RangeFilter for >, >=, <, <=
 type RangeFilter struct {
 	field string
 	gt    string
@@ -447,6 +543,7 @@ func (t RangeFilter) MarshalJSON() ([]byte, error) {
 }
 func (t RangeFilter) IsBoolFilter() {}
 
+// BoolShouldFilter => "bool": { "should": [ ... ] }
 type BoolShouldFilter struct {
 	filters []BoolFilter
 }
@@ -466,6 +563,7 @@ func (t BoolShouldFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolShouldFilter) IsBoolFilter() {}
 
+// BoolMustFilter => "bool": { "must": [ ... ] }
 type BoolMustFilter struct {
 	filters []BoolFilter
 }
@@ -485,6 +583,7 @@ func (t BoolMustFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolMustFilter) IsBoolFilter() {}
 
+// BoolMustNotFilter => "bool": { "must_not": [ ... ] }
 type BoolMustNotFilter struct {
 	filters []BoolFilter
 }
@@ -504,6 +603,7 @@ func (t BoolMustNotFilter) MarshalJSON() ([]byte, error) {
 }
 func (t BoolMustNotFilter) IsBoolFilter() {}
 
+// NestedFilter => "nested": { "path": "...", "query": { ... } }
 type NestedFilter struct {
 	path  string
 	query BoolFilter
@@ -526,7 +626,7 @@ func (t NestedFilter) MarshalJSON() ([]byte, error) {
 }
 func (t NestedFilter) IsBoolFilter() {}
 
-// Healthcheck ...
+// Healthcheck checks cluster health (green or yellow is acceptable).
 func (c Client) Healthcheck(ctx context.Context) error {
 	opts := []func(request *opensearchapi.ClusterHealthRequest){
 		c.es.Cluster.Health.WithContext(ctx),
@@ -561,7 +661,7 @@ func (c Client) Healthcheck(ctx context.Context) error {
 	return nil
 }
 
-// CreateIndexTemplate ...
+// CreateIndexTemplate sets up an index template in OpenSearch with the provided name/body.
 func (c Client) CreateIndexTemplate(ctx context.Context, name string, body string) error {
 	opts := []func(request *opensearchapi.IndicesPutIndexTemplateRequest){
 		c.es.Indices.PutIndexTemplate.WithContext(ctx),
@@ -582,7 +682,7 @@ func (c Client) CreateIndexTemplate(ctx context.Context, name string, body strin
 	return nil
 }
 
-// CreateComponentTemplate ...
+// CreateComponentTemplate sets up a component template in OpenSearch.
 func (c Client) CreateComponentTemplate(ctx context.Context, name string, body string) error {
 	opts := []func(request *opensearchapi.ClusterPutComponentTemplateRequest){
 		c.es.Cluster.PutComponentTemplate.WithContext(ctx),
@@ -603,6 +703,7 @@ func (c Client) CreateComponentTemplate(ctx context.Context, name string, body s
 	return nil
 }
 
+// DeleteByQueryResponse captures the JSON from the _delete_by_query API.
 type DeleteByQueryResponse struct {
 	Took             int  `json:"took"`
 	TimedOut         bool `json:"timed_out"`
@@ -621,8 +722,14 @@ type DeleteByQueryResponse struct {
 	Failures             []any   `json:"failures"`
 }
 
-// DeleteByQuery ...
-func DeleteByQuery(ctx context.Context, es *opensearch.Client, indices []string, query any, opts ...func(*opensearchapi.DeleteByQueryRequest)) (DeleteByQueryResponse, error) {
+// DeleteByQuery runs _delete_by_query on the specified indices using the given JSON query.
+func DeleteByQuery(
+	ctx context.Context,
+	es *opensearch.Client,
+	indices []string,
+	query any,
+	opts ...func(*opensearchapi.DeleteByQueryRequest),
+) (DeleteByQueryResponse, error) {
 	defaultOpts := []func(*opensearchapi.DeleteByQueryRequest){
 		es.DeleteByQuery.WithContext(ctx),
 		es.DeleteByQuery.WithWaitForCompletion(true),
