@@ -393,7 +393,7 @@ func qualValue(qual *proto.QualValue) string {
 // or partial matching in a text field. If found, we produce a dual (field + field.keyword) query.
 func containsSpecialSymbol(val string) bool {
 	// Some special chars: / \ < > , - _ ( ) [ ] =
-	specialChars := "/\\<>,-_()[]="
+	specialChars := "/\\<>,-_()[]:;="
 	return strings.ContainsAny(val, specialChars)
 }
 
