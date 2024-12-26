@@ -45,7 +45,7 @@ import (
 // containsSpecialSymbol checks for punctuation that might cause
 // partial tokenization in a text field, thus needing the dual approach (field & field.keyword).
 func containsSpecialSymbol(val string) bool {
-	specialChars := "/\\<>,-_()[]="
+	specialChars := "/\\<>,-_()[]=:;"
 	return strings.ContainsAny(val, specialChars)
 }
 
