@@ -101,7 +101,7 @@ type TaskResult struct {
 	PlatformID   string            `json:"platform_id"`
 	ResourceID   string            `json:"resource_id"`
 	ResourceName string            `json:"resource_name"`
-	Description  interface{}       `json:"description"`
+	Description  interface{}       `json:"Description"`
 	TaskType     string            `json:"task_type"`
 	ResultType   string            `json:"result_type"`
 	Metadata     map[string]string `json:"metadata"`
