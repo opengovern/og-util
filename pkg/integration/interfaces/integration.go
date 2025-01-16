@@ -23,6 +23,7 @@ type IntegrationConfiguration struct {
 
 	UISpec   []byte
 	Manifest []byte
+	SetupMD  []byte
 
 	DescriberDeploymentName string
 	DescriberRunCommand     string
