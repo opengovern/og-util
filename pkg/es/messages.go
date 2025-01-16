@@ -1,8 +1,10 @@
 package es
 
 import (
+	"fmt"
 	"github.com/opengovern/og-util/pkg/integration"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -52,6 +54,11 @@ func (r Resource) KeysAndIndex() ([]string, string) {
 	}, ResourceTypeToESIndex(r.ResourceType)
 }
 
+type LookupResourceMetadata struct {
+	// Parameters parameters passed to describe job (converted map[string]string to string using ConvertMapToString function)
+	Parameters string `json:"parameters"`
+}
+
 type LookupResource struct {
 	EsID    string `json:"es_id"`
 	EsIndex string `json:"es_index"`
@@ -72,10 +79,32 @@ type LookupResource struct {
 	IsCommon bool `json:"is_common"`
 	// Tags
 	Tags []Tag `json:"canonical_tags"`
+	// Metadata describe job metadata
+	Metadata LookupResourceMetadata `json:"metadata"`
 	// DescribedBy is the resource describe job id
 	DescribedBy string `json:"described_by"`
 	// DescribedAt is when the DescribeSourceJob is created
 	DescribedAt int64 `json:"described_at"`
+}
+
+// ConvertMapToString converts a map[string]string to a deterministic string representation.
+func ConvertMapToString(input map[string]string) string {
+	// Create a slice of keys
+	keys := make([]string, 0, len(input))
+	for k := range input {
+		keys = append(keys, k)
+	}
+
+	// Sort the keys to ensure deterministic order
+	sort.Strings(keys)
+
+	// Build the string
+	var sb strings.Builder
+	for _, key := range keys {
+		sb.WriteString(fmt.Sprintf("%s=%s;", key, input[key]))
+	}
+
+	return sb.String()
 }
 
 func (r LookupResource) KeysAndIndex() ([]string, string) {
@@ -84,6 +113,7 @@ func (r LookupResource) KeysAndIndex() ([]string, string) {
 		r.IntegrationID,
 		string(r.IntegrationType),
 		strings.ToLower(r.ResourceType),
+		r.Metadata.Parameters,
 	}, InventorySummaryIndex
 }
 
