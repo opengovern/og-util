@@ -35,13 +35,14 @@ type CloudQLColumn struct {
 }
 
 type IntegrationType interface {
-	GetIntegrationType() integration.Type
-	GetConfiguration() IntegrationConfiguration
+	GetIntegrationType() (integration.Type, error)
+	GetConfiguration() (IntegrationConfiguration, error)
 	GetResourceTypesByLabels(map[string]string) (map[string]ResourceTypeConfiguration, error)
 	HealthCheck(jsonData []byte, providerId string, labels map[string]string, annotations map[string]string) (bool, error)
 	DiscoverIntegrations(jsonData []byte) ([]integration.Integration, error)
-	GetResourceTypeFromTableName(tableName string) string
-	ListAllTables() map[string][]CloudQLColumn
+	GetResourceTypeFromTableName(tableName string) (string, error)
+	ListAllTables() (map[string][]CloudQLColumn, error)
+	Ping() error
 }
 
 // IntegrationCreator IntegrationType interface, credentials, error
@@ -51,27 +52,30 @@ type IntegrationTypeRPC struct {
 	client *rpc.Client
 }
 
-func (i *IntegrationTypeRPC) GetIntegrationType() integration.Type {
+func (i *IntegrationTypeRPC) GetIntegrationType() (integration.Type, error) {
 	var integrationType integration.Type
 	err := i.client.Call("Plugin.GetIntegrationType", struct{}{}, &integrationType)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return integrationType
+	return integrationType, nil
 }
 
-func (i *IntegrationTypeRPC) GetConfiguration() IntegrationConfiguration {
+func (i *IntegrationTypeRPC) GetConfiguration() (IntegrationConfiguration, error) {
 	var configuration IntegrationConfiguration
 	err := i.client.Call("Plugin.GetConfiguration", struct{}{}, &configuration)
 	if err != nil {
-		panic(err)
+		return IntegrationConfiguration{}, err
 	}
-	return configuration
+	return configuration, nil
 }
 
 func (i *IntegrationTypeRPC) GetResourceTypesByLabels(labels map[string]string) (map[string]ResourceTypeConfiguration, error) {
 	var resourceTypes map[string]ResourceTypeConfiguration
 	err := i.client.Call("Plugin.GetResourceTypesByLabels", labels, &resourceTypes)
+	if err != nil {
+		return nil, err
+	}
 	return resourceTypes, err
 }
 
@@ -90,6 +94,9 @@ func (i *IntegrationTypeRPC) HealthCheck(jsonData []byte, providerId string, lab
 		Labels:      labels,
 		Annotations: annotations,
 	}, &result)
+	if err != nil {
+		return false, err
+	}
 	return result, err
 }
 
@@ -99,22 +106,26 @@ func (i *IntegrationTypeRPC) DiscoverIntegrations(jsonData []byte) ([]integratio
 	return integrations, err
 }
 
-func (i *IntegrationTypeRPC) GetResourceTypeFromTableName(tableName string) string {
+func (i *IntegrationTypeRPC) GetResourceTypeFromTableName(tableName string) (string, error) {
 	var resourceType string
 	err := i.client.Call("Plugin.GetResourceTypeFromTableName", tableName, &resourceType)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return resourceType
+	return resourceType, nil
 }
 
-func (i *IntegrationTypeRPC) ListAllTables() map[string][]CloudQLColumn {
+func (i *IntegrationTypeRPC) ListAllTables() (map[string][]CloudQLColumn, error) {
 	var tables map[string][]CloudQLColumn
 	err := i.client.Call("Plugin.ListAllTables", struct{}{}, &tables)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return tables
+	return tables, nil
+}
+
+func (i *IntegrationTypeRPC) Ping() error {
+	return i.client.Call("Plugin.Ping", struct{}{}, nil)
 }
 
 type IntegrationTypeRPCServer struct {
@@ -122,13 +133,15 @@ type IntegrationTypeRPCServer struct {
 }
 
 func (i *IntegrationTypeRPCServer) GetIntegrationType(_ struct{}, integrationType *integration.Type) error {
-	*integrationType = i.Impl.GetIntegrationType()
-	return nil
+	var err error
+	*integrationType, err = i.Impl.GetIntegrationType()
+	return err
 }
 
 func (i *IntegrationTypeRPCServer) GetConfiguration(_ struct{}, configuration *IntegrationConfiguration) error {
-	*configuration = i.Impl.GetConfiguration()
-	return nil
+	var err error
+	*configuration, err = i.Impl.GetConfiguration()
+	return err
 }
 
 func (i *IntegrationTypeRPCServer) GetResourceTypesByLabels(labels map[string]string, resourceTypes *map[string]ResourceTypeConfiguration) error {
@@ -150,13 +163,19 @@ func (i *IntegrationTypeRPCServer) DiscoverIntegrations(jsonData []byte, integra
 }
 
 func (i *IntegrationTypeRPCServer) GetResourceTypeFromTableName(tableName string, resourceType *string) error {
-	*resourceType = i.Impl.GetResourceTypeFromTableName(tableName)
-	return nil
+	var err error
+	*resourceType, err = i.Impl.GetResourceTypeFromTableName(tableName)
+	return err
 }
 
 func (i *IntegrationTypeRPCServer) ListAllTables(_ struct{}, tables *map[string][]CloudQLColumn) error {
-	*tables = i.Impl.ListAllTables()
-	return nil
+	var err error
+	*tables, err = i.Impl.ListAllTables()
+	return err
+}
+
+func (i *IntegrationTypeRPCServer) Ping(_ struct{}, _ *struct{}) error {
+	return i.Impl.Ping()
 }
 
 type IntegrationTypePlugin struct {
