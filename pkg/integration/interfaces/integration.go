@@ -37,7 +37,7 @@ type CloudQLColumn struct {
 type IntegrationType interface {
 	GetIntegrationType() (integration.Type, error)
 	GetConfiguration() (IntegrationConfiguration, error)
-	GetResourceTypesByLabels(map[string]string) (map[string]ResourceTypeConfiguration, error)
+	GetResourceTypesByLabels(map[string]string) ([]ResourceTypeConfiguration, error)
 	HealthCheck(jsonData []byte, providerId string, labels map[string]string, annotations map[string]string) (bool, error)
 	DiscoverIntegrations(jsonData []byte) ([]integration.Integration, error)
 	GetResourceTypeFromTableName(tableName string) (string, error)
@@ -70,8 +70,8 @@ func (i *IntegrationTypeRPC) GetConfiguration() (IntegrationConfiguration, error
 	return configuration, nil
 }
 
-func (i *IntegrationTypeRPC) GetResourceTypesByLabels(labels map[string]string) (map[string]ResourceTypeConfiguration, error) {
-	var resourceTypes map[string]ResourceTypeConfiguration
+func (i *IntegrationTypeRPC) GetResourceTypesByLabels(labels map[string]string) ([]ResourceTypeConfiguration, error) {
+	var resourceTypes []ResourceTypeConfiguration
 	err := i.client.Call("Plugin.GetResourceTypesByLabels", labels, &resourceTypes)
 	if err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func (i *IntegrationTypeRPCServer) GetConfiguration(_ struct{}, configuration *I
 	return err
 }
 
-func (i *IntegrationTypeRPCServer) GetResourceTypesByLabels(labels map[string]string, resourceTypes *map[string]ResourceTypeConfiguration) error {
+func (i *IntegrationTypeRPCServer) GetResourceTypesByLabels(labels map[string]string, resourceTypes *[]ResourceTypeConfiguration) error {
 	var err error
 	*resourceTypes, err = i.Impl.GetResourceTypesByLabels(labels)
 	return err

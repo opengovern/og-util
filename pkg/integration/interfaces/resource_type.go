@@ -9,6 +9,7 @@ type ResourceTypeConfiguration struct {
 	IntegrationType integration.Type `json:"integration_type"`
 	Description     string           `json:"description"`
 	Params          []Param          `json:"params"`
+	Table 			string			`json:"table"`
 }
 
 type Param struct {
