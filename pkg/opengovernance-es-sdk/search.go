@@ -109,7 +109,6 @@ func (c Client) SearchWithTrackTotalHits(ctx context.Context, index string, quer
 	}
 
 	b, err := io.ReadAll(res.Body)
-	fmt.Println("b is: ", string(b))
 
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
