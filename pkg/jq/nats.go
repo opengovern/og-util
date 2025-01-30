@@ -16,12 +16,19 @@ type consumerInfo struct {
 	consumerConfig jetstream.ConsumerConfig
 }
 
+type consumeInfo struct {
+	consumerInfo consumerInfo
+	handler      func(jetstream.Msg)
+	opts         []jetstream.PullConsumeOpt
+}
+
 type JobQueue struct {
 	logger *zap.Logger
 	conn   *nats.Conn
 	js     jetstream.JetStream
 
 	consumers []consumerInfo
+	consumes  []consumeInfo
 	streams   []jetstream.StreamConfig
 }
 
@@ -70,6 +77,17 @@ func (jq *JobQueue) reconnectHandler(nc *nats.Conn) {
 		_, err := jq.js.CreateOrUpdateConsumer(context.Background(), consumer.stream, consumer.consumerConfig)
 		if err != nil {
 			jq.logger.Error("consumer re-creation after reconnect failed", zap.Error(err))
+		}
+	}
+
+	for _, consume := range jq.consumes {
+		consumer, err := jq.js.CreateOrUpdateConsumer(context.Background(), consume.consumerInfo.stream, consume.consumerInfo.consumerConfig)
+		if err != nil {
+			jq.logger.Error("consumer re-creation after reconnect failed", zap.Error(err))
+		}
+		_, err = consumer.Consume(consume.handler, consume.opts...)
+		if err != nil {
+			jq.logger.Error("consumer re-consumption after reconnect failed", zap.Error(err))
 		}
 	}
 }
@@ -164,6 +182,15 @@ func (jq *JobQueue) ConsumeWithConfig(
 	if err != nil {
 		return nil, err
 	}
+
+	jq.consumes = append(jq.consumes, consumeInfo{
+		consumerInfo: consumerInfo{
+			stream:         stream,
+			consumerConfig: config,
+		},
+		handler: handler,
+		opts:    pullConsumerOpts,
+	})
 
 	return consumeCtx, nil
 }
