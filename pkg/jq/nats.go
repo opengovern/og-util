@@ -11,10 +11,18 @@ import (
 	"go.uber.org/zap"
 )
 
+type consumerInfo struct {
+	stream         string
+	consumerConfig jetstream.ConsumerConfig
+}
+
 type JobQueue struct {
+	logger *zap.Logger
 	conn   *nats.Conn
 	js     jetstream.JetStream
-	logger *zap.Logger
+
+	consumers []consumerInfo
+	streams   []jetstream.StreamConfig
 }
 
 func New(url string, logger *zap.Logger) (*JobQueue, error) {
@@ -28,6 +36,8 @@ func New(url string, logger *zap.Logger) (*JobQueue, error) {
 		url,
 		nats.ReconnectHandler(jq.reconnectHandler),
 		nats.DisconnectErrHandler(jq.disconnectHandler),
+		nats.MaxReconnects(-1),
+		nats.PingInterval(10*time.Second),
 	)
 	if err != nil {
 		return nil, err
@@ -47,6 +57,21 @@ func New(url string, logger *zap.Logger) (*JobQueue, error) {
 
 func (jq *JobQueue) reconnectHandler(nc *nats.Conn) {
 	jq.logger.Info("got reconnected", zap.String("url", nc.ConnectedUrl()))
+	jq.js, _ = jetstream.New(nc)
+
+	for _, stream := range jq.streams {
+		_, err := jq.js.CreateOrUpdateStream(context.Background(), stream)
+		if err != nil {
+			jq.logger.Error("stream re-creation after reconnect failed", zap.Error(err))
+		}
+	}
+
+	for _, consumer := range jq.consumers {
+		_, err := jq.js.CreateOrUpdateConsumer(context.Background(), consumer.stream, consumer.consumerConfig)
+		if err != nil {
+			jq.logger.Error("consumer re-creation after reconnect failed", zap.Error(err))
+		}
+	}
 }
 
 func (jq *JobQueue) disconnectHandler(_ *nats.Conn, err error) {
@@ -72,6 +97,7 @@ func (jq *JobQueue) Stream(ctx context.Context, name, description string, topics
 		Replicas:     1,
 		Storage:      jetstream.MemoryStorage,
 	}
+
 	return jq.StreamWithConfig(ctx, name, description, topics, config)
 }
 
@@ -83,6 +109,9 @@ func (jq *JobQueue) StreamWithConfig(ctx context.Context, name, description stri
 	if _, err := jq.js.CreateOrUpdateStream(ctx, config); err != nil {
 		return err
 	}
+
+	jq.streams = append(jq.streams, config)
+
 	return nil
 }
 
@@ -154,6 +183,11 @@ func (jq *JobQueue) CreateOrUpdateConsumer(
 	if err != nil {
 		return err
 	}
+
+	jq.consumers = append(jq.consumers, consumerInfo{
+		stream:         stream,
+		consumerConfig: config,
+	})
 
 	return nil
 }
