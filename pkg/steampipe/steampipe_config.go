@@ -49,7 +49,7 @@ connection "opengovernance" {
 		return err
 	}
 
-	filePath := path.Join(dirname, ".steampipe", "config", "kaytu.spc")
+	filePath := path.Join(dirname, ".steampipe", "config", "opengovernance.spc")
 	os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
 	err = os.WriteFile(filePath, []byte(content), os.ModePerm)
 	if err != nil {
