@@ -118,6 +118,16 @@ connection "` + plugin + `" {
 	return os.WriteFile(filePath, []byte(content), os.ModePerm)
 }
 
+func RemoveSpecFile(plugin string) error {
+	dirname, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	filePath := path.Join(dirname, ".steampipe", "config", plugin+".spc")
+	return os.Remove(filePath)
+}
+
 // StartSteampipeServiceAndGetConnection starts steampipe service and returns steampipe connection
 // NOTE: this function will only work on images that have steampipe installed & the PopulateSteampipeConfig is called beforehand
 func StartSteampipeServiceAndGetConnection(logger *zap.Logger) (*Database, error) {
