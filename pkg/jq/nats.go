@@ -239,3 +239,11 @@ func (jq *JobQueue) DeleteMessage(ctx context.Context, streamName string, sequen
 	}
 	return nil
 }
+
+func (jq *JobQueue) Subscribe(subject string, f func(m *nats.Msg)) (*nats.Subscription, error) {
+	subscription, err := jq.conn.Subscribe(subject, f)
+	if err != nil {
+		return nil, err
+	}
+	return subscription, nil
+}
