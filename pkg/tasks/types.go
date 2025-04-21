@@ -1,5 +1,7 @@
 package tasks
 
+import "fmt"
+
 type TaskDefinition struct {
 	RunID    uint           `json:"runId"`
 	TaskType string         `json:"taskType"`
@@ -14,4 +16,8 @@ type TaskRequest struct {
 	TaskDefinition TaskDefinition `json:"taskDefinition"`
 
 	ExtraInputs map[string][]string `json:"extraInputs"`
+}
+
+func GetTaskRunCancelSubject(natsTopicName string, runId uint) string {
+	return fmt.Sprintf("cancel.%s.%d", natsTopicName, runId)
 }
