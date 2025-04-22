@@ -228,6 +228,15 @@ func (jq *JobQueue) Produce(ctx context.Context, topic string, data []byte, id s
 	return &pubAck.Sequence, nil
 }
 
+func (jq *JobQueue) ProduceFireAndForget(topic string, data []byte) error {
+	err := jq.conn.Publish(topic, data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (jq *JobQueue) DeleteMessage(ctx context.Context, streamName string, sequenceNumber uint64) error {
 	stream, err := jq.js.Stream(ctx, streamName)
 	if err != nil {
