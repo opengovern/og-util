@@ -25,7 +25,8 @@ func PopulateSteampipeConfig(elasticSearchConfig config.ElasticSearch, steampipe
 	return nil
 }
 
-func PopulateOpenGovernancePluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres) error {
+func PopulateOpenGovernancePluginSteampipeConfig(elasticSearchConfig config.ElasticSearch, postgresConfig config.Postgres,
+	integrationServiceBaseUrl string) error {
 	if len(postgresConfig.SSLMode) == 0 {
 		postgresConfig.SSLMode = "disable"
 	}
@@ -42,6 +43,7 @@ connection "opengovernance" {
   pg_password = "` + postgresConfig.Password + `"
   pg_database = "` + postgresConfig.DB + `"
   pg_ssl_mode = "` + postgresConfig.SSLMode + `"
+  integration_service_baseurl = "` + integrationServiceBaseUrl + `"
 }
 `
 	dirname, err := os.UserHomeDir()
