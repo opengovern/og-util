@@ -1,6 +1,9 @@
 package tasks
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/opengovern/og-util/pkg/vault"
+)
 
 type TaskDefinition struct {
 	RunID    uint           `json:"runId"`
@@ -14,6 +17,8 @@ type TaskRequest struct {
 	UseOpenSearch             bool   `json:"useOpenSearch"`
 
 	TaskDefinition TaskDefinition `json:"taskDefinition"`
+
+	VaultConfig vault.Config
 
 	ExtraInputs map[string][]string `json:"extraInputs"`
 }
