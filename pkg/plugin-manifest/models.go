@@ -1,4 +1,4 @@
-package utils
+package plugin-validation
 
 // --- Struct Definitions ---
 // These structs map directly to the YAML/JSON manifest structure.
