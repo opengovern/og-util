@@ -1,0 +1,58 @@
+name: test
+
+on:
+  push:
+    branches:
+      - main
+  # Optional: Add pull_request trigger to test changes before merging
+  # pull_request:
+  #   branches:
+  #     - main
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          # Enable caching for Go modules
+          cache: true
+
+      # Verify dependencies and ensure go.mod/go.sum are tidy
+      # Run this *before* testing
+      - name: Verify dependencies
+        run: go mod tidy
+
+      # Optional but recommended: Check if go mod tidy changed files
+      # This ensures developers commit the tidy go.mod/go.sum files
+      - name: Check for modified go.mod/go.sum
+        run: |
+          git diff --exit-code -- go.mod go.sum || \
+          (echo "::error::go.mod or go.sum needs tidying (run 'go mod tidy' locally and commit changes)" && exit 1)
+
+      # Run tests after verifying dependencies
+      - name: Run Go Tests
+        id: go_test # Keep the id if needed elsewhere
+        run: go test -v ./...
+
+      # Conditional step: Create a new tag if tests pass on the main branch
+      # The action likely handles the branch check internally, but `if` makes it explicit
+      # The `success()` check ensures tests passed.
+      - name: Tag version
+        if: success() && github.ref == 'refs/heads/main' 
+        # Ensure tests passed and it's the main branch
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2 # Use latest version (v6.2 as of writing)
+        with:
+          github_token: ${{ secrets.OG_RELEASE_TAG_UPDATE }}
+          # release_branches is deprecated, use default_branch or commit_sha directly if needed
+          # The action defaults to tagging commits on the default branch (usually main)
+          tag_prefix: v # Prefix for the tag (e.g., v1.2.3)
+          # Consider adding custom_tag for more control if needed
