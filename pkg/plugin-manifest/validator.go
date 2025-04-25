@@ -1,6 +1,6 @@
-// Package pluginmanifest provides utilities for validating plugin manifests,
-// including downloading and verifying associated components.
-package pluginmanifest // Corrected package name
+// Package pluginmanifest provides utilities for loading, validating, and verifying plugin manifests
+// and their associated downloadable components.
+package pluginmanifest
 
 import (
 	// Standard library imports
@@ -31,15 +31,14 @@ import (
 )
 
 // --- Struct Definitions ---
-// These structs map directly to the YAML/JSON manifest structure.
+// (Struct definitions remain the same)
 
 // Component represents a single functional part of the plugin.
 type Component struct {
 	URI           string `yaml:"uri,omitempty" json:"uri,omitempty"`
 	ImageURI      string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"`
 	PathInArchive string `yaml:"path-in-archive,omitempty" json:"path-in-archive,omitempty"`
-	// Checksum for verifying file integrity (e.g., "sha256:<hex_hash>")
-	Checksum string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
+	Checksum      string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
 }
 
 // Metadata holds descriptive information about the plugin.
@@ -76,7 +75,6 @@ type PluginManifest struct {
 }
 
 // --- Configuration Constants ---
-// (Consider moving these to a config struct or loading from env/file)
 const (
 	MaxDownloadRetries     = 3
 	InitialBackoffDuration = 1 * time.Second
@@ -85,16 +83,15 @@ const (
 	ResponseHeaderTimeout  = 10 * time.Second
 	OverallDownloadTimeout = 60 * time.Second
 	MaxDownloadSizeBytes   = 1 * 1024 * 1024 * 1024 // 1 GiB limit
+	ArtifactPlatformBinary = "platform-binary"
+	ArtifactCloudQLBinary  = "cloudql-binary"
 )
 
 // --- Global HTTP Client ---
 var httpClient *http.Client
 
-// Initialize the shared HTTP client once.
 func init() {
-	// Seed random number generator once at startup for jitter
 	rand.Seed(time.Now().UnixNano())
-
 	httpClient = &http.Client{
 		Timeout: OverallDownloadTimeout,
 		Transport: &http.Transport{
@@ -102,11 +99,8 @@ func init() {
 				Timeout:   ConnectTimeout,
 				KeepAlive: 30 * time.Second,
 			}).DialContext,
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   TLSHandshakeTimeout,
-			ResponseHeaderTimeout: ResponseHeaderTimeout,
+			ForceAttemptHTTP2: true, MaxIdleConns: 100, IdleConnTimeout: 90 * time.Second,
+			TLSHandshakeTimeout: TLSHandshakeTimeout, ResponseHeaderTimeout: ResponseHeaderTimeout,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
@@ -115,23 +109,26 @@ func init() {
 
 // --- Interface Definition ---
 
-// PluginValidator defines the interface for loading and validating plugin manifests.
+// PluginValidator defines the interface for loading and validating plugin manifests and artifacts.
 type PluginValidator interface {
-	// LoadAndValidateManifest reads, parses, and validates a plugin manifest from the given file path.
-	// It performs structural checks, metadata validation, and downloads/verifies binary components.
-	LoadAndValidateManifest(filePath string) (*PluginManifest, error) // Uses types defined in this package
+	// LoadManifest reads and parses a plugin manifest from the given file path.
+	LoadManifest(filePath string) (*PluginManifest, error)
+	// ValidateManifestStructure performs structural and metadata checks on a loaded manifest.
+	ValidateManifestStructure(manifest *PluginManifest) error
+	// CheckPlatformSupport checks if the manifest supports a given platform version.
+	CheckPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error)
+	// ValidateArtifacts downloads and validates specific artifacts ("platform-binary", "cloudql-binary")
+	// or both if artifactType is empty or unspecified.
+	ValidateArtifacts(manifest *PluginManifest, artifactType string) error
 }
 
 // --- Concrete Implementation ---
 
 // defaultValidator implements the PluginValidator interface.
-type defaultValidator struct {
-	// Potentially add configuration fields here if not using constants/env vars
-}
+type defaultValidator struct{}
 
 // NewDefaultValidator creates a new instance of the default validator.
 func NewDefaultValidator() PluginValidator {
-	// This now correctly returns a pointer to defaultValidator which implements the interface
 	return &defaultValidator{}
 }
 
@@ -140,43 +137,26 @@ func isNonEmpty(s string) bool {
 	return strings.TrimSpace(s) != ""
 }
 
-// --- Core Logic Methods (associated with defaultValidator) ---
+// --- Interface Method Implementations ---
 
-// LoadAndValidateManifest implements the PluginValidator interface method.
-// Renamed from LoadAndParseManifest to match the interface.
-func (v *defaultValidator) LoadAndValidateManifest(filePath string) (*PluginManifest, error) {
+// LoadManifest reads and parses the manifest file.
+func (v *defaultValidator) LoadManifest(filePath string) (*PluginManifest, error) {
 	log.Printf("Loading manifest from: %s", filePath)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
 	}
-
-	// Use the PluginManifest struct defined in this package
 	var manifest PluginManifest
 	err = yaml.Unmarshal(data, &manifest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse manifest file '%s' (check syntax): %w", filePath, err)
 	}
-
-	// Perform validation after successful parsing
-	err = v.validateManifestStructure(&manifest)
-	if err != nil {
-		return nil, err // Return validation error
-	}
-
-	// Perform download/validation checks
-	err = v.validateBinaryComponents(&manifest)
-	if err != nil {
-		return nil, err // Return download/validation error
-	}
-
-	log.Println("--- Manifest Validation Fully Successful ---")
-	// Return pointer to the locally defined PluginManifest struct
+	log.Printf("Successfully parsed manifest for plugin: %s v%s", manifest.Plugin.Name, manifest.Plugin.Version)
 	return &manifest, nil
 }
 
-// validateManifestStructure performs basic structural and metadata checks.
-func (v *defaultValidator) validateManifestStructure(manifest *PluginManifest) error {
+// ValidateManifestStructure performs structural and metadata checks.
+func (v *defaultValidator) ValidateManifestStructure(manifest *PluginManifest) error {
 	log.Println("--- Starting Manifest Structure Validation ---")
 	if manifest == nil {
 		return fmt.Errorf("manifest cannot be nil")
@@ -224,6 +204,7 @@ func (v *defaultValidator) validateManifestStructure(manifest *PluginManifest) e
 	if !isNonEmpty(cloudqlComp.URI) {
 		return fmt.Errorf("plugin.components.cloudql-binary.uri is required")
 	}
+	// Check path requirement only if URIs match
 	if platformComp.URI == cloudqlComp.URI {
 		if !isNonEmpty(platformComp.PathInArchive) {
 			return fmt.Errorf("plugin.components.platform-binary.path-in-archive required when URIs match ('%s')", platformComp.URI)
@@ -232,17 +213,78 @@ func (v *defaultValidator) validateManifestStructure(manifest *PluginManifest) e
 			return fmt.Errorf("plugin.components.cloudql-binary.path-in-archive required when URIs match ('%s')", cloudqlComp.URI)
 		}
 	}
+	// Check sample data URI only if section exists
 	if manifest.Plugin.SampleData != nil && !isNonEmpty(manifest.Plugin.SampleData.URI) {
 		return fmt.Errorf("plugin.sample-data.uri required when sample-data section present")
 	}
 
-	log.Println("Basic manifest structure and metadata validation successful.")
+	log.Println("Manifest structure and metadata validation successful.")
 	return nil
 }
 
-// validateBinaryComponents handles the download and validation logic.
-func (v *defaultValidator) validateBinaryComponents(manifest *PluginManifest) error {
-	log.Println("--- Starting Binary Component Validation ---")
+// CheckPlatformSupport checks if the manifest supports a given platform version.
+func (v *defaultValidator) CheckPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error) {
+	if manifest == nil {
+		return false, fmt.Errorf("manifest cannot be nil")
+	}
+	if !isNonEmpty(platformVersion) {
+		return false, fmt.Errorf("platformVersion cannot be empty")
+	}
+
+	currentV, err := semver.NewVersion(platformVersion)
+	if err != nil {
+		return false, fmt.Errorf("invalid platform version format '%s': %w", platformVersion, err)
+	}
+
+	if len(manifest.Plugin.SupportedPlatformVersions) == 0 {
+		log.Printf("Warning: Checking support for platform %s against plugin %s with no defined supported versions.", platformVersion, manifest.Plugin.Name)
+		return false, nil // Or true depending on desired default behavior
+	}
+
+	log.Printf("Checking platform version %s against plugin %s constraints...", platformVersion, manifest.Plugin.Name)
+	for _, constraintStr := range manifest.Plugin.SupportedPlatformVersions {
+		constraints, err := semver.NewConstraint(constraintStr)
+		// This error should ideally be caught by ValidateManifestStructure, but check again
+		if err != nil {
+			log.Printf("Warning: Skipping invalid constraint '%s' during support check.", constraintStr)
+			continue
+		}
+		if constraints.Check(currentV) {
+			log.Printf("Platform version %s is SUPPORTED by constraint '%s'.", platformVersion, constraintStr)
+			return true, nil // Found a matching constraint
+		}
+	}
+
+	log.Printf("Platform version %s is NOT SUPPORTED by any constraints.", platformVersion)
+	return false, nil // No matching constraint found
+}
+
+// ValidateArtifacts downloads and validates specified artifacts.
+func (v *defaultValidator) ValidateArtifacts(manifest *PluginManifest, artifactType string) error {
+	if manifest == nil {
+		return fmt.Errorf("manifest cannot be nil for artifact validation")
+	}
+	log.Printf("--- Starting Artifact Validation (Type: '%s') ---", artifactType)
+
+	validatePlatform := false
+	validateCloudQL := false
+
+	switch strings.ToLower(artifactType) {
+	case "": // Validate both if type is empty
+		validatePlatform = true
+		validateCloudQL = true
+		log.Println("No specific artifact type provided, validating both PlatformBinary and CloudQLBinary.")
+	case strings.ToLower(ArtifactPlatformBinary):
+		validatePlatform = true
+		log.Println("Validating only PlatformBinary artifact.")
+	case strings.ToLower(ArtifactCloudQLBinary):
+		validateCloudQL = true
+		log.Println("Validating only CloudQLBinary artifact.")
+	default:
+		return fmt.Errorf("invalid artifactType '%s'. Must be '%s', '%s', or empty",
+			artifactType, ArtifactPlatformBinary, ArtifactCloudQLBinary)
+	}
+
 	var wg sync.WaitGroup
 	var platformErr, cloudqlErr error
 	var platformData []byte // To store downloaded data if URIs match
@@ -250,49 +292,69 @@ func (v *defaultValidator) validateBinaryComponents(manifest *PluginManifest) er
 	platformComp := manifest.Plugin.Components.PlatformBinary
 	cloudqlComp := manifest.Plugin.Components.CloudQLBinary
 
-	// Validate Platform Binary (always run)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// Use the Component struct defined in this package
-		platformData, platformErr = v.validateSingleBinaryComponent(platformComp, "platform-binary")
-	}()
+	// --- Launch Goroutines based on validation flags ---
 
-	// Validate CloudQL Binary (conditionally run concurrently)
-	if platformComp.URI != cloudqlComp.URI {
+	// Validate Platform Binary if requested
+	if validatePlatform {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// Use the Component struct defined in this package
-			_, cloudqlErr = v.validateSingleBinaryComponent(cloudqlComp, "cloudql-binary")
+			platformData, platformErr = v.validateSingleBinaryComponent(platformComp, ArtifactPlatformBinary)
 		}()
 	}
 
-	// Wait for downloads/validations to complete
+	// Validate CloudQL Binary if requested AND URI is different from platform binary
+	if validateCloudQL && platformComp.URI != cloudqlComp.URI {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Pass cloudqlComp here
+			_, cloudqlErr = v.validateSingleBinaryComponent(cloudqlComp, ArtifactCloudQLBinary)
+		}()
+	}
+
+	// Wait for any launched goroutines to complete
 	wg.Wait()
 
-	// Check for errors from concurrent operations
+	// --- Check Errors ---
 	if platformErr != nil {
-		return fmt.Errorf("platform-binary validation failed: %w", platformErr)
+		return fmt.Errorf("platform-binary artifact validation failed: %w", platformErr)
 	}
-	if cloudqlErr != nil {
-		return fmt.Errorf("cloudql-binary validation failed: %w", cloudqlErr)
+	// Check cloudqlErr only if it was supposed to run independently
+	if validateCloudQL && platformComp.URI != cloudqlComp.URI && cloudqlErr != nil {
+		return fmt.Errorf("cloudql-binary artifact validation failed: %w", cloudqlErr)
 	}
 
-	// If URIs matched, perform the CloudQL path check using the already downloaded data
-	if platformComp.URI == cloudqlComp.URI {
+	// --- Handle Shared URI Case ---
+	// If CloudQL validation was requested AND URIs match, validate its path in the already downloaded data
+	if validateCloudQL && platformComp.URI == cloudqlComp.URI {
+		if platformData == nil {
+			// This should only happen if platform validation wasn't requested but cloudql was, which is inconsistent state
+			// Or if platform validation failed but we didn't return early. Let's assume platform validation ran if URIs match and cloudql is requested.
+			// Re-downloading is inefficient, ideally we'd structure to ensure platformData is available.
+			// For now, return error indicating likely logic issue or prior platform failure.
+			if platformErr != nil {
+				return fmt.Errorf("cannot validate cloudql-binary path in shared archive because platform-binary validation failed: %w", platformErr)
+			}
+			return fmt.Errorf("internal logic error: platform data not available for shared URI validation")
+
+		}
 		log.Printf("Validating cloudql path '%s' within shared archive from %s...", cloudqlComp.PathInArchive, platformComp.URI)
-		// Use the Component struct defined in this package
 		err := v.validateArchivePathExists(platformData, cloudqlComp.PathInArchive, cloudqlComp.URI)
 		if err != nil {
-			return fmt.Errorf("cloudql-binary validation failed: archive/path check failed for URI %s: %w", cloudqlComp.URI, err)
+			// Assign error to cloudqlErr for consistent reporting if needed, though we return directly here
+			cloudqlErr = fmt.Errorf("cloudql-binary artifact validation failed: archive/path check failed for shared URI %s: %w", cloudqlComp.URI, err)
+			return cloudqlErr
 		}
 	}
+
+	log.Println("--- Artifact Validation Successful ---")
 	return nil
 }
 
+// --- Internal Validation Helpers ---
+
 // validateSingleBinaryComponent downloads and validates a specific binary component.
-// Uses the Component struct defined in this package.
 func (v *defaultValidator) validateSingleBinaryComponent(component Component, componentName string) ([]byte, error) {
 	log.Printf("--- Validating Component: %s ---", componentName)
 	if !isNonEmpty(component.URI) {
@@ -312,6 +374,7 @@ func (v *defaultValidator) validateSingleBinaryComponent(component Component, co
 		return nil, fmt.Errorf("%s validation failed: checksum error for URI %s: %w", componentName, component.URI, err)
 	}
 
+	// Validate archive path only if PathInArchive is non-empty
 	if isNonEmpty(component.PathInArchive) {
 		log.Printf("Validating archive from %s for path '%s'...", component.URI, component.PathInArchive)
 		err := v.validateArchivePathExists(downloadedData, component.PathInArchive, component.URI)
@@ -319,7 +382,8 @@ func (v *defaultValidator) validateSingleBinaryComponent(component Component, co
 			return nil, fmt.Errorf("%s validation failed: archive/path check failed for URI %s: %w", componentName, component.URI, err)
 		}
 	} else {
-		log.Printf("Component %s downloaded and checksum verified (no pathInArchive specified). Size: %d bytes.", componentName, len(downloadedData))
+		// If PathInArchive is empty, we assume the downloaded file IS the binary/component itself.
+		log.Printf("Component %s downloaded and checksum verified (no pathInArchive specified, assuming direct download). Size: %d bytes.", componentName, len(downloadedData))
 	}
 
 	log.Printf("--- Component %s Validation Successful ---", componentName)
@@ -360,7 +424,7 @@ func (v *defaultValidator) downloadWithRetry(url string) ([]byte, error) {
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512)) // Read small part for context
 			resp.Body.Close()
 			lastErr = fmt.Errorf("attempt %d: status code %d. Body: %s", attempt+1, resp.StatusCode, string(bodyBytes))
 			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
@@ -386,26 +450,28 @@ func (v *defaultValidator) downloadWithRetry(url string) ([]byte, error) {
 			log.Printf("Attempt %d: Warning - Content-Length missing", attempt+1)
 		}
 
-		limitedReader := io.LimitedReader{R: resp.Body, N: MaxDownloadSizeBytes + 1}
+		limitedReader := io.LimitedReader{R: resp.Body, N: MaxDownloadSizeBytes + 1} // +1 to detect overflow
 		bodyBytes, err := io.ReadAll(&limitedReader)
 		resp.Body.Close()
 		if err != nil {
 			lastErr = fmt.Errorf("attempt %d: read body failed: %w", attempt+1, err)
 			continue
 		}
+		// Check if we read more than the limit
 		if limitedReader.N == 0 {
 			return nil, fmt.Errorf("attempt %d: file > max %d bytes", attempt+1, MaxDownloadSizeBytes)
 		}
 
 		actualSize := int64(len(bodyBytes))
-		if expectedSize != -1 && actualSize != expectedSize {
+		if expectedSize != -1 && actualSize != expectedSize { // Check against expected size if known
 			lastErr = fmt.Errorf("attempt %d: size %d != Content-Length %d", attempt+1, actualSize, expectedSize)
-			continue
+			continue // Retry on size mismatch
 		}
 
 		log.Printf("Download successful (%d bytes)", actualSize)
-		return bodyBytes, nil
+		return bodyBytes, nil // Success
 	}
+	// If all retries failed
 	return nil, fmt.Errorf("download failed after %d attempts: %w", MaxDownloadRetries+1, lastErr)
 }
 
@@ -445,17 +511,27 @@ func (v *defaultValidator) validateArchivePathExists(archiveData []byte, pathInA
 	}
 
 	ext := strings.ToLower(filepath.Ext(archiveURI))
+	// Handle multi-part extensions like .tar.gz
 	archiveType := ""
+	if strings.HasSuffix(archiveURI, ".tar.gz") || strings.HasSuffix(archiveURI, ".tgz") {
+		archiveType = "tar.gz"
+	} else if strings.HasSuffix(archiveURI, ".tar.bz2") || strings.HasSuffix(archiveURI, ".tbz2") {
+		archiveType = "tar.bz2"
+	} else if ext == ".zip" {
+		archiveType = "zip"
+	} else {
+		return fmt.Errorf("unsupported archive extension for URI '%s'. Supported: .zip, .tar.gz, .tgz, .tar.bz2, .tbz2", archiveURI)
+	}
+
 	var err error
 	found := false
 	byteReader := bytes.NewReader(archiveData)
 
-	switch {
-	case ext == ".zip":
-		archiveType = "zip"
-		zipReader, err := zip.NewReader(byteReader, int64(len(archiveData)))
-		if err != nil {
-			return fmt.Errorf("read zip failed: %w", err)
+	switch archiveType {
+	case "zip":
+		zipReader, zipErr := zip.NewReader(byteReader, int64(len(archiveData)))
+		if zipErr != nil {
+			return fmt.Errorf("read zip failed: %w", zipErr)
 		}
 		for _, file := range zipReader.File {
 			if file.Name == pathInArchive {
@@ -476,11 +552,10 @@ func (v *defaultValidator) validateArchivePathExists(archiveData []byte, pathInA
 				break
 			}
 		}
-	case strings.HasSuffix(archiveURI, ".tar.gz") || strings.HasSuffix(archiveURI, ".tgz"):
-		archiveType = "tar.gz"
-		gzipReader, err := gzip.NewReader(byteReader)
-		if err != nil {
-			return fmt.Errorf("gzip reader failed: %w", err)
+	case "tar.gz":
+		gzipReader, gzErr := gzip.NewReader(byteReader)
+		if gzErr != nil {
+			return fmt.Errorf("gzip reader failed: %w", gzErr)
 		}
 		defer gzipReader.Close()
 		tarReader := tar.NewReader(gzipReader)
@@ -488,16 +563,13 @@ func (v *defaultValidator) validateArchivePathExists(archiveData []byte, pathInA
 		if err != nil {
 			return err
 		}
-	case strings.HasSuffix(archiveURI, ".tar.bz2") || strings.HasSuffix(archiveURI, ".tbz2"):
-		archiveType = "tar.bz2"
+	case "tar.bz2":
 		bz2Reader := bzip2.NewReader(byteReader)
 		tarReader := tar.NewReader(bz2Reader)
 		found, err = v.checkTarArchive(tarReader, pathInArchive)
 		if err != nil {
 			return err
 		}
-	default:
-		return fmt.Errorf("unsupported archive extension '%s'", ext)
 	}
 
 	if !found {
@@ -513,22 +585,21 @@ func (v *defaultValidator) checkTarArchive(tarReader *tar.Reader, pathInArchive 
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
-		}
+		} // End of archive is not an error here
 		if err != nil {
 			return false, fmt.Errorf("read tar header failed: %w", err)
 		}
 		if header.Name == pathInArchive {
-			if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA || header.Typeflag == 0 {
+			if header.Typeflag == tar.TypeReg || header.Typeflag == tar.TypeRegA || header.Typeflag == 0 { // Check for regular file types
+				// Attempt to read the content to ensure it's not corrupt
 				if _, copyErr := io.Copy(io.Discard, tarReader); copyErr != nil {
-					return false, fmt.Errorf("tar path '%s' read failed: %w", pathInArchive, copyErr)
+					return false, fmt.Errorf("tar path '%s' read failed (corrupt?): %w", pathInArchive, copyErr)
 				}
-				return true, nil
+				return true, nil // Found and readable
 			} else {
-				return false, fmt.Errorf("tar path '%s' not regular file (type %v)", pathInArchive, header.Typeflag)
+				return false, fmt.Errorf("tar path '%s' not regular file (typeflag %v)", pathInArchive, header.Typeflag)
 			}
 		}
 	}
-	return false, nil // Not found
+	return false, nil // Not found after iterating through the whole archive
 }
-
-// --- Removed duplicate struct definitions ---
