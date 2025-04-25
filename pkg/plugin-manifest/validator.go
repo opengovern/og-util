@@ -1,4 +1,4 @@
-package plugin-validation
+package pluginvalidation
 
 import (
 	// Standard library imports
