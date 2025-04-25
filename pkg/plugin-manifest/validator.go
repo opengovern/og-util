@@ -1,4 +1,6 @@
-package pluginvalidation
+// Package pluginmanifest provides utilities for validating plugin manifests,
+// including downloading and verifying associated components.
+package pluginmanifest // Corrected package name
 
 import (
 	// Standard library imports
@@ -27,6 +29,51 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"gopkg.in/yaml.v3"
 )
+
+// --- Struct Definitions ---
+// These structs map directly to the YAML/JSON manifest structure.
+
+// Component represents a single functional part of the plugin.
+type Component struct {
+	URI           string `yaml:"uri,omitempty" json:"uri,omitempty"`
+	ImageURI      string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"`
+	PathInArchive string `yaml:"path-in-archive,omitempty" json:"path-in-archive,omitempty"`
+	// Checksum for verifying file integrity (e.g., "sha256:<hex_hash>")
+	Checksum string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
+}
+
+// Metadata holds descriptive information about the plugin.
+type Metadata struct {
+	Author        string `yaml:"author" json:"author"`
+	PublishedDate string `yaml:"published-date" json:"published-date"`
+	Description   string `yaml:"description,omitempty" json:"description,omitempty"`
+	Website       string `yaml:"website,omitempty" json:"website,omitempty"`
+	License       string `yaml:"license,omitempty" json:"license,omitempty"`
+}
+
+// Plugin defines the core details of the plugin.
+type Plugin struct {
+	Name                      string           `yaml:"name" json:"name"`
+	Version                   string           `yaml:"version" json:"version"`
+	SupportedPlatformVersions []string         `yaml:"supported-platform-versions" json:"supported-platform-versions"`
+	Metadata                  Metadata         `yaml:"metadata" json:"metadata"`
+	Components                PluginComponents `yaml:"components" json:"components"`
+	SampleData                *Component       `yaml:"sample-data,omitempty" json:"sample-data,omitempty"`
+}
+
+// PluginComponents holds the different component definitions.
+type PluginComponents struct {
+	Discovery      Component `yaml:"discovery" json:"discovery"`
+	PlatformBinary Component `yaml:"platform-binary" json:"platform-binary"`
+	CloudQLBinary  Component `yaml:"cloudql-binary" json:"cloudql-binary"`
+}
+
+// PluginManifest is the top-level structure for the manifest file.
+type PluginManifest struct {
+	APIVersion string `yaml:"api-version" json:"api-version"`
+	Type       string `yaml:"type" json:"type"`
+	Plugin     Plugin `yaml:"plugin" json:"plugin"`
+}
 
 // --- Configuration Constants ---
 // (Consider moving these to a config struct or loading from env/file)
@@ -72,7 +119,7 @@ func init() {
 type PluginValidator interface {
 	// LoadAndValidateManifest reads, parses, and validates a plugin manifest from the given file path.
 	// It performs structural checks, metadata validation, and downloads/verifies binary components.
-	LoadAndValidateManifest(filePath string) (*PluginManifest, error)
+	LoadAndValidateManifest(filePath string) (*PluginManifest, error) // Uses types defined in this package
 }
 
 // --- Concrete Implementation ---
@@ -84,6 +131,7 @@ type defaultValidator struct {
 
 // NewDefaultValidator creates a new instance of the default validator.
 func NewDefaultValidator() PluginValidator {
+	// This now correctly returns a pointer to defaultValidator which implements the interface
 	return &defaultValidator{}
 }
 
@@ -94,14 +142,16 @@ func isNonEmpty(s string) bool {
 
 // --- Core Logic Methods (associated with defaultValidator) ---
 
-// LoadAndParseManifest implements the PluginValidator interface method.
-func (v *defaultValidator) LoadAndParseManifest(filePath string) (*PluginManifest, error) {
+// LoadAndValidateManifest implements the PluginValidator interface method.
+// Renamed from LoadAndParseManifest to match the interface.
+func (v *defaultValidator) LoadAndValidateManifest(filePath string) (*PluginManifest, error) {
 	log.Printf("Loading manifest from: %s", filePath)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
 	}
 
+	// Use the PluginManifest struct defined in this package
 	var manifest PluginManifest
 	err = yaml.Unmarshal(data, &manifest)
 	if err != nil {
@@ -121,6 +171,7 @@ func (v *defaultValidator) LoadAndParseManifest(filePath string) (*PluginManifes
 	}
 
 	log.Println("--- Manifest Validation Fully Successful ---")
+	// Return pointer to the locally defined PluginManifest struct
 	return &manifest, nil
 }
 
@@ -152,7 +203,6 @@ func (v *defaultValidator) validateManifestStructure(manifest *PluginManifest) e
 		if !isNonEmpty(constraintStr) {
 			return fmt.Errorf("plugin.supported-platform-versions entry %d cannot be empty", i)
 		}
-		// Use stricter constraint format checking compatible with Masterminds/semver
 		if _, err := semver.NewConstraint(constraintStr); err != nil {
 			return fmt.Errorf("invalid constraint string '%s': %w", constraintStr, err)
 		}
@@ -204,6 +254,7 @@ func (v *defaultValidator) validateBinaryComponents(manifest *PluginManifest) er
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// Use the Component struct defined in this package
 		platformData, platformErr = v.validateSingleBinaryComponent(platformComp, "platform-binary")
 	}()
 
@@ -212,6 +263,7 @@ func (v *defaultValidator) validateBinaryComponents(manifest *PluginManifest) er
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			// Use the Component struct defined in this package
 			_, cloudqlErr = v.validateSingleBinaryComponent(cloudqlComp, "cloudql-binary")
 		}()
 	}
@@ -230,6 +282,7 @@ func (v *defaultValidator) validateBinaryComponents(manifest *PluginManifest) er
 	// If URIs matched, perform the CloudQL path check using the already downloaded data
 	if platformComp.URI == cloudqlComp.URI {
 		log.Printf("Validating cloudql path '%s' within shared archive from %s...", cloudqlComp.PathInArchive, platformComp.URI)
+		// Use the Component struct defined in this package
 		err := v.validateArchivePathExists(platformData, cloudqlComp.PathInArchive, cloudqlComp.URI)
 		if err != nil {
 			return fmt.Errorf("cloudql-binary validation failed: archive/path check failed for URI %s: %w", cloudqlComp.URI, err)
@@ -239,6 +292,7 @@ func (v *defaultValidator) validateBinaryComponents(manifest *PluginManifest) er
 }
 
 // validateSingleBinaryComponent downloads and validates a specific binary component.
+// Uses the Component struct defined in this package.
 func (v *defaultValidator) validateSingleBinaryComponent(component Component, componentName string) ([]byte, error) {
 	log.Printf("--- Validating Component: %s ---", componentName)
 	if !isNonEmpty(component.URI) {
@@ -476,3 +530,5 @@ func (v *defaultValidator) checkTarArchive(tarReader *tar.Reader, pathInArchive 
 	}
 	return false, nil // Not found
 }
+
+// --- Removed duplicate struct definitions ---
