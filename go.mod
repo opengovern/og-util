@@ -36,6 +36,7 @@ require (
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.36.0
+	github.com/opencontainers/image-spec v1.1.0
 	github.com/opensearch-project/opensearch-go/v2 v2.3.0
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pganalyze/pg_query_go/v4 v4.2.3
@@ -61,6 +62,7 @@ require (
 	gorm.io/plugin/prometheus v0.1.0
 	k8s.io/client-go v0.31.2
 	moul.io/zapgorm2 v1.3.0
+	oras.land/oras-go/v2 v2.5.0
 )
 
 require (
@@ -192,7 +194,6 @@ require (
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/opencontainers/runc v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
