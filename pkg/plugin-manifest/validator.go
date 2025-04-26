@@ -118,11 +118,11 @@ const (
 	// InitialBackoffDuration defines the starting wait time for retries.
 	InitialBackoffDuration = 1 * time.Second
 	// ConnectTimeout is the maximum time to wait for establishing a TCP connection.
-	ConnectTimeout = 5 * time.Second
+	ConnectTimeout = 10 * time.Second // Increased slightly
 	// TLSHandshakeTimeout is the maximum time allowed for the TLS handshake.
-	TLSHandshakeTimeout = 5 * time.Second
+	TLSHandshakeTimeout = 10 * time.Second // Increased slightly
 	// ResponseHeaderTimeout is the maximum time to wait for the server's response headers.
-	ResponseHeaderTimeout = 10 * time.Second
+	ResponseHeaderTimeout = 15 * time.Second // Increased slightly
 	// OverallRequestTimeout defines the maximum time allowed for a single HTTP request attempt.
 	OverallRequestTimeout = 60 * time.Second
 	// MaxDownloadSizeBytes limits the maximum size of a downloadable artifact archive file.
@@ -139,6 +139,8 @@ const (
 )
 
 // --- Global HTTP Client ---
+// This client is primarily used for artifact downloads.
+// Registry operations will use the oras-go default client unless auth is needed.
 var httpClient *http.Client
 
 // --- Regular Expression for Image Digest ---
@@ -147,6 +149,7 @@ var imageDigestRegex = regexp.MustCompile(`^.+@sha256:[a-fA-F0-9]{64}$`)
 // init initializes the package-level resources.
 func init() {
 	rand.Seed(time.Now().UnixNano())
+	// Configure the HTTP client primarily for downloads
 	httpClient = &http.Client{
 		Timeout: OverallRequestTimeout,
 		Transport: &http.Transport{
@@ -158,7 +161,7 @@ func init() {
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
-	log.Println("Initialized shared HTTP client for plugin manifest validation.")
+	log.Println("Initialized shared HTTP client for artifact downloads.")
 }
 
 // --- Interface Definition ---
@@ -446,23 +449,21 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), OverallRequestTimeout)
 		defer cancel() // Ensure cancel is called
 
-		// *** FIXED BLOCK START ***
 		ref, err := registry.ParseReference(imageURI)
 		if err != nil {
-			return fmt.Errorf("attempt %d: failed to parse image reference '%s': %w", attempt+1, imageURI, err) // No retry needed
+			return fmt.Errorf("attempt %d: failed to parse image reference '%s': %w", attempt+1, imageURI, err)
 		}
-		// build “registry/repo” string so remote.NewRepository sees both parts
 		fullRepo := fmt.Sprintf("%s/%s", ref.Host(), ref.Repository) // Combine host and repo path
-		repo, err := remote.NewRepository(fullRepo)                  // Use the combined path
+		repo, err := remote.NewRepository(fullRepo)
 		if err != nil {
-			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, fullRepo, err) // Use fullRepo in error
-			continue                                                                                                   // Retry if client creation fails
+			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, fullRepo, err)
+			continue
 		}
-		// *** FIXED BLOCK END ***
 
-		repo.Client = httpClient // Use global client directly for default/anonymous auth
-
-		log.Printf("[DEBUG] Attempting to resolve manifest using registry client for host: %s, repository: %s", repo.Reference.Registry, repo.Reference.Repository) // Log the registry host the client *thinks* it's using
+		// *** REMOVED repo.Client = httpClient ***
+		// Let oras-go use its default client which handles anonymous auth correctly
+		// If authentication is needed later, repo.Client can be set to an auth.Client
+		log.Printf("[DEBUG] Attempting to resolve manifest using ORAS default client for host: %s, repository: %s", repo.Reference.Registry, repo.Reference.Repository)
 
 		// Resolve attempts to fetch manifest metadata (HEAD or GET) using the digest
 		_, err = repo.Resolve(ctx, ref.Reference) // ref.Reference is the digest
@@ -522,6 +523,7 @@ func (v *defaultValidator) validateSingleDownloadableComponent(component Compone
 }
 
 // downloadWithRetry attempts to download a file from a URL with exponential backoff and checks.
+// Uses the globally configured httpClient.
 func (v *defaultValidator) downloadWithRetry(url string) ([]byte, error) {
 	var lastErr error
 	backoff := InitialBackoffDuration
