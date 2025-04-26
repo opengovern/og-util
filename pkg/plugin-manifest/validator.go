@@ -12,7 +12,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
+	"errors" // Import errors package for error handling
 	"fmt"
 	"io"
 	"log"
@@ -29,55 +29,82 @@ import (
 
 	// Third-party imports
 	"github.com/Masterminds/semver/v3"
-	_ "github.com/opencontainers/image-spec/specs-go/v1" // OCI spec alias - underscore import as types aren't directly used but good to note dependency
+	_ "github.com/opencontainers/image-spec/specs-go/v1" // OCI spec alias - underscore import as types aren't directly used in this version but good to note dependency
 	"gopkg.in/yaml.v3"
-	"oras.land/oras-go/v2/registry"
-	"oras.land/oras-go/v2/registry/remote"
-	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry"        // For parsing reference
+	"oras.land/oras-go/v2/registry/remote" // For interacting with remote registries
+	// For auth types if needed later
 )
 
 // --- Struct Definitions ---
 
 // Component represents a single functional part of the plugin.
 type Component struct {
-	URI           string `yaml:"uri,omitempty" json:"uri,omitempty"`
-	ImageURI      string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"`
+	// URI for downloadable components (e.g., zip, tar.gz).
+	URI string `yaml:"uri,omitempty" json:"uri,omitempty"`
+	// ImageURI for container image components (e.g., discovery).
+	// Must be in digest format (e.g., repo/image@sha256:hash).
+	ImageURI string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"`
+	// PathInArchive specifies the relative path to the executable or file
+	// within a downloaded archive (if URI points to an archive).
 	PathInArchive string `yaml:"path-in-archive,omitempty" json:"path-in-archive,omitempty"`
-	Checksum      string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
+	// Checksum for verifying file integrity (e.g., "sha256:<hex_hash>").
+	// For downloadable archives, it's the hash of the archive file.
+	// Generally not used for ImageURI as the digest serves this purpose.
+	Checksum string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
 }
 
 // Metadata holds descriptive information about the plugin.
 type Metadata struct {
-	Author        string `yaml:"author" json:"author"`
+	// Author of the plugin (Required).
+	Author string `yaml:"author" json:"author"`
+	// PublishedDate of this plugin version (YYYY-MM-DD format recommended) (Required).
 	PublishedDate string `yaml:"published-date" json:"published-date"`
-	Contact       string `yaml:"contact" json:"contact"`
-	License       string `yaml:"license" json:"license"`
-	Description   string `yaml:"description,omitempty" json:"description,omitempty"`
-	Website       string `yaml:"website,omitempty" json:"website,omitempty"`
+	// Contact information for the author or support (Required).
+	Contact string `yaml:"contact" json:"contact"`
+	// License identifier (SPDX format recommended, e.g., "Apache-2.0") (Required).
+	License string `yaml:"license" json:"license"`
+	// Description of the plugin's functionality (Optional).
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	// Website URL for the plugin or author (Optional).
+	Website string `yaml:"website,omitempty" json:"website,omitempty"`
 }
 
 // Plugin defines the core details of the plugin.
 type Plugin struct {
-	Name                      string           `yaml:"name" json:"name"`
-	Version                   string           `yaml:"version" json:"version"`
-	SupportedPlatformVersions []string         `yaml:"supported-platform-versions" json:"supported-platform-versions"`
-	Metadata                  Metadata         `yaml:"metadata" json:"metadata"`
-	Components                PluginComponents `yaml:"components" json:"components"`
-	SampleData                *Component       `yaml:"sample-data,omitempty" json:"sample-data,omitempty"`
+	// Name of the plugin (unique identifier) (Required).
+	Name string `yaml:"name" json:"name"`
+	// Version of the plugin (SemVer format recommended) (Required).
+	Version string `yaml:"version" json:"version"`
+	// SupportedPlatformVersions lists the platform versions this plugin is compatible with,
+	// using SemVer constraint strings (e.g., ">=1.2.0, <2.0.0") (Required, non-empty).
+	SupportedPlatformVersions []string `yaml:"supported-platform-versions" json:"supported-platform-versions"`
+	// Metadata about the plugin (Required).
+	Metadata Metadata `yaml:"metadata" json:"metadata"`
+	// Components defines the functional parts of the plugin (Required).
+	Components PluginComponents `yaml:"components" json:"components"`
+	// SampleData provides information about optional sample data (Optional).
+	SampleData *Component `yaml:"sample-data,omitempty" json:"sample-data,omitempty"`
 }
 
 // PluginComponents holds the different component definitions.
 type PluginComponents struct {
-	Discovery      Component `yaml:"discovery" json:"discovery"`
+	// Discovery component, typically a container image (Required).
+	Discovery Component `yaml:"discovery" json:"discovery"`
+	// PlatformBinary component, typically a downloadable executable or archive (Required).
 	PlatformBinary Component `yaml:"platform-binary" json:"platform-binary"`
-	CloudQLBinary  Component `yaml:"cloudql-binary" json:"cloudql-binary"`
+	// CloudQLBinary component, typically a downloadable executable or archive (Required).
+	CloudQLBinary Component `yaml:"cloudql-binary" json:"cloudql-binary"`
 }
 
 // PluginManifest is the top-level structure for the manifest file.
 type PluginManifest struct {
+	// APIVersion of the manifest schema (Required, must be "v1").
 	APIVersion string `yaml:"api-version" json:"api-version"`
-	Type       string `yaml:"type" json:"type"`
-	Plugin     Plugin `yaml:"plugin" json:"plugin"`
+	// Type of the manifest (Required, must be "plugin").
+	Type string `yaml:"type" json:"type"`
+	// Plugin definition (Required).
+	Plugin Plugin `yaml:"plugin" json:"plugin"`
 }
 
 // --- Configuration Constants ---
@@ -102,11 +129,11 @@ const (
 	// ArtifactTypeDiscovery identifies the discovery image component.
 	ArtifactTypeDiscovery = "discovery"
 	// ArtifactTypePlatformBinary identifies the platform-binary component.
-	ArtifactTypePlatformBinary = "platform-binary"
+	ArtifactTypePlatformBinary = "platform-binary" // Added constant
 	// ArtifactTypeCloudQLBinary identifies the cloudql-binary component.
-	ArtifactTypeCloudQLBinary = "cloudql-binary"
+	ArtifactTypeCloudQLBinary = "cloudql-binary" // Added constant
 	// ArtifactTypeAll indicates validation for all relevant components.
-	ArtifactTypeAll = "all" // Or use "" for this case
+	ArtifactTypeAll = "all"
 )
 
 // --- Global HTTP Client ---
@@ -138,18 +165,12 @@ func init() {
 type PluginValidator interface {
 	// LoadManifest reads and parses a plugin manifest from the given file path.
 	LoadManifest(filePath string) (*PluginManifest, error)
-
 	// ValidateManifestStructure performs structural and metadata checks on a loaded manifest.
 	ValidateManifestStructure(manifest *PluginManifest) error
-
 	// CheckPlatformSupport checks if the manifest supports a given platform version.
 	CheckPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error)
-
 	// ValidateArtifact downloads/verifies specific artifacts based on artifactType.
 	// Valid types: "discovery", "platform-binary", "cloudql-binary", "all" (or empty).
-	// "discovery": Checks image existence in the registry.
-	// "platform-binary"/"cloudql-binary": Downloads, verifies checksum, checks archive.
-	// "all" or "": Validates discovery, platform-binary, and cloudql-binary.
 	ValidateArtifact(manifest *PluginManifest, artifactType string) error
 }
 
@@ -292,20 +313,16 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 	if manifest == nil {
 		return fmt.Errorf("manifest cannot be nil for artifact validation")
 	}
-
 	normalizedType := strings.ToLower(artifactType)
 	if !isNonEmpty(artifactType) {
-		normalizedType = ArtifactTypeAll // Treat empty as "all"
+		normalizedType = ArtifactTypeAll
 	}
-
 	logMsgType := normalizedType
 	log.Printf("--- Starting Artifact Validation (Type: %s) ---", logMsgType)
 
-	// Flags to determine which validations to run
 	validateDiscovery := false
 	validatePlatform := false
 	validateCloudQL := false
-
 	switch normalizedType {
 	case ArtifactTypeAll:
 		validateDiscovery = true
@@ -322,73 +339,56 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 		validateCloudQL = true
 		log.Println("Validating only CloudQLBinary artifact.")
 	default:
-		return fmt.Errorf("invalid artifactType '%s'. Must be '%s', '%s', '%s', or empty/all",
-			artifactType, ArtifactTypeDiscovery, ArtifactTypePlatformBinary, ArtifactTypeCloudQLBinary)
+		return fmt.Errorf("invalid artifactType '%s'. Must be '%s', '%s', '%s', or empty/all", artifactType, ArtifactTypeDiscovery, ArtifactTypePlatformBinary, ArtifactTypeCloudQLBinary)
 	}
 
-	// --- Perform Validations ---
 	var wg sync.WaitGroup
 	var discoveryErr, platformErr, cloudqlErr error
-	var platformData []byte // Shared data if URIs match
-
+	var platformData []byte
 	platformComp := manifest.Plugin.Components.PlatformBinary
 	cloudqlComp := manifest.Plugin.Components.CloudQLBinary
 
-	// --- Discovery Image Validation ---
 	if validateDiscovery {
-		// Image validation can run concurrently with downloads if needed,
-		// but often it's fast enough to run sequentially first, or last.
-		// Running it first might catch registry issues early.
 		log.Println("Initiating Discovery image validation...")
-		discoveryErr = v.validateImageManifestExists(manifest.Plugin.Components.Discovery.ImageURI)
+		discoveryErr = v.validateImageManifestExists(manifest.Plugin.Components.Discovery.ImageURI) // Pass URI directly
 		if discoveryErr != nil {
-			// If validating all and discovery fails, maybe return early? Or collect all errors?
-			// Current approach: Collect all errors.
 			log.Printf("Discovery image validation failed: %v", discoveryErr)
 		} else {
 			log.Println("Discovery image validation successful.")
 		}
 	}
 
-	// --- Downloadable Artifact Validation ---
 	if validatePlatform {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			log.Println("Initiating PlatformBinary artifact validation...")
-			platformData, platformErr = v.validateSingleDownloadableComponent(platformComp, ArtifactPlatformBinary)
+			platformData, platformErr = v.validateSingleDownloadableComponent(platformComp, ArtifactTypePlatformBinary)
 			if platformErr == nil {
 				log.Println("PlatformBinary artifact validation successful.")
 			}
 		}()
 	}
-
 	if validateCloudQL && platformComp.URI != cloudqlComp.URI {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			log.Println("Initiating CloudQLBinary artifact validation (separate URI)...")
-			_, cloudqlErr = v.validateSingleDownloadableComponent(cloudqlComp, ArtifactCloudQLBinary)
+			_, cloudqlErr = v.validateSingleDownloadableComponent(cloudqlComp, ArtifactTypeCloudQLBinary)
 			if cloudqlErr == nil {
 				log.Println("CloudQLBinary artifact validation successful.")
 			}
 		}()
 	}
+	wg.Wait() // Wait for downloads
 
-	// Wait for downloads/validations to complete
-	wg.Wait()
-
-	// --- Handle Shared URI Case for CloudQL ---
 	if validateCloudQL && platformComp.URI == cloudqlComp.URI {
 		log.Println("Initiating CloudQLBinary artifact validation (shared URI)...")
-		// Check if platform binary validation (which downloaded the data) succeeded
 		if platformErr != nil {
 			cloudqlErr = fmt.Errorf("cannot validate cloudql-binary path in shared archive because platform-binary validation failed: %w", platformErr)
 		} else if platformData == nil {
-			// This case implies platform validation was requested but failed silently or didn't run? Should not happen with current logic.
 			cloudqlErr = fmt.Errorf("internal logic error: platform data not available for shared URI validation")
 		} else {
-			// Platform validation succeeded, platformData contains the archive bytes. Validate the cloudql path within it.
 			log.Printf("Validating cloudql path '%s' within shared archive from %s...", cloudqlComp.PathInArchive, platformComp.URI)
 			err := v.validateArchivePathExists(platformData, cloudqlComp.PathInArchive, cloudqlComp.URI)
 			if err != nil {
@@ -399,7 +399,6 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 		}
 	}
 
-	// --- Collect and Return Errors ---
 	var combinedErrors []string
 	if discoveryErr != nil {
 		combinedErrors = append(combinedErrors, fmt.Sprintf("discovery image validation failed: %v", discoveryErr))
@@ -407,13 +406,10 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 	if platformErr != nil {
 		combinedErrors = append(combinedErrors, fmt.Sprintf("platform-binary artifact validation failed: %w", platformErr))
 	}
-	if cloudqlErr != nil {
-		// Avoid duplicating error if it was already reported via platformErr in shared URI case
-		if !(platformComp.URI == cloudqlComp.URI && platformErr != nil) {
-			combinedErrors = append(combinedErrors, fmt.Sprintf("cloudql-binary artifact validation failed: %w", cloudqlErr))
-		}
+	// Avoid duplicating error if it was already reported via platformErr in shared URI case
+	if cloudqlErr != nil && !(platformComp.URI == cloudqlComp.URI && platformErr != nil) {
+		combinedErrors = append(combinedErrors, fmt.Sprintf("cloudql-binary artifact validation failed: %w", cloudqlErr))
 	}
-
 	if len(combinedErrors) > 0 {
 		return errors.New(strings.Join(combinedErrors, "; "))
 	}
@@ -425,9 +421,7 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 // --- Internal Validation Helpers ---
 
 // validateImageManifestExists checks if an image manifest exists in the registry using retries.
-// Renamed from ValidateImage to be an internal helper.
 func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
-	// Basic input validation
 	if !isNonEmpty(imageURI) {
 		return fmt.Errorf("image URI is empty")
 	}
@@ -449,20 +443,22 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 		}
 		log.Printf("Image resolve attempt %d/%d for %s...", attempt+1, MaxRegistryRetries+1, imageURI)
 		ctx, cancel := context.WithTimeout(context.Background(), OverallRequestTimeout)
-		defer cancel() // Defer cancel right after creating context
+		defer cancel()
 
 		ref, err := registry.ParseReference(imageURI)
 		if err != nil {
 			return fmt.Errorf("attempt %d: failed to parse image reference '%s': %w", attempt+1, imageURI, err)
-		} // No retry needed
-		repo, err := remote.NewRepository(ref.Repository.Name())
+		} // No retry
+		// Use ref.Repository directly as it's the repository part of the reference
+		repo, err := remote.NewRepository(ref.Repository)
 		if err != nil {
-			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, ref.Repository.Name(), err)
+			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, ref.Repository, err)
 			continue
-		}
-		repo.Client = auth.NewClient(httpClient) // Use global client, handles anonymous/future auth
+		} // Corrected: Use ref.Repository
+		// Assign the global httpClient. Authentication can be added here if needed via auth.Client or repo options.
+		repo.Client = httpClient // Corrected: Assign http client directly for default/anonymous access
 
-		// Resolve attempts to fetch manifest metadata (HEAD or GET)
+		// Resolve attempts to fetch manifest metadata (HEAD or GET) using the digest
 		_, err = repo.Resolve(ctx, ref.Reference) // ref.Reference is the digest
 
 		if err == nil {
@@ -472,7 +468,7 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 
 		lastErr = fmt.Errorf("attempt %d: failed resolve image manifest for '%s': %w", attempt+1, imageURI, err)
 		log.Printf("Error details: %v", err)
-		var httpErr *remote.Error
+		var httpErr *remote.Error // Correct type for checking registry errors
 		if errors.As(err, &httpErr) {
 			if httpErr.StatusCode >= 400 && httpErr.StatusCode < 500 {
 				log.Printf("Attempt %d: Client error %d (%s), not retrying.", attempt+1, httpErr.StatusCode, http.StatusText(httpErr.StatusCode))
@@ -486,7 +482,6 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 }
 
 // validateSingleDownloadableComponent downloads and validates a specific downloadable binary component.
-// Renamed from validateSingleBinaryComponent for clarity.
 func (v *defaultValidator) validateSingleDownloadableComponent(component Component, componentName string) ([]byte, error) {
 	log.Printf("--- Validating Downloadable Component: %s ---", componentName)
 	if !isNonEmpty(component.URI) {
