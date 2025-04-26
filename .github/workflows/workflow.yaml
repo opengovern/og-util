@@ -8,42 +8,115 @@ on:
   pull_request:
     branches:
       - main
+  # Allow manual triggering with an option to run all tests
+  workflow_dispatch:
+    inputs:
+      run_all_tests:
+        description: 'Run tests for all packages (true/false)'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+    # Define permissions for the job for security best practices
+    permissions:
+      contents: write # Needed for checkout and potentially for tagging
+      pull-requests: read # Needed for PR context if used
+
+    # Add a timeout to prevent runaway jobs
+    timeout-minutes: 15
 
     steps:
       - name: Checkout the repository
+        # Fetch full history to allow diffing against base branch in PRs
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-          # Enable caching for Go modules
-          cache: true
+          cache: true # Enable caching for Go modules
 
-      # Verify dependencies and ensure go.mod/go.sum are tidy
-      # Run this *before* testing
       - name: Verify dependencies
         run: go mod tidy
 
-      # Optional but recommended: Check if go mod tidy changed files
-      # This ensures developers commit the tidy go.mod/go.sum files
       - name: Check for modified go.mod/go.sum
         run: |
+          # Fail workflow if go.mod/go.sum were changed by `go mod tidy`
           git diff --exit-code -- go.mod go.sum || \
           (echo "::error::go.mod or go.sum needs tidying (run 'go mod tidy' locally and commit changes)" && exit 1)
 
-      # Run tests after verifying dependencies
+      # Use tj-actions/changed-files to get list of changed files
+      - name: Get changed files
+        id: changed_files
+        uses: tj-actions/changed-files@v44 # Use a specific recent version
+        with:
+          files: | # Look for changes in go files and module files
+            **/*.go
+            go.mod
+            go.sum
+          # Get changes relative to the base branch for PRs, or previous commit for pushes
+          since_last_remote_commit: ${{ github.event_name == 'push' }}
+          base_sha: ${{ github.event.pull_request.base.sha }}
+
+      # Determine which packages to test based on changed files or manual input
+      - name: Determine test target packages
+        id: set_target
+        run: |
+          run_all=${{ github.event.inputs.run_all_tests || 'false' }}
+          changed_go_files="${{ steps.changed_files.outputs.added_modified_files }}" # Files added or modified
+          all_changed_files="${{ steps.changed_files.outputs.all_changed_files }}" # Includes deleted etc.
+
+          test_target="./..." # Default to all tests
+
+          echo "Run all input: $run_all"
+          echo "Changed Go/Mod files: $changed_go_files"
+          echo "All changed files: $all_changed_files"
+
+          # Condition 1: Manual trigger requested all tests
+          if [[ "$run_all" == "true" ]]; then
+            echo "Manual trigger requested all tests."
+            test_target="./..."
+          # Condition 2: go.mod or go.sum changed - run all tests
+          elif grep -qE '(^|\s)(go\.mod|go\.sum)(\s|$)' <<< "$all_changed_files"; then
+            echo "go.mod or go.sum changed, running all tests."
+            test_target="./..."
+          # Condition 3: Specific Go files changed (and not running all)
+          elif [[ -n "$changed_go_files" ]]; then
+            echo "Specific Go files changed, determining target packages."
+            # Get unique directory names containing changed .go files
+            # Prepend './' to each directory for go test command
+            # Use xargs -n1 dirname to handle potential spaces, sort -u for unique, sed to prepend ./, paste to join
+            target_dirs=$(echo "$changed_go_files" | xargs -n1 dirname | sort -u | sed 's#^#./#' | paste -sd ' ')
+            if [[ -n "$target_dirs" ]]; then
+               echo "Target packages: $target_dirs"
+               test_target="$target_dirs"
+            else
+               echo "No specific Go packages identified from changes, defaulting to all tests."
+               test_target="./..." # Fallback if dirname processing fails or yields nothing
+            fi
+          # Condition 4: No Go files changed, not running all
+          else
+            echo "No Go files changed and not running all tests. No tests will run."
+            test_target="" # Set target to empty to skip test step
+          fi
+
+          echo "Final test target: $test_target"
+          echo "test_target=$test_target" >> $GITHUB_OUTPUT
+
+      # Run tests only if a target was determined, include race detector
       - name: Run Go Tests
-        id: go_test # Keep the id if needed elsewhere
-        run: go test -v ./...
+        if: steps.set_target.outputs.test_target != ''
+        id: go_test
+        # Added -race flag for concurrency testing
+        run: go test -race -v ${{ steps.set_target.outputs.test_target }}
 
       # Conditional step: Create a new tag if tests pass ON A PUSH to the main branch
-      # We only want to tag on actual merges/pushes to main, not on PR builds.
       - name: Tag version
         # Check for success, ensure it's the main branch, AND ensure it was a push event (not pull_request)
         if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
