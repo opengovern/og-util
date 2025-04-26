@@ -1,129 +1,187 @@
-name: test
+# Workflow name
+name: test and release
 
+# Triggers for the workflow
 on:
+  # Run on pushes to the main branch
   push:
     branches:
       - main
-  # Trigger on pull requests targeting the main branch
+  # Run on pull requests targeting the main branch
   pull_request:
     branches:
       - main
-  # Allow manual triggering with an option to run all tests
+  # Allow manual triggering via the Actions tab
   workflow_dispatch:
     inputs:
+      # Optional input for manual trigger to force running all tests
       run_all_tests:
         description: 'Run tests for all packages (true/false)'
         required: false
-        default: 'false'
+        # Corrected: Use boolean false, not string 'false'
+        default: false
         type: boolean
 
+# Define the jobs within the workflow
 jobs:
-  test:
-    name: test
-    runs-on: ubuntu-latest
-    # Define permissions for the job for security best practices
+  # Job for testing the code and creating a Git tag
+  test_and_tag:
+    name: test and tag
+    runs-on: ubuntu-latest # Specify the runner environment
+    # Define permissions required by the job steps
     permissions:
-      contents: write # Needed for checkout and potentially for tagging
-      pull-requests: read # Needed for PR context if used
+      contents: write # Needed for checkout and pushing tags
+      pull-requests: read # Needed to read PR context (e.g., base SHA)
 
-    # Add a timeout to prevent runaway jobs
+    # Set a timeout for the job to prevent indefinite runs
     timeout-minutes: 15
 
+    # Define outputs that can be used by dependent jobs
+    outputs:
+      # Output the newly created tag name
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+      # Potentially output other details from the tagging step if needed
+      # previous_tag: ${{ steps.tag_version.outputs.previous_tag }}
+      # release_notes: ${{ steps.tag_version.outputs.changelog }} # Example if action generated notes
+
     steps:
+      # Step 1: Check out the repository code
       - name: Checkout the repository
-        # Fetch full history to allow diffing against base branch in PRs
         uses: actions/checkout@v4
         with:
+          # Fetch all history is needed for comparing changes accurately, especially for PRs
           fetch-depth: 0
 
+      # Step 2: Set up the Go environment
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
-          cache: true # Enable caching for Go modules
+          go-version: "1.21" # Specify desired Go version
+          cache: true # Enable caching of Go modules for faster builds
 
+      # Step 3: Verify Go module dependencies
       - name: Verify dependencies
-        run: go mod tidy
+        run: go mod tidy # Ensure go.mod and go.sum are consistent
 
+      # Step 4: Check for uncommitted go.mod/go.sum changes
       - name: Check for modified go.mod/go.sum
         run: |
-          # Fail workflow if go.mod/go.sum were changed by `go mod tidy`
+          # Use git diff to check for changes after `go mod tidy`
+          # Fail the workflow if changes are detected, prompting developer to commit them
           git diff --exit-code -- go.mod go.sum || \
           (echo "::error::go.mod or go.sum needs tidying (run 'go mod tidy' locally and commit changes)" && exit 1)
 
-      # Use tj-actions/changed-files to get list of changed files
+      # Step 5: Identify changed files since the last relevant commit/branch point
       - name: Get changed files
         id: changed_files
-        uses: tj-actions/changed-files@v44 # Use a specific recent version
+        uses: tj-actions/changed-files@v44 # Use a specific version of the action
         with:
-          files: | # Look for changes in go files and module files
+          # Specify file patterns to monitor for changes
+          files: |
             **/*.go
             go.mod
             go.sum
-          # Get changes relative to the base branch for PRs, or previous commit for pushes
-          since_last_remote_commit: ${{ github.event_name == 'push' }}
-          base_sha: ${{ github.event.pull_request.base.sha }}
+          # Determine the comparison base based on the event type
+          since_last_remote_commit: ${{ github.event_name == 'push' }} # For pushes, compare to previous commit
+          base_sha: ${{ github.event.pull_request.base.sha }} # For PRs, compare to the base branch
 
-      # Determine which packages to test based on changed files or manual input
+      # Step 6: Determine which Go packages need testing
       - name: Determine test target packages
         id: set_target
         run: |
+          # Get inputs and outputs from previous steps
+          # Correctly handle boolean input from github.event.inputs
           run_all=${{ github.event.inputs.run_all_tests || 'false' }}
-          changed_go_files="${{ steps.changed_files.outputs.added_modified_files }}" # Files added or modified
-          all_changed_files="${{ steps.changed_files.outputs.all_changed_files }}" # Includes deleted etc.
-
-          test_target="./..." # Default to all tests
+          changed_go_files="${{ steps.changed_files.outputs.added_modified_files }}"
+          all_changed_files="${{ steps.changed_files.outputs.all_changed_files }}"
+          test_target="./..." # Default: run tests for all packages
 
           echo "Run all input: $run_all"
           echo "Changed Go/Mod files: $changed_go_files"
           echo "All changed files: $all_changed_files"
 
-          # Condition 1: Manual trigger requested all tests
+          # Logic to determine the test target
           if [[ "$run_all" == "true" ]]; then
+            # If manually triggered to run all tests
             echo "Manual trigger requested all tests."
             test_target="./..."
-          # Condition 2: go.mod or go.sum changed - run all tests
           elif grep -qE '(^|\s)(go\.mod|go\.sum)(\s|$)' <<< "$all_changed_files"; then
+            # If go.mod or go.sum changed, run all tests
             echo "go.mod or go.sum changed, running all tests."
             test_target="./..."
-          # Condition 3: Specific Go files changed (and not running all)
           elif [[ -n "$changed_go_files" ]]; then
+            # If specific Go files changed, test only their packages
             echo "Specific Go files changed, determining target packages."
-            # Get unique directory names containing changed .go files
-            # Prepend './' to each directory for go test command
-            # Use xargs -n1 dirname to handle potential spaces, sort -u for unique, sed to prepend ./, paste to join
+            # Extract unique directory paths containing changes, format for `go test`
             target_dirs=$(echo "$changed_go_files" | xargs -n1 dirname | sort -u | sed 's#^#./#' | paste -sd ' ')
             if [[ -n "$target_dirs" ]]; then
                echo "Target packages: $target_dirs"
                test_target="$target_dirs"
             else
+               # Fallback if directory processing yields nothing unexpectedly
                echo "No specific Go packages identified from changes, defaulting to all tests."
-               test_target="./..." # Fallback if dirname processing fails or yields nothing
+               test_target="./..."
             fi
-          # Condition 4: No Go files changed, not running all
           else
+            # If no relevant files changed and not running all, skip tests
             echo "No Go files changed and not running all tests. No tests will run."
-            test_target="" # Set target to empty to skip test step
+            test_target="" # Empty target skips the test step
           fi
 
+          # Set the output variable for the next step
           echo "Final test target: $test_target"
           echo "test_target=$test_target" >> $GITHUB_OUTPUT
 
-      # Run tests only if a target was determined, include race detector
+      # Step 7: Run Go tests, potentially selectively
       - name: Run Go Tests
+        # Only run if a test target was determined
         if: steps.set_target.outputs.test_target != ''
         id: go_test
-        # Added -race flag for concurrency testing
+        # Run tests with verbosity (-v) and race detector (-race)
         run: go test -race -v ${{ steps.set_target.outputs.test_target }}
 
-      # Conditional step: Create a new tag if tests pass ON A PUSH to the main branch
+      # Step 8: Create and push a Git tag
       - name: Tag version
-        # Check for success, ensure it's the main branch, AND ensure it was a push event (not pull_request)
+        # Conditions: previous steps succeeded, event was a push, branch is main
         if: success() && github.ref == 'refs/heads/main' && github.event_name == 'push'
-        id: tag_version
-        uses: mathieudutour/github-tag-action@v6.2 # Use latest version (v6.2 as of writing)
+        id: tag_version # ID used to reference outputs (like the new tag name)
+        uses: mathieudutour/github-tag-action@v6.2 # Use specific version
         with:
+          # Use a secret token with permissions to push tags
           github_token: ${{ secrets.OG_RELEASE_TAG_UPDATE }}
-          # The action defaults to tagging commits on the default branch (usually main)
-          tag_prefix: v # Prefix for the tag (e.g., v1.2.3)
-          # Consider adding custom_tag for more control if needed
+          # Prefix for the generated semantic version tag (e.g., v1.2.3)
+          tag_prefix: v
+
+  # Job for creating the GitHub Release, runs after test_and_tag job
+  create_release:
+    name: create release
+    needs: test_and_tag # Dependency: run only if test_and_tag succeeds
+    runs-on: ubuntu-latest
+    # Define permissions required by this job
+    permissions:
+      contents: write # Needed to create the GitHub Release
+
+    # Condition: Only run if a new tag was created in the previous job
+    # AND the event was a push to the main branch
+    if: needs.test_and_tag.outputs.new_tag != '' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      # Step 1: Create the GitHub Release using the tag from the previous job
+      - name: Create GitHub Release
+        uses: actions/create-release@v1 # Use specific version
+        env:
+          # *** UPDATED: Use the custom secret for release creation ***
+          GITHUB_TOKEN: ${{ secrets.OG_RELEASE_TAG_UPDATE }}
+        with:
+          # Use the tag name generated in the 'test_and_tag' job
+          tag_name: ${{ needs.test_and_tag.outputs.new_tag }}
+          # Name the release based on the tag
+          release_name: Release ${{ needs.test_and_tag.outputs.new_tag }}
+          # Optional: Add release notes - can be static, dynamic, or auto-generated
+          body: |
+            Automated release based on tag ${{ needs.test_and_tag.outputs.new_tag }}
+            *(Add more detailed release notes here or use an action to generate them)*
+          # Set draft=true to manually review before publishing, false to publish immediately
+          draft: false
+          # Set prerelease=true if this is a pre-release (e.g., beta, rc)
+          prerelease: false
