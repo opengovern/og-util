@@ -33,6 +33,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"oras.land/oras-go/v2/registry"        // For parsing reference
 	"oras.land/oras-go/v2/registry/remote" // For interacting with remote registries
+
 	// For auth types
 	"oras.land/oras-go/v2/registry/remote/errcode" // Import the errcode package for registry error details
 )
@@ -138,33 +139,23 @@ const (
 )
 
 // --- Global HTTP Client ---
-// httpClient is shared for both artifact downloads and registry interactions.
-// It includes configured timeouts and transport settings.
 var httpClient *http.Client
 
 // --- Regular Expression for Image Digest ---
-// imageDigestRegex validates the required format for discovery image URIs (e.g., repo/image@sha256:hash).
 var imageDigestRegex = regexp.MustCompile(`^.+@sha256:[a-fA-F0-9]{64}$`)
 
 // init initializes the package-level resources.
 func init() {
-	// Seed random number generator once at startup for jitter in backoff calculations.
 	rand.Seed(time.Now().UnixNano())
-
-	// Configure the shared HTTP client with appropriate timeouts and transport settings.
 	httpClient = &http.Client{
-		Timeout: OverallRequestTimeout, // Apply overall timeout to the client.
+		Timeout: OverallRequestTimeout,
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
-				Timeout:   ConnectTimeout,   // Timeout for establishing the connection.
-				KeepAlive: 30 * time.Second, // Keep-alive duration for idle connections.
+				Timeout: ConnectTimeout, KeepAlive: 30 * time.Second,
 			}).DialContext,
-			ForceAttemptHTTP2:     true,                  // Prefer HTTP/2.
-			MaxIdleConns:          100,                   // Max idle connections across all hosts.
-			IdleConnTimeout:       90 * time.Second,      // Timeout for idle connections.
-			TLSHandshakeTimeout:   TLSHandshakeTimeout,   // Timeout for TLS handshake.
-			ResponseHeaderTimeout: ResponseHeaderTimeout, // Timeout waiting for response headers.
-			ExpectContinueTimeout: 1 * time.Second,       // Timeout for expect-continue handshake.
+			ForceAttemptHTTP2: true, MaxIdleConns: 100, IdleConnTimeout: 90 * time.Second,
+			TLSHandshakeTimeout: TLSHandshakeTimeout, ResponseHeaderTimeout: ResponseHeaderTimeout,
+			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
 	log.Println("Initialized shared HTTP client for plugin manifest validation.")
@@ -173,36 +164,21 @@ func init() {
 // --- Interface Definition ---
 
 // PluginValidator defines the interface for loading and validating plugin manifests and artifacts.
-// It separates concerns for loading, structural validation, platform support checks,
-// and artifact validation (including image existence checks).
 type PluginValidator interface {
 	// LoadManifest reads and parses a plugin manifest from the given file path.
-	// It returns the parsed manifest or an error if reading/parsing fails.
 	LoadManifest(filePath string) (*PluginManifest, error)
-
 	// ValidateManifestStructure performs structural and metadata checks on a loaded manifest.
-	// It verifies required fields, formats (like version, image digest), and constraints
-	// without performing network operations like downloads or registry checks.
-	// Returns an error if validation fails.
 	ValidateManifestStructure(manifest *PluginManifest) error
-
-	// CheckPlatformSupport checks if the manifest's supported-platform-versions constraints
-	// are satisfied by the provided platformVersion string (must be valid SemVer).
-	// Returns true if supported, false otherwise, or an error if inputs are invalid.
+	// CheckPlatformSupport checks if the manifest supports a given platform version.
 	CheckPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error)
-
 	// ValidateArtifact downloads/verifies specific artifacts based on artifactType.
 	// Valid types: "discovery", "platform-binary", "cloudql-binary", "all" (or empty).
-	// "discovery": Checks image existence in the registry.
-	// "platform-binary"/"cloudql-binary": Downloads, verifies checksum, checks archive.
-	// "all" or "": Validates discovery, platform-binary, and cloudql-binary.
-	// Returns an error if any specified artifact fails validation.
 	ValidateArtifact(manifest *PluginManifest, artifactType string) error
 }
 
 // --- Concrete Implementation ---
 
-// defaultValidator implements the PluginValidator interface using standard libraries and oras-go.
+// defaultValidator implements the PluginValidator interface.
 type defaultValidator struct{}
 
 // NewDefaultValidator creates a new instance of the default validator.
@@ -211,8 +187,6 @@ func NewDefaultValidator() PluginValidator {
 }
 
 // --- Helper Function ---
-
-// isNonEmpty checks if a string contains non-whitespace characters.
 func isNonEmpty(s string) bool {
 	return strings.TrimSpace(s) != ""
 }
@@ -427,17 +401,16 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 		}
 	}
 
-	// Collect and return errors
 	var combinedErrors []string
 	if discoveryErr != nil {
 		combinedErrors = append(combinedErrors, fmt.Sprintf("discovery image validation failed: %v", discoveryErr))
 	}
 	if platformErr != nil {
 		combinedErrors = append(combinedErrors, fmt.Errorf("platform-binary artifact validation failed: %w", platformErr).Error())
-	} // Use Errorf for wrapping
+	}
 	if cloudqlErr != nil && !(platformComp.URI == cloudqlComp.URI && platformErr != nil) {
 		combinedErrors = append(combinedErrors, fmt.Errorf("cloudql-binary artifact validation failed: %w", cloudqlErr).Error())
-	} // Use Errorf for wrapping
+	}
 	if len(combinedErrors) > 0 {
 		return errors.New(strings.Join(combinedErrors, "; "))
 	}
@@ -473,16 +446,23 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 		ctx, cancel := context.WithTimeout(context.Background(), OverallRequestTimeout)
 		defer cancel() // Ensure cancel is called
 
+		// *** FIXED BLOCK START ***
 		ref, err := registry.ParseReference(imageURI)
 		if err != nil {
-			return fmt.Errorf("attempt %d: failed to parse image reference '%s': %w", attempt+1, imageURI, err)
-		} // No retry needed
-		repo, err := remote.NewRepository(ref.Repository)
+			return fmt.Errorf("attempt %d: failed to parse image reference '%s': %w", attempt+1, imageURI, err) // No retry needed
+		}
+		// build “registry/repo” string so remote.NewRepository sees both parts
+		fullRepo := fmt.Sprintf("%s/%s", ref.Host(), ref.Repository) // Combine host and repo path
+		repo, err := remote.NewRepository(fullRepo)                  // Use the combined path
 		if err != nil {
-			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, ref.Repository, err)
-			continue
-		} // Retry if client creation fails
+			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, fullRepo, err) // Use fullRepo in error
+			continue                                                                                                   // Retry if client creation fails
+		}
+		// *** FIXED BLOCK END ***
+
 		repo.Client = httpClient // Use global client directly for default/anonymous auth
+
+		log.Printf("[DEBUG] Attempting to resolve manifest using registry client for host: %s, repository: %s", repo.Reference.Registry, repo.Reference.Repository) // Log the registry host the client *thinks* it's using
 
 		// Resolve attempts to fetch manifest metadata (HEAD or GET) using the digest
 		_, err = repo.Resolve(ctx, ref.Reference) // ref.Reference is the digest
@@ -507,7 +487,7 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 			log.Printf("Attempt %d: Request timed out.", attempt+1)
 			// Continue to retry on timeout
 		}
-		// Retry for other errors (network issues, 5xx server errors)
+		// Retry for other errors
 	}
 	// If all retries failed
 	return fmt.Errorf("failed to resolve image %s after %d attempts: %w", imageURI, MaxRegistryRetries+1, lastErr)
