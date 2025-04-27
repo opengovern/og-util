@@ -189,6 +189,7 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 		if isNonEmpty(spec.Type) && spec.Type != SpecTypeTask {
 			return fmt.Errorf("%s: if type is specified for embedded task, it must be '%s', got: '%s'", taskDesc, SpecTypeTask, spec.Type)
 		}
+		// Name and Description are now optional for embedded tasks, no check needed here.
 	}
 
 	// --- Common Task Field Checks (Required for both Standalone and Embedded, except where noted for embedded) ---
