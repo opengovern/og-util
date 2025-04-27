@@ -221,4 +221,6 @@ func (v *defaultValidator) GetEmbeddedTaskSpecification(pluginSpec *PluginSpecif
 	return v.getEmbeddedTaskSpecificationImpl(pluginSpec, format)
 }
 
-// --- Exported Helper Functions ---
+func (v *defaultValidator) GetTaskDefinition(filePath string) (*TaskSpecification, error) {
+	return v.getTaskDefinitionImpl(filePath)
+}

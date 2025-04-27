@@ -97,58 +97,76 @@ func (v *defaultValidator) processQuerySpec(data []byte, filePath string, defaul
 }
 
 // validateQueryStructure performs structural checks specific to 'query' specifications.
-// Assumes isNonEmpty and validateOptionalTagsMap are defined elsewhere (e.g., common.go)
+// Assumes isNonEmpty, validateOptionalTagsMap, and validateOptionalClassification
+// helper functions are defined elsewhere (e.g., common.go).
+// Assumes idFormatRegex is defined and initialized elsewhere.
 func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) error {
 	if spec == nil {
 		return errors.New("query specification cannot be nil")
 	}
+
 	// Define context early for use in error messages
-	specContext := "query specification (ID missing)"
+	specContext := "query specification (ID missing)" // Default context if ID is missing
 	if isNonEmpty(spec.ID) {
 		specContext = fmt.Sprintf("query specification (ID: %s)", spec.ID)
 	} else {
 		return errors.New("query specification: id is required") // ID is mandatory
 	}
-	// API Version and Type already validated by processQuerySpec
+	// API Version and Type are assumed to be validated by the calling function (processQuerySpec)
 
 	// --- Required Fields --- (ID checked above)
+
+	// Validate ID format
 	lowerID := strings.ToLower(spec.ID)
 	if !idFormatRegex.MatchString(lowerID) {
 		return fmt.Errorf("%s: id contains invalid characters or format. Allowed: lowercase alphanumeric (a-z, 0-9), hyphen (-), underscore (_). Must start/end with alphanumeric. Symbols (- or _) cannot be consecutive or at start/end", specContext)
 	}
 
+	// Validate Title
 	if !isNonEmpty(spec.Title) {
 		return fmt.Errorf("%s: title is required", specContext)
 	}
 
-	for i, itype := range spec.IntegrationType {
-		if !isNonEmpty(itype) {
-			return fmt.Errorf("%s: integration_type entry %d cannot be empty", specContext, i)
-		}
-	}
+	// Validate Query Text
 	if !isNonEmpty(spec.Query) {
 		return fmt.Errorf("%s: query text is required and cannot be empty", specContext)
 	}
 
+	// --- Optional Fields Validation (if present) ---
+
+	// Validate Integration Type (Optional field, but non-empty content if present)
+	// spec.IntegrationType is now StringOrSlice ([]string)
+	if len(spec.IntegrationType) > 0 { // Check length AFTER potential unmarshalling (StringOrSlice handles nil/empty YAML)
+		for i, itype := range spec.IntegrationType { // itype is string
+			if !isNonEmpty(itype) {
+				return fmt.Errorf("%s: integration_type entry %d cannot be an empty string", specContext, i)
+			}
+		}
+	}
+	// Note: An explicitly empty list like 'integration_type: []' in YAML might be unmarshalled
+	// into a non-nil but zero-length slice by StringOrSlice depending on its implementation.
+	// The len check above handles this; if len is 0, it's treated as valid (optional).
+
+	// Validate Metadata
 	if spec.Metadata != nil {
 		if len(spec.Metadata) == 0 {
 			log.Printf("Warning: %s: metadata field exists but is empty.", specContext)
 		}
-		// Use blank identifier '_' for the unused map value 'val'
+		// Use blank identifier '_' for unused map value 'val'
 		for k, _ := range spec.Metadata {
 			if !isNonEmpty(k) {
 				return fmt.Errorf("%s: metadata keys cannot be empty", specContext)
 			}
-			// Value 'val' is intentionally ignored here as empty values are currently allowed.
+			// Allow empty string values for metadata based on previous confirmation.
 		}
 	}
 
-	// is_view defaults to false - no validation needed
+	// is_view defaults to false - no structural validation needed here.
 
-	// Parameters
+	// Validate Parameters
 	if spec.Parameters == nil {
-		spec.Parameters = []QueryParameter{} // Ensure it's an empty slice, not nil for consistency
-	} else if len(spec.Parameters) > 0 { // Only validate entries if the list is not empty
+		spec.Parameters = []QueryParameter{} // Ensure non-nil slice if omitted
+	} else if len(spec.Parameters) > 0 {
 		paramKeys := make(map[string]struct{})
 		for i, param := range spec.Parameters {
 			entryContext := fmt.Sprintf("%s parameters entry %d", specContext, i)
@@ -163,33 +181,22 @@ func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) erro
 		}
 	}
 
-	// --- Tags Validation (Using Helper) ---
-	// Calls the helper function assumed defined in common.go
+	// Validate Tags (Using Helper)
+	// Assumes validateOptionalTagsMap takes map[string]StringOrSlice
 	if err := validateOptionalTagsMap(spec.Tags, specContext); err != nil {
 		return err // Error is already contextualized by the helper
 	}
 
-	// --- Classification Validation ---
-	if spec.Classification != nil {
-		if len(spec.Classification) == 0 {
-			log.Printf("Warning: %s: classification field exists but is empty.", specContext)
-		}
-		for i, innerList := range spec.Classification {
-			if len(innerList) == 0 {
-				return fmt.Errorf("%s: classification entry %d: inner list cannot be empty", specContext, i)
-			}
-			for j, item := range innerList {
-				if !isNonEmpty(item) {
-					return fmt.Errorf("%s: classification entry %d, item %d cannot be empty", specContext, i, j)
-				}
-			}
-		}
+	// Validate Classification (Using Helper)
+	// Assumes validateOptionalClassification takes [][]string
+	if err := validateOptionalClassification(spec.Classification, specContext); err != nil {
+		return err // Error is already contextualized by the helper
 	}
 
-	// Description and PrimaryTable are optional strings, no validation needed if omitted.
+	// Description and PrimaryTable are optional strings - no validation needed for presence/format here.
 
-	return nil
-} // --- END validateQueryStructure ---
+	return nil // All checks passed
+}
 
 // Note: Assumes defaultValidator struct is defined elsewhere (e.g., validator.go)
 // Note: Assumes isNonEmpty func is defined elsewhere (e.g., common.go)

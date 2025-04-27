@@ -113,7 +113,8 @@ type PluginSpecification struct {
 	Metadata                  Metadata                 `yaml:"metadata"`
 	Components                PluginComponents         `yaml:"components"`
 	SampleData                *Component               `yaml:"sample-data,omitempty"`
-	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"` // Using StringOrSlice
+	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
+	Classification            [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
 }
 
 // --- Task Specific Structs ---
@@ -134,19 +135,21 @@ type TaskSpecification struct {
 	Metadata                  *Metadata `yaml:"metadata,omitempty"`
 	SupportedPlatformVersions []string  `yaml:"supported-platform-versions,omitempty"`
 
-	ID          string                   `yaml:"id,omitempty"`
-	Name        string                   `yaml:"name,omitempty"`
-	Description string                   `yaml:"description,omitempty"`
-	IsEnabled   bool                     `yaml:"is_enabled"`
-	Type        string                   `yaml:"type,omitempty"`
-	ImageURL    string                   `yaml:"image_url"`
-	Command     []string                 `yaml:"command"`
-	Timeout     string                   `yaml:"timeout"`
-	ScaleConfig ScaleConfig              `yaml:"scale_config"`
-	Params      []string                 `yaml:"params"`
-	Configs     []interface{}            `yaml:"configs"`
-	RunSchedule []RunScheduleEntry       `yaml:"run_schedule"`
-	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // Using StringOrSlice
+	ID             string                   `yaml:"id,omitempty"`
+	Name           string                   `yaml:"name,omitempty"`
+	Description    string                   `yaml:"description,omitempty"`
+	IsEnabled      bool                     `yaml:"is_enabled"`
+	Type           string                   `yaml:"type,omitempty"`
+	ImageURL       string                   `yaml:"image_url"`
+	Command        []string                 `yaml:"command"`
+	Timeout        string                   `yaml:"timeout"`
+	ScaleConfig    ScaleConfig              `yaml:"scale_config"`
+	Params         []string                 `yaml:"params"`
+	Configs        []interface{}            `yaml:"configs"`
+	RunSchedule    []RunScheduleEntry       `yaml:"run_schedule"`
+	Tags           map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
+	Classification [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
+
 }
 
 type TaskDetails struct {
@@ -166,7 +169,9 @@ type TaskDetails struct {
 	Metadata                  Metadata
 	IsReference               bool                     `json:"is_reference"`
 	ReferencedTaskID          string                   `json:"referenced_task_id,omitempty"`
-	Tags                      map[string]StringOrSlice `json:"tags,omitempty"` // Using StringOrSlice
+	Tags                      map[string]StringOrSlice `json:"tags,omitempty"`           // Using StringOrSlice
+	Classification            [][]string               `json:"classification,omitempty"` // <<< Ensure Present
+
 }
 
 // --- Query Specific Structs ---
@@ -200,12 +205,12 @@ type ControlSpecification struct {
 	Type       string `yaml:"type"`
 	ID         string `yaml:"id"`
 
-	Title       string                   `yaml:"title"`
-	Description string                   `yaml:"description,omitempty"`
-	Severity    string                   `yaml:"severity"`
-	Frameworks  []string                 `yaml:"frameworks,omitempty"`
-	LogicSource Component                `yaml:"logic-source"`
-	Parameters  map[string]interface{}   `yaml:"parameters,omitempty"`
-	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // Using StringOrSlice
-	// ... other control-specific fields ...
+	Title          string                   `yaml:"title"`
+	Description    string                   `yaml:"description,omitempty"`
+	Severity       string                   `yaml:"severity"`
+	Frameworks     []string                 `yaml:"frameworks,omitempty"`
+	LogicSource    Component                `yaml:"logic-source"`
+	Parameters     map[string]interface{}   `yaml:"parameters,omitempty"`
+	Tags           map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
+	Classification [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
 }

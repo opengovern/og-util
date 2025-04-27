@@ -162,3 +162,31 @@ func validateOptionalTagsMap(tags map[string]StringOrSlice, specContext string) 
 func isNonEmpty(s string) bool {
 	return strings.TrimSpace(s) != ""
 }
+
+// validateOptionalClassification checks constraints on a classification structure if it's present.
+// Returns nil if classifications are nil, empty, or valid. Returns error otherwise.
+func validateOptionalClassification(classifications [][]string, specContext string) error {
+	if classifications == nil {
+		return nil // Optional field is missing, valid.
+	}
+	if len(classifications) == 0 {
+		// Classification field exists but is empty (e.g., classification: []) - Warn but allow.
+		log.Printf("Warning: %s: classification field exists but is empty.", specContext)
+		return nil
+	}
+
+	// Check inner list and item constraints
+	for i, innerList := range classifications {
+		if len(innerList) == 0 {
+			// Disallow empty inner lists (e.g., - [])
+			return fmt.Errorf("%s: classification entry %d: inner list cannot be empty", specContext, i)
+		}
+		for j, item := range innerList {
+			if !isNonEmpty(item) {
+				// Disallow empty strings within inner lists (e.g., - ["Security", ""])
+				return fmt.Errorf("%s: classification entry %d, item %d cannot be an empty string", specContext, i, j)
+			}
+		}
+	}
+	return nil // Classifications are valid
+}
