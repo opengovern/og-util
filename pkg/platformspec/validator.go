@@ -12,7 +12,10 @@ import (
 	"strings"
 	"time" // Needed for init
 
+	// Import other necessary packages used only by functions implemented *in this file*
 	"gopkg.in/yaml.v3"
+	// NOTE: Do not import packages solely used by implementations in other files
+	// e.g., remove "github.com/Masterminds/semver/v3" if CheckPlatformSupport is not implemented here.
 )
 
 // --- Configuration Constants ---
@@ -30,7 +33,6 @@ const (
 	PublishedDateFormat = "2006-01-02" // Go's reference date format
 
 	// Constants for artifact validation types used in ProcessSpecification
-	// Exported constants (uppercase)
 	ArtifactTypeDiscovery      = "discovery"       // Validate only the discovery task's image.
 	ArtifactTypePlatformBinary = "platform-binary" // Validate only the platform binary artifact.
 	ArtifactTypeCloudQLBinary  = "cloudql-binary"  // Validate only the CloudQL binary artifact.
@@ -49,14 +51,15 @@ var httpClient *http.Client
 var imageDigestRegex *regexp.Regexp
 
 // init initializes package-level resources.
+// Assumes initializeHTTPClient and initializeSPDX are defined (e.g., in common.go, metadata_validation.go)
 func init() {
 	// Seed random number generator (used in artifact_validation.go)
 	rand.Seed(time.Now().UnixNano())
-	// Initialize HTTP client (defined in http_client.go)
+	// Initialize HTTP client (assumes definition in http_client.go or common.go)
 	initializeHTTPClient()
 	// Compile regex (used in task_spec.go and artifact_validation.go)
 	imageDigestRegex = regexp.MustCompile(`^.+@sha256:[a-fA-F0-9]{64}$`)
-	// Initialize SPDX (defined in metadata_validation.go)
+	// Initialize SPDX (assumes definition in metadata_validation.go or common.go)
 	initializeSPDX()
 
 	log.Println("Platform specification validator package initialized.")
@@ -143,15 +146,8 @@ type Validator interface {
 	//   error: An error if the input specification is nil, uses task-id, or marshaling fails.
 	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error)
 
-	// GetFlattenedTags extracts tags from a QuerySpecification and returns them as a flat list ["key:value"].
-	// Use this function *after* successfully calling ProcessSpecification for a query.
-	//
-	// Parameters:
-	//  spec: A pointer to a validated QuerySpecification struct.
-	//
-	// Returns:
-	//  []string: A slice of strings in "key:value" format. Returns empty slice if spec or tags are nil/empty.
-	GetFlattenedTags(spec *QuerySpecification) []string
+	// NOTE: GetFlattenedTags is NO LONGER part of the interface.
+	// Use the package-level function GetFlattenedTags(spec interface{}) instead.
 }
 
 // --- Type Identification ---
@@ -175,6 +171,7 @@ type pluginDiscoveryCheck struct {
 
 // IdentifySpecificationTypes reads a specification file and quickly identifies the primary type
 // and counts known embedded types (like the discovery task in a plugin) without full validation.
+// Assumes isNonEmpty is defined elsewhere (e.g., common.go)
 func (v *defaultValidator) IdentifySpecificationTypes(filePath string) (*SpecificationTypeInfo, error) {
 	log.Printf("Identifying specification types in file: %s", filePath)
 	data, err := os.ReadFile(filePath)
@@ -203,27 +200,18 @@ func (v *defaultValidator) IdentifySpecificationTypes(filePath string) (*Specifi
 	// 2. Check for Known Embeddings based on Primary Type
 	switch primaryType {
 	case SpecTypePlugin:
-		// Check for embedded discovery task using the updated minimal struct
 		var pluginCheck pluginDiscoveryCheck
-		// Unmarshal again into the minimal struct. Ignore errors here, as we only care if discovery exists.
 		if err := yaml.Unmarshal(data, &pluginCheck); err == nil {
-			// Check if the path components.discovery.task-spec exists and is not null
 			if pluginCheck.Components.Discovery.TaskSpec != nil {
 				log.Printf("Found embedded 'discovery' component (type: %s)", SpecTypeTask)
-				info.EmbeddedTypes[SpecTypeTask] = 1 // Currently only one known embedded task
+				info.EmbeddedTypes[SpecTypeTask] = 1
 			} else {
 				log.Printf("Plugin discovery component does not contain an embedded 'task-spec'. It might be a 'task-id' reference.")
 			}
 		} else {
 			log.Printf("Warning: Could not perform minimal parse for embedded discovery check in '%s': %v", filePath, err)
 		}
-
-	// Add cases here for other primary types that might embed known types in the future
-	// case SpecTypeWorkflow:
-	//    // Check for embedded tasks or queries...
-
 	default:
-		// No known embedded types for other current types (task, query, control)
 		log.Printf("No known embedded types defined for primary type '%s'.", primaryType)
 	}
 
@@ -244,6 +232,7 @@ func NewDefaultValidator() Validator {
 
 // ProcessSpecification reads, identifies, validates structure (incl. date/SPDX license), checks platform (if applicable),
 // and validates artifacts (if applicable and requested). This is the main entry point.
+// Assumes isNonEmpty and type-specific process*Spec methods are defined elsewhere.
 func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error) {
 	log.Printf("Processing specification file: %s (Platform Version: %s, Artifact Validation: %s, Skip Artifacts: %t)",
 		filePath, platformVersion, artifactValidationType, skipArtifactValidation)
@@ -267,7 +256,6 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 	log.Printf("Detected specification type: '%s'", specType)
 
 	// Handle API Version Defaulting (defaults to v1 for non-plugin types if missing)
-	// Store original for potential validation later if needed
 	originalAPIVersion := base.APIVersion
 	defaultedAPIVersion := base.APIVersion
 	if !isNonEmpty(base.APIVersion) {
@@ -281,20 +269,18 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 	}
 
 	// 2. Process based on Type - dispatch to type-specific processors
+	// These methods are defined on defaultValidator but implemented in other files
 	switch specType {
 	case SpecTypePlugin:
-		// Plugin validation handles API version check internally as it must be v1 explicitly
-		// Assumes processPluginSpec is defined in plugin_spec.go
+		// Calls processPluginSpec defined in plugin_spec.go
 		return v.processPluginSpec(data, filePath, platformVersion, artifactValidationType, skipArtifactValidation)
 
 	case SpecTypeTask:
-		// Task validation handles API version check internally (allows default)
-		// Assumes processTaskSpec is defined in task_spec.go
+		// Calls processTaskSpec defined in task_spec.go
 		return v.processTaskSpec(data, filePath, skipArtifactValidation, defaultedAPIVersion, originalAPIVersion)
 
 	case SpecTypeQuery:
-		// Query processing handles API version check and validation internally
-		// Assumes processQuerySpec is defined in query_spec.go
+		// Calls processQuerySpec defined in query_spec.go
 		return v.processQuerySpec(data, filePath, defaultedAPIVersion, originalAPIVersion)
 
 	case SpecTypeControl: // Example future type
@@ -302,31 +288,20 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 		if err := yaml.Unmarshal(data, &spec); err != nil {
 			return nil, fmt.Errorf("failed to parse specification file '%s' as control: %w", filePath, err)
 		}
-		// Apply defaulted API version if necessary
 		if !isNonEmpty(spec.APIVersion) {
 			spec.APIVersion = defaultedAPIVersion
 		}
-		spec.Type = specType // Ensure type is set
-
-		// Basic validation for common fields
+		spec.Type = specType
 		if spec.APIVersion != APIVersionV1 {
 			return nil, fmt.Errorf("control specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, originalAPIVersion)
 		}
 		if !isNonEmpty(spec.ID) {
 			return nil, fmt.Errorf("control specification '%s': id is required", filePath)
 		}
-
 		log.Println("Validating control specification structure...")
-		// if err := v.validateControlStructure(&spec); err != nil { // Define this function later
-		//  return nil, fmt.Errorf("control specification structure validation failed: %w", err)
-		// }
-		log.Println("Control specification structure validation successful (Placeholder - validation not implemented).")
-		// Potentially validate control logic source artifact?
-		// Assumes validateSingleDownloadableComponent exists in artifact_validation.go
-		// if !skipArtifactValidation && spec.LogicSource.URI != "" {
-		//    _, err := v.validateSingleDownloadableComponent(spec.LogicSource, "control logic source")
-		//    if err != nil { return nil, fmt.Errorf("control logic source validation failed: %w", err)}
-		// }
+		// TODO: Implement v.validateControlStructure(&spec) in control_spec.go later
+		log.Println("Control specification structure validation successful (Placeholder).")
+		// TODO: Add artifact validation if needed for controls later
 		return &spec, nil
 
 	default:
@@ -334,10 +309,8 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 	}
 }
 
-// --- Helper Functions ---
-
 // isNonEmpty checks if a string is non-empty after trimming whitespace.
-// Consider moving to a utils.go file if more helpers are added.
+// ADD THIS HELPER FUNCTION HERE
 func isNonEmpty(s string) bool {
 	return strings.TrimSpace(s) != ""
 }

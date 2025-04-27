@@ -15,7 +15,7 @@ import (
 var queryParamRegex = regexp.MustCompile(`\{\{\.(.*?)\}\}`)
 
 // Compile regex for ID validation once (alphanumeric + hyphen, no leading/trailing hyphen)
-var idFormatRegex = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
+var idFormatRegex = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9]|[_-][a-z0-9])*$`)
 
 // detectQueryParams finds unique template parameters like {{.ParamName}} in a query string.
 func detectQueryParams(query string) []string {
@@ -93,12 +93,20 @@ func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) erro
 	if !isNonEmpty(spec.ID) {
 		return errors.New("query specification: id is required")
 	}
-	// Validate ID format (basic domain component rules)
-	if !idFormatRegex.MatchString(spec.ID) {
-		return fmt.Errorf("query specification (ID: %s): id contains invalid characters or format (must be alphanumeric with hyphens, not starting/ending with hyphen)", spec.ID)
+
+	// Validate ID format:
+	// Convert to lowercase for case-insensitive validation.
+	lowerID := strings.ToLower(spec.ID)
+	// The original spec.ID is kept for context in errors if needed, but lowerID is validated.
+	if !idFormatRegex.MatchString(lowerID) {
+		// Use the original spec.ID in the error message for clarity.
+		return fmt.Errorf("query specification (ID: %s): id contains invalid characters or format. Allowed: alphanumeric (a-z, 0-9), hyphen (-), underscore (_). Must start/end with alphanumeric. Symbols (- or _) cannot be consecutive or at start/end", spec.ID)
 	}
+	// Optional: If you want to enforce lowercase storage, you could reassign here:
+	// spec.ID = lowerID
 
 	if !isNonEmpty(spec.Title) {
+		// Use original spec.ID in subsequent error messages for consistency
 		return fmt.Errorf("query specification (ID: %s): title is required", spec.ID)
 	}
 	if len(spec.IntegrationType) == 0 {
@@ -143,7 +151,7 @@ func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) erro
 			}
 			// Value being "" is allowed by requirement.
 			// if param.Value == "" { // Check if explicitly nil/null if needed, but "" is valid
-			// 	return fmt.Errorf("%s (key: %s): value is required (can be empty string \"\")", entryContext, param.Key)
+			//  return fmt.Errorf("%s (key: %s): value is required (can be empty string \"\")", entryContext, param.Key)
 			// }
 			if _, exists := paramKeys[param.Key]; exists {
 				return fmt.Errorf("query specification (ID: %s): duplicate parameter key '%s' found", spec.ID, param.Key)

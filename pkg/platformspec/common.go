@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -85,4 +86,45 @@ func initializeHTTPClient() {
 			ExpectContinueTimeout: ExpectContinueTimeout,
 		},
 	}
+}
+
+// flattenTagsMap takes a map[string][]string and returns a flattened list
+// of "key:value" strings, sorted deterministically.
+// Returns an empty slice if the input map is nil or empty.
+func flattenTagsMap(tags map[string][]string) []string {
+	// Handle nil or empty map gracefully
+	if tags == nil || len(tags) == 0 {
+		return []string{} // Return empty slice, not nil
+	}
+
+	// Estimate capacity to potentially reduce reallocations
+	estimatedCapacity := 0
+	for _, values := range tags {
+		estimatedCapacity += len(values)
+	}
+	flattened := make([]string, 0, estimatedCapacity)
+
+	// Get keys and sort them for deterministic output order
+	keys := make([]string, 0, len(tags))
+	for k := range tags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Iterate over sorted keys
+	for _, key := range keys {
+		values := tags[key]
+
+		// Sort values within each key for consistency.
+		// Create a copy to sort if preserving original order matters elsewhere.
+		sortedValues := make([]string, len(values))
+		copy(sortedValues, values)
+		sort.Strings(sortedValues) // Sort the copy
+
+		for _, value := range sortedValues {
+			// Assuming prior validation ensures key/value are non-empty if map entry exists
+			flattened = append(flattened, fmt.Sprintf("%s:%s", key, value))
+		}
+	}
+	return flattened
 }
