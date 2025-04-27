@@ -87,7 +87,7 @@ type TaskSpecification struct {
 	IsEnabled   bool               `yaml:"is_enabled"`            // Required.
 	Type        string             `yaml:"type,omitempty"`        // Optional for embedded (defaults to "task"). Required ("task") for standalone.
 	ImageURL    string             `yaml:"image_url"`             // Required (digest format).
-	Command     string             `yaml:"command"`               // Required.
+	Command     []string           `yaml:"command"`               // Required.
 	Timeout     string             `yaml:"timeout"`               // Required (< 24h).
 	ScaleConfig ScaleConfig        `yaml:"scale_config"`          // Required.
 	Params      []string           `yaml:"params"`                // Required (can be empty []).
@@ -104,7 +104,7 @@ type TaskDetails struct {
 	TaskName          string             // The human-readable name of the task (includes defaults if embedded).
 	TaskDescription   string             // The description of the task (includes defaults if embedded).
 	ValidatedImageURI string             // The container image URI, validated for format and registry existence.
-	Command           string             // The command executed by the task container.
+	Command           []string           // The command executed by the task container.
 	Timeout           string             // The execution timeout duration string.
 	ScaleConfig       ScaleConfig        // The task's scaling configuration.
 	Params            []string           // List of expected parameter names.

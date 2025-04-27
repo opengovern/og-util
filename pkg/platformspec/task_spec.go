@@ -205,7 +205,7 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 	if !imageDigestRegex.MatchString(spec.ImageURL) {
 		return fmt.Errorf("%s: image_url ('%s') must be in digest format (e.g., registry/repository/image@sha256:hash)", taskDesc, spec.ImageURL)
 	}
-	if !isNonEmpty(spec.Command) {
+	if len(spec.Command) > 0 && !isNonEmpty(spec.Command[0]) {
 		return fmt.Errorf("%s: command is required", taskDesc)
 	}
 	if !isNonEmpty(spec.Timeout) {
