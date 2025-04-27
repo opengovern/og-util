@@ -14,8 +14,8 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"net"
-	"net/http"
+	"net"      // Corrected: Import 'net' for net.Error
+	"net/http" // Corrected: Import 'net/http' for http.StatusText
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -41,6 +41,7 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 	if !isNonEmpty(imageURI) {
 		return errors.New("image URI cannot be empty for existence check")
 	}
+	// imageDigestRegex is assumed to be initialized in validator.go init()
 	if !imageDigestRegex.MatchString(imageURI) {
 		return fmt.Errorf("image URI ('%s') must be in digest format (e.g., repo/image@sha256:...) for existence check", imageURI)
 	}
@@ -73,17 +74,21 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 
 		// 2. Create a remote repository client
 		var repo registry.Repository
-		repo, err = remote.NewRepository(ref.Repository) // Pass just the repository part (e.g., "library/alpine")
+		// *** FIX: Use RepositoryWithRegistry() to include the hostname ***
+		// FIX: Combine Host() and Repository() for the full name
+		repoNameWithRegistry := fmt.Sprintf("%s/%s", ref.Host(), ref.Repository)
+		log.Printf("[Debug] Creating remote repository client for: %s", repoNameWithRegistry) // Add debug log
+		repo, err = remote.NewRepository(repoNameWithRegistry)
 		if err != nil {
-			lastErr = fmt.Errorf("attempt %d: failed to create ORAS repository client for '%s': %w", attempt+1, ref.Repository, err)
+			lastErr = fmt.Errorf("attempt %d: failed to create ORAS repository client for '%s': %w", attempt+1, repoNameWithRegistry, err)
 			cancel()
 			continue // Retry might not help, but let's follow the loop structure
 		}
 
 		// 3. Resolve the manifest by digest
-		log.Printf("Attempting to resolve digest '%s' in repository '%s'...", ref.Reference, ref.Repository)
-		_, err = repo.Resolve(ctx, ref.Reference) // ref.Reference contains the digest
-		cancel()                                  // Release context resources after the operation
+		log.Printf("Attempting to resolve digest '%s' in repository '%s'...", ref.Reference, repoNameWithRegistry) // Log full name
+		_, err = repo.Resolve(ctx, ref.Reference)                                                                  // ref.Reference contains the digest
+		cancel()                                                                                                   // Release context resources after the operation
 
 		// 4. Handle results
 		if err == nil {
@@ -125,15 +130,14 @@ func (v *defaultValidator) validateSingleDownloadableComponent(component Compone
 	log.Printf("Checksum provided: %s", component.Checksum)            // Log if checksum is expected
 	log.Printf("PathInArchive specified: %s", component.PathInArchive) // Log if path check is needed
 
-	// 1. Download the artifact with retries
+	// 1. Download the artifact with retries (includes empty file check now)
 	downloadedData, err := v.downloadWithRetry(component.URI)
 	if err != nil {
+		// Error from downloadWithRetry is already contextualized
 		return nil, fmt.Errorf("%s download failed from URI '%s': %w", componentName, component.URI, err)
 	}
-	if len(downloadedData) == 0 {
-		return nil, fmt.Errorf("%s validation failed: downloaded file from '%s' is unexpectedly empty", componentName, component.URI)
-	}
-	log.Printf("Successfully downloaded %d bytes for %s from %s.", len(downloadedData), componentName, component.URI)
+	// Note: Empty file check is now inside downloadWithRetry, no need to check len(downloadedData) == 0 here.
+	log.Printf("Successfully downloaded non-empty file (%d bytes) for %s from %s.", len(downloadedData), componentName, component.URI)
 
 	// 2. Verify Checksum (if provided)
 	err = v.verifyChecksum(downloadedData, component.Checksum)
@@ -158,6 +162,7 @@ func (v *defaultValidator) validateSingleDownloadableComponent(component Compone
 }
 
 // downloadWithRetry attempts to download a file from a URL with exponential backoff, jitter, size limits, and status checks.
+// It now also explicitly checks if the downloaded content is empty (0 bytes).
 func (v *defaultValidator) downloadWithRetry(url string) ([]byte, error) {
 	var lastErr error
 	backoff := InitialBackoffDuration
@@ -183,6 +188,7 @@ func (v *defaultValidator) downloadWithRetry(url string) ([]byte, error) {
 		// Consider adding User-Agent?
 		// req.Header.Set("User-Agent", "platformspec-validator/1.0")
 
+		// httpClient is assumed to be initialized in validator.go init()
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("attempt %d: HTTP request failed for '%s': %w", attempt+1, url, err)
@@ -247,7 +253,18 @@ func (v *defaultValidator) downloadWithRetry(url string) ([]byte, error) {
 			log.Printf("Warning: Error closing response body for '%s' on attempt %d: %v", url, attempt+1, closeErr)
 		}
 		if limitedReader.N == 0 {
+			// File exceeded limit
 			return nil, fmt.Errorf("attempt %d: downloaded file from '%s' exceeds maximum allowed size of %d bytes", attempt+1, url, MaxDownloadSizeBytes)
+		}
+
+		// *** ADDED CHECK: Ensure downloaded file is not empty (0 KB) ***
+		if len(bodyBytes) == 0 {
+			// Even if status code was 2xx, an empty body might be invalid
+			lastErr = fmt.Errorf("attempt %d: downloaded file from '%s' is empty (0 bytes)", attempt+1, url)
+			// Treat empty file as potentially transient? Allow retry or fail immediately?
+			// Let's fail immediately for now, as an empty file is usually not expected.
+			log.Printf("Error: Downloaded file from '%s' is empty.", url)
+			return nil, lastErr
 		}
 
 		// Verify Size Against Content-Length (if available)
@@ -315,6 +332,7 @@ func isHex(s string) bool {
 // It reads the archive from the provided byte slice.
 func (v *defaultValidator) validateArchivePathExists(archiveData []byte, pathInArchive string, archiveURI string) error {
 	if len(archiveData) == 0 {
+		// This check is slightly redundant now given the check in downloadWithRetry, but harmless.
 		return errors.New("cannot check path in empty archive data")
 	}
 	if !isNonEmpty(pathInArchive) {
