@@ -213,7 +213,7 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 		TaskName:          discoveryTask.Name,        // Includes defaults if applied
 		TaskDescription:   discoveryTask.Description, // Includes defaults if applied
 		ValidatedImageURI: discoveryTask.ImageURL,    // Use the validated URL
-		Command:           discoveryTask.Command,     // Copy the command (string or []string)
+		Command:           discoveryTask.Command,     // Copy the command slice
 		Timeout:           discoveryTask.Timeout,
 		ScaleConfig:       discoveryTask.ScaleConfig,
 		Params:            discoveryTask.Params,
@@ -430,7 +430,7 @@ func (v *defaultValidator) GetEmbeddedTaskSpecification(pluginSpec *PluginSpecif
 		Description: embeddedTask.Description,
 		IsEnabled:   embeddedTask.IsEnabled,
 		ImageURL:    embeddedTask.ImageURL,
-		Command:     embeddedTask.Command, // Copy the command (string or []string)
+		Command:     embeddedTask.Command, // Copy the command slice
 		Timeout:     embeddedTask.Timeout,
 		ScaleConfig: embeddedTask.ScaleConfig, // Copy struct
 		Params:      embeddedTask.Params,      // Copy slice

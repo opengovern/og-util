@@ -36,7 +36,7 @@ const (
 	ArtifactTypeCloudQLBinary  = "cloudql-binary"  // Validate only the CloudQL binary artifact.
 	ArtifactTypeAll            = "all"             // Validate all artifacts (default).
 
-	// Output Formats for GetTaskSpecification
+	// Output Formats for GetEmbeddedTaskSpecification
 	FormatYAML = "yaml"
 	FormatJSON = "json"
 )
@@ -128,7 +128,7 @@ type Validator interface {
 	//   error: An error if reading or basic parsing fails.
 	IdentifySpecificationTypes(filePath string) (*SpecificationTypeInfo, error)
 
-	// GetTaskSpecification generates a standalone TaskSpecification representation (YAML or JSON string)
+	// GetEmbeddedTaskSpecification generates a standalone TaskSpecification representation (YAML or JSON string)
 	// from the embedded discovery task within a validated PluginSpecification.
 	// It includes inherited metadata and platform support details.
 	// Use this function *after* successfully calling ProcessSpecification for a plugin.
@@ -140,7 +140,17 @@ type Validator interface {
 	// Returns:
 	//   string: The generated specification string in the requested format.
 	//   error: An error if the input specification is nil or marshaling fails.
-	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error)
+	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error) // Renamed method
+
+	// GetFlattenedTags extracts tags from a QuerySpecification and returns them as a flat list ["key:value"].
+	// Use this function *after* successfully calling ProcessSpecification for a query.
+	//
+	// Parameters:
+	//  spec: A pointer to a validated QuerySpecification struct.
+	//
+	// Returns:
+	//  []string: A slice of strings in "key:value" format. Returns empty slice if spec or tags are nil/empty.
+	GetFlattenedTags(spec *QuerySpecification) []string
 }
 
 // --- Type Identification ---
@@ -269,38 +279,18 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 	switch specType {
 	case SpecTypePlugin:
 		// Plugin validation handles API version check internally as it must be v1 explicitly
+		// Assumes processPluginSpec is defined in plugin_spec.go
 		return v.processPluginSpec(data, filePath, platformVersion, artifactValidationType, skipArtifactValidation)
 
 	case SpecTypeTask:
 		// Task validation handles API version check internally (allows default)
+		// Assumes processTaskSpec is defined in task_spec.go
 		return v.processTaskSpec(data, filePath, skipArtifactValidation, defaultedAPIVersion, originalAPIVersion)
 
-	case SpecTypeQuery: // Example future type
-		var spec QuerySpecification
-		if err := yaml.Unmarshal(data, &spec); err != nil {
-			return nil, fmt.Errorf("failed to parse specification file '%s' as query: %w", filePath, err)
-		}
-		// Apply defaulted API version if necessary
-		if !isNonEmpty(spec.APIVersion) {
-			spec.APIVersion = defaultedAPIVersion
-		}
-		spec.Type = specType // Ensure type is set
-
-		// Basic validation for common fields
-		if spec.APIVersion != APIVersionV1 {
-			return nil, fmt.Errorf("query specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, originalAPIVersion)
-		}
-		if !isNonEmpty(spec.ID) {
-			return nil, fmt.Errorf("query specification '%s': id is required", filePath)
-		}
-
-		log.Println("Validating query specification structure...")
-		// if err := v.validateQueryStructure(&spec); err != nil { // Define this function later
-		// 	return nil, fmt.Errorf("query specification structure validation failed: %w", err)
-		// }
-		log.Println("Query specification structure validation successful (Placeholder - validation not implemented).")
-		// No artifact validation for queries currently defined
-		return &spec, nil
+	case SpecTypeQuery:
+		// Query processing handles API version check and validation internally
+		// Assumes processQuerySpec is defined in query_spec.go
+		return v.processQuerySpec(data, filePath, defaultedAPIVersion, originalAPIVersion)
 
 	case SpecTypeControl: // Example future type
 		var spec ControlSpecification
@@ -327,7 +317,11 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 		// }
 		log.Println("Control specification structure validation successful (Placeholder - validation not implemented).")
 		// Potentially validate control logic source artifact?
-		// if !skipArtifactValidation && spec.LogicSource.URI != "" { ... call artifact validation ... }
+		// Assumes validateSingleDownloadableComponent exists in artifact_validation.go
+		// if !skipArtifactValidation && spec.LogicSource.URI != "" {
+		//    _, err := v.validateSingleDownloadableComponent(spec.LogicSource, "control logic source")
+		//    if err != nil { return nil, fmt.Errorf("control logic source validation failed: %w", err)}
+		// }
 		return &spec, nil
 
 	default:
@@ -342,10 +336,3 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 func isNonEmpty(s string) bool {
 	return strings.TrimSpace(s) != ""
 }
-
-// --- Getters and Platform Check (Delegated to specific files) ---
-
-// GetTaskDefinition is implemented in task_spec.go
-// GetTaskDetailsFromPluginSpecification is implemented in plugin_spec.go
-// CheckPlatformSupport is implemented in plugin_spec.go
-// GetTaskSpecification is implemented in plugin_spec.go

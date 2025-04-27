@@ -87,7 +87,7 @@ type TaskSpecification struct {
 	IsEnabled   bool               `yaml:"is_enabled"`            // Required.
 	Type        string             `yaml:"type,omitempty"`        // Optional for embedded (defaults to "task"). Required ("task") for standalone.
 	ImageURL    string             `yaml:"image_url"`             // Required (digest format).
-	Command     []string           `yaml:"command"`               // Required.
+	Command     []string           `yaml:"command"`               // Required: Command and args (Docker exec form: ["/executable", "arg1", "arg2"]).
 	Timeout     string             `yaml:"timeout"`               // Required (< 24h).
 	ScaleConfig ScaleConfig        `yaml:"scale_config"`          // Required.
 	Params      []string           `yaml:"params"`                // Required (can be empty []).
@@ -104,7 +104,7 @@ type TaskDetails struct {
 	TaskName          string             // The human-readable name of the task (includes defaults if embedded).
 	TaskDescription   string             // The description of the task (includes defaults if embedded).
 	ValidatedImageURI string             // The container image URI, validated for format and registry existence.
-	Command           []string           // The command executed by the task container.
+	Command           []string           // The command executed by the task container (Docker exec form).
 	Timeout           string             // The execution timeout duration string.
 	ScaleConfig       ScaleConfig        // The task's scaling configuration.
 	Params            []string           // List of expected parameter names.
@@ -118,19 +118,38 @@ type TaskDetails struct {
 	Metadata                  Metadata // Metadata from the parent plugin.
 }
 
-// --- Placeholder Structs for Future Extensibility ---
+// --- Query Specific Structs ---
 
-// QuerySpecification represents a future 'query' type specification.
+// QueryParameter defines the structure for an entry in the 'parameters' list of a query.
+type QueryParameter struct {
+	Key   string `yaml:"key"`   // Required: Name of the parameter used in the query template.
+	Value string `yaml:"value"` // Required: Default value for the parameter. Can be empty string "".
+	// Add Description string `yaml:"description,omitempty"` if needed later.
+}
+
+// QuerySpecification represents a 'query' type specification.
 type QuerySpecification struct {
 	APIVersion string `yaml:"api-version"` // Defaults to v1 if omitted.
 	Type       string `yaml:"type"`        // Must be 'query'.
 	ID         string `yaml:"id"`          // Required.
+
 	// --- Query Specific Fields ---
-	QueryText string            `yaml:"query-text"`
-	Engine    string            `yaml:"engine"` // e.g., "sql", "cloudql"
-	Inputs    map[string]string `yaml:"inputs,omitempty"`
-	// ... other query-specific fields ...
+	Title           string              `yaml:"title"`                    // Required: Human-readable title.
+	Description     string              `yaml:"description,omitempty"`    // Optional: More detailed description.
+	IntegrationType []string            `yaml:"integration_type"`         // Required: List of applicable integration types (e.g., ["aws_cloud_account"]). Cannot be empty.
+	Query           string              `yaml:"query"`                    // Required: The actual query text (e.g., SQL). Cannot be empty.
+	PrimaryTable    string              `yaml:"primary_table,omitempty"`  // Optional: Main table the query targets.
+	Metadata        map[string]string   `yaml:"metadata,omitempty"`       // Optional: Key/value pairs (e.g., reasoning, value). Defaults nil. Keys/values must be non-empty if present.
+	IsView          bool                `yaml:"is_view"`                  // Optional: Defaults to false.
+	Parameters      []QueryParameter    `yaml:"parameters"`               // Optional: List of parameters. Defaults []. Key/Value required if parameter entry exists.
+	Tags            map[string][]string `yaml:"tags,omitempty"`           // Optional: Key/value list pairs. Defaults nil. Keys & list values must be non-empty if present.
+	Classification  [][]string          `yaml:"classification,omitempty"` // Optional: List of string lists. Defaults nil. Inner lists & strings must be non-empty if present.
+
+	// --- Derived Data (Not from YAML) ---
+	DetectedParams []string `yaml:"-" json:"-"` // Parameters detected within the Query string (e.g., {{.ParamName}})
 }
+
+// --- Control Specific Structs (Placeholder) ---
 
 // ControlSpecification represents a future 'control' type specification.
 type ControlSpecification struct {
@@ -138,6 +157,8 @@ type ControlSpecification struct {
 	Type       string `yaml:"type"`        // Must be 'control'.
 	ID         string `yaml:"id"`          // Required.
 	// --- Control Specific Fields ---
+	Title       string                 `yaml:"title"` // Likely required
+	Description string                 `yaml:"description,omitempty"`
 	Severity    string                 `yaml:"severity"` // e.g., "high", "medium"
 	Frameworks  []string               `yaml:"frameworks,omitempty"`
 	LogicSource Component              `yaml:"logic-source"` // Reference to where the control logic lives
