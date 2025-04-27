@@ -1,3 +1,4 @@
+// query_spec.go
 package platformspec
 
 import (
@@ -14,10 +15,11 @@ import (
 // Compile regex for parameter detection once
 var queryParamRegex = regexp.MustCompile(`\{\{\.(.*?)\}\}`)
 
-// Compile regex for ID validation once (alphanumeric + hyphen, no leading/trailing hyphen)
+// Compile regex for ID validation once (alphanumeric + hyphen/underscore, constraints)
 var idFormatRegex = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9]|[_-][a-z0-9])*$`)
 
 // detectQueryParams finds unique template parameters like {{.ParamName}} in a query string.
+// Assumes isNonEmpty is defined elsewhere (e.g., common.go)
 func detectQueryParams(query string) []string {
 	matches := queryParamRegex.FindAllStringSubmatch(query, -1)
 	if matches == nil {
@@ -28,8 +30,8 @@ func detectQueryParams(query string) []string {
 	uniqueParams := make(map[string]struct{})
 	for _, match := range matches {
 		if len(match) > 1 { // Ensure the capturing group exists
-			paramName := strings.TrimSpace(match[1]) // Trim whitespace
-			if paramName != "" {                     // Ignore empty names like {{.}}
+			paramName := strings.TrimSpace(match[1])       // Trim whitespace
+			if isNonEmpty(paramName) && paramName != "." { // Ignore empty names like {{.}} or just {{ . }}
 				uniqueParams[paramName] = struct{}{}
 			}
 		}
@@ -47,151 +49,140 @@ func detectQueryParams(query string) []string {
 
 // processQuerySpec handles the parsing and validation specific to query specifications.
 // It's called by ProcessSpecification in validator.go.
+// Assumes isNonEmpty is defined elsewhere (e.g., common.go)
 func (v *defaultValidator) processQuerySpec(data []byte, filePath string, defaultedAPIVersion, originalAPIVersion string) (*QuerySpecification, error) {
 	var spec QuerySpecification
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("failed to parse specification file '%s' as query: %w", filePath, err)
+		// Provide slightly more context in the parsing error
+		return nil, fmt.Errorf("failed to parse YAML file '%s' as query spec: %w", filePath, err)
 	}
 
 	// Apply defaulted API version if necessary
 	if !isNonEmpty(spec.APIVersion) {
 		spec.APIVersion = defaultedAPIVersion
+		// Log defaulting only if it actually happens and wasn't already defaulted
+		if defaultedAPIVersion == APIVersionV1 && originalAPIVersion != APIVersionV1 {
+			log.Printf("Info: Specification '%s' (type: %s) missing 'api-version', defaulting to '%s'.", filePath, spec.Type, APIVersionV1)
+		}
 	}
 	// Ensure parsed APIVersion matches base (and is v1 after defaulting)
 	if spec.APIVersion != APIVersionV1 {
-		return nil, fmt.Errorf("query specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, originalAPIVersion)
+		actualVersion := originalAPIVersion
+		if isNonEmpty(spec.APIVersion) && spec.APIVersion != defaultedAPIVersion {
+			actualVersion = spec.APIVersion
+		}
+		return nil, fmt.Errorf("query specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, actualVersion)
 	}
 	// Ensure type is set correctly (should be 'query' from base parse)
 	if !isNonEmpty(spec.Type) {
 		spec.Type = SpecTypeQuery // Default if somehow missing after base parse
+		log.Printf("Info: Specification '%s' parsed without 'type', defaulting to '%s'.", filePath, SpecTypeQuery)
 	} else if spec.Type != SpecTypeQuery {
 		return nil, fmt.Errorf("query specification '%s': type must be '%s', got '%s'", filePath, SpecTypeQuery, spec.Type)
 	}
 
-	log.Println("Validating query specification structure...")
+	log.Printf("Validating query specification structure for '%s' (ID: %s)...", filePath, spec.ID)
 	if err := v.validateQueryStructure(&spec); err != nil {
-		return nil, fmt.Errorf("query specification structure validation failed: %w", err)
+		// Wrap error to include file path
+		return nil, fmt.Errorf("query specification structure validation failed for '%s': %w", filePath, err)
 	}
 
 	// Detect and store parameters after successful validation
 	spec.DetectedParams = detectQueryParams(spec.Query)
-	log.Printf("Detected query parameters: %v", spec.DetectedParams)
+	log.Printf("Detected query parameters for spec ID '%s': %v", spec.ID, spec.DetectedParams)
 
-	log.Println("Query specification structure validation successful.")
+	log.Printf("Query specification '%s' (ID: %s) structure validation successful.", filePath, spec.ID)
 	// No artifact validation currently defined for queries
 	return &spec, nil
 }
 
 // validateQueryStructure performs structural checks specific to 'query' specifications.
+// Assumes isNonEmpty and validateOptionalTagsMap are defined elsewhere (e.g., common.go)
 func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) error {
 	if spec == nil {
 		return errors.New("query specification cannot be nil")
 	}
+	// Define context early for use in error messages
+	specContext := "query specification (ID missing)"
+	if isNonEmpty(spec.ID) {
+		specContext = fmt.Sprintf("query specification (ID: %s)", spec.ID)
+	} else {
+		return errors.New("query specification: id is required") // ID is mandatory
+	}
 	// API Version and Type already validated by processQuerySpec
 
-	// --- Required Fields ---
-	if !isNonEmpty(spec.ID) {
-		return errors.New("query specification: id is required")
-	}
-
-	// Validate ID format:
-	// Convert to lowercase for case-insensitive validation.
+	// --- Required Fields --- (ID checked above)
 	lowerID := strings.ToLower(spec.ID)
-	// The original spec.ID is kept for context in errors if needed, but lowerID is validated.
 	if !idFormatRegex.MatchString(lowerID) {
-		// Use the original spec.ID in the error message for clarity.
-		return fmt.Errorf("query specification (ID: %s): id contains invalid characters or format. Allowed: alphanumeric (a-z, 0-9), hyphen (-), underscore (_). Must start/end with alphanumeric. Symbols (- or _) cannot be consecutive or at start/end", spec.ID)
+		return fmt.Errorf("%s: id contains invalid characters or format. Allowed: lowercase alphanumeric (a-z, 0-9), hyphen (-), underscore (_). Must start/end with alphanumeric. Symbols (- or _) cannot be consecutive or at start/end", specContext)
 	}
-	// Optional: If you want to enforce lowercase storage, you could reassign here:
-	// spec.ID = lowerID
 
 	if !isNonEmpty(spec.Title) {
-		// Use original spec.ID in subsequent error messages for consistency
-		return fmt.Errorf("query specification (ID: %s): title is required", spec.ID)
+		return fmt.Errorf("%s: title is required", specContext)
 	}
 	if len(spec.IntegrationType) == 0 {
-		return fmt.Errorf("query specification (ID: %s): integration_type is required and cannot be empty", spec.ID)
+		return fmt.Errorf("%s: integration_type is required and cannot be empty", specContext)
 	}
 	for i, itype := range spec.IntegrationType {
 		if !isNonEmpty(itype) {
-			return fmt.Errorf("query specification (ID: %s): integration_type entry %d cannot be empty", spec.ID, i)
+			return fmt.Errorf("%s: integration_type entry %d cannot be empty", specContext, i)
 		}
 	}
 	if !isNonEmpty(spec.Query) {
-		return fmt.Errorf("query specification (ID: %s): query text is required and cannot be empty", spec.ID)
+		return fmt.Errorf("%s: query text is required and cannot be empty", specContext)
 	}
 
-	// --- Optional Fields Validation (if present) ---
 	if spec.Metadata != nil {
 		if len(spec.Metadata) == 0 {
-			// Allow empty map if key exists, but maybe warn?
-			log.Printf("Warning: query specification (ID: %s): metadata field exists but is empty.", spec.ID)
+			log.Printf("Warning: %s: metadata field exists but is empty.", specContext)
 		}
-		for k, val := range spec.Metadata {
+		// Use blank identifier '_' for the unused map value 'val'
+		for k, _ := range spec.Metadata {
 			if !isNonEmpty(k) {
-				return fmt.Errorf("query specification (ID: %s): metadata keys cannot be empty", spec.ID)
+				return fmt.Errorf("%s: metadata keys cannot be empty", specContext)
 			}
-			if !isNonEmpty(val) {
-				return fmt.Errorf("query specification (ID: %s): metadata value for key '%s' cannot be empty", spec.ID, k)
-			}
+			// Value 'val' is intentionally ignored here as empty values are currently allowed.
 		}
 	}
 
-	// is_view defaults to false, no explicit validation needed unless true has implications.
+	// is_view defaults to false - no validation needed
 
-	// Parameters default to empty slice if omitted or explicitly null in YAML
+	// Parameters
 	if spec.Parameters == nil {
-		spec.Parameters = []QueryParameter{} // Ensure it's an empty slice, not nil
+		spec.Parameters = []QueryParameter{} // Ensure it's an empty slice, not nil for consistency
 	} else if len(spec.Parameters) > 0 { // Only validate entries if the list is not empty
 		paramKeys := make(map[string]struct{})
 		for i, param := range spec.Parameters {
-			entryContext := fmt.Sprintf("query specification (ID: %s) parameters entry %d", spec.ID, i)
+			entryContext := fmt.Sprintf("%s parameters entry %d", specContext, i)
 			if !isNonEmpty(param.Key) {
 				return fmt.Errorf("%s: key is required", entryContext)
 			}
-			// Value being "" is allowed by requirement.
-			// if param.Value == "" { // Check if explicitly nil/null if needed, but "" is valid
-			//  return fmt.Errorf("%s (key: %s): value is required (can be empty string \"\")", entryContext, param.Key)
-			// }
+			// Value being "" is allowed.
 			if _, exists := paramKeys[param.Key]; exists {
-				return fmt.Errorf("query specification (ID: %s): duplicate parameter key '%s' found", spec.ID, param.Key)
+				return fmt.Errorf("%s: duplicate parameter key '%s' found", specContext, param.Key)
 			}
 			paramKeys[param.Key] = struct{}{}
 		}
 	}
 
-	// Tags default to nil if omitted or explicitly null
-	if spec.Tags != nil {
-		if len(spec.Tags) == 0 {
-			log.Printf("Warning: query specification (ID: %s): tags field exists but is empty.", spec.ID)
-		}
-		for key, values := range spec.Tags {
-			if !isNonEmpty(key) {
-				return fmt.Errorf("query specification (ID: %s): tags keys cannot be empty", spec.ID)
-			}
-			if len(values) == 0 {
-				return fmt.Errorf("query specification (ID: %s): tags value list for key '%s' cannot be empty", spec.ID, key)
-			}
-			for j, val := range values {
-				if !isNonEmpty(val) {
-					return fmt.Errorf("query specification (ID: %s): tags value entry %d for key '%s' cannot be empty", spec.ID, j, key)
-				}
-			}
-		}
+	// --- Tags Validation (Using Helper) ---
+	// Calls the helper function assumed defined in common.go
+	if err := validateOptionalTagsMap(spec.Tags, specContext); err != nil {
+		return err // Error is already contextualized by the helper
 	}
 
-	// Classification defaults to nil if omitted or explicitly null
+	// --- Classification Validation ---
 	if spec.Classification != nil {
 		if len(spec.Classification) == 0 {
-			log.Printf("Warning: query specification (ID: %s): classification field exists but is empty.", spec.ID)
+			log.Printf("Warning: %s: classification field exists but is empty.", specContext)
 		}
 		for i, innerList := range spec.Classification {
 			if len(innerList) == 0 {
-				return fmt.Errorf("query specification (ID: %s): classification entry %d: inner list cannot be empty", spec.ID, i)
+				return fmt.Errorf("%s: classification entry %d: inner list cannot be empty", specContext, i)
 			}
 			for j, item := range innerList {
 				if !isNonEmpty(item) {
-					return fmt.Errorf("query specification (ID: %s): classification entry %d, item %d: cannot be empty", spec.ID, i, j)
+					return fmt.Errorf("%s: classification entry %d, item %d cannot be empty", specContext, i, j)
 				}
 			}
 		}
@@ -200,30 +191,9 @@ func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) erro
 	// Description and PrimaryTable are optional strings, no validation needed if omitted.
 
 	return nil
-}
+} // --- END validateQueryStructure ---
 
-// GetFlattenedTags extracts tags from a QuerySpecification and returns them as a flat list ["key:value"].
-func (v *defaultValidator) GetFlattenedTags(spec *QuerySpecification) []string {
-	if spec == nil || spec.Tags == nil || len(spec.Tags) == 0 {
-		return []string{} // Return empty slice if spec or tags are nil/empty
-	}
-
-	flattened := make([]string, 0)
-	// Sort keys for consistent output order (optional but good practice)
-	keys := make([]string, 0, len(spec.Tags))
-	for k := range spec.Tags {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		values := spec.Tags[key]
-		// Sort values within each key for consistency (optional)
-		sort.Strings(values)
-		for _, value := range values {
-			// Format: "key:value"
-			flattened = append(flattened, fmt.Sprintf("%s:%s", key, value))
-		}
-	}
-	return flattened
-}
+// Note: Assumes defaultValidator struct is defined elsewhere (e.g., validator.go)
+// Note: Assumes isNonEmpty func is defined elsewhere (e.g., common.go)
+// Note: Assumes validateOptionalTagsMap func is defined elsewhere (e.g., common.go)
+// Note: Assumes APIVersionV1 and SpecTypeQuery constants are defined elsewhere (e.g., validator.go)

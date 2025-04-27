@@ -308,9 +308,3 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 		return nil, fmt.Errorf("unknown or unsupported specification type '%s' in file '%s'", base.Type, filePath)
 	}
 }
-
-// isNonEmpty checks if a string is non-empty after trimming whitespace.
-// ADD THIS HELPER FUNCTION HERE
-func isNonEmpty(s string) bool {
-	return strings.TrimSpace(s) != ""
-}

@@ -13,9 +13,9 @@ import (
 
 // GetFlattenedTags extracts tags from a validated specification object (obtained via ProcessSpecification)
 // and returns them as a flat list of "key:value" strings.
-// It currently supports *QuerySpecification and potentially other types if they are added
-// with a `Tags map[string][]string` field.
+// It handles types having a `Tags map[string]StringOrSlice` field.
 // Returns an empty slice if the spec type is unsupported, nil, or has no tags.
+// Assumes flattenTagsMap helper is defined elsewhere (e.g., common.go).
 func GetFlattenedTags(spec interface{}) []string {
 	if spec == nil {
 		return []string{}
@@ -24,26 +24,20 @@ func GetFlattenedTags(spec interface{}) []string {
 	// Use type switch to check for known specification types with Tags field
 	switch s := spec.(type) {
 	case *QuerySpecification:
-		// Call the internal helper function (assumed to be in common.go)
-		return flattenTagsMap(s.Tags)
+		// Call the internal helper function (assumed defined elsewhere)
+		return flattenTagsMap(s.Tags) // Pass map[string]StringOrSlice
 	case *PluginSpecification:
-		// Example: Plugins currently don't have a top-level Tags field in the provided structs.
-		// If they did (e.g., s.Tags map[string][]string), you would add:
-		// return flattenTagsMap(s.Tags)
-		log.Printf("Warning: GetFlattenedTags called with *PluginSpecification, which currently has no standard Tags field.")
-		return []string{}
+		// Call the internal helper function (assumed defined elsewhere)
+		return flattenTagsMap(s.Tags) // Pass map[string]StringOrSlice
 	case *TaskSpecification:
-		// Example: Tasks currently don't have a top-level Tags field.
-		log.Printf("Warning: GetFlattenedTags called with *TaskSpecification, which currently has no standard Tags field.")
-		return []string{}
+		// Call the internal helper function (assumed defined elsewhere)
+		return flattenTagsMap(s.Tags) // Pass map[string]StringOrSlice
 	case *ControlSpecification:
-		// Example: Controls might have tags in the future.
-		// If they did (e.g., s.Tags map[string][]string), you would add:
-		// return flattenTagsMap(s.Tags)
-		log.Printf("Warning: GetFlattenedTags called with *ControlSpecification, which currently has no standard Tags field.")
-		return []string{}
+		// Call the internal helper function (assumed defined elsewhere)
+		return flattenTagsMap(s.Tags) // Pass map[string]StringOrSlice
 	default:
-		log.Printf("Warning: GetFlattenedTags called with an unknown or unsupported specification type: %T", s)
+		// Log warning only if type is genuinely unknown/unsupported for tags
+		log.Printf("Warning: GetFlattenedTags called with an unknown or unsupported specification type for tags: %T", s)
 		return []string{} // Return empty slice for unknown types
 	}
 }

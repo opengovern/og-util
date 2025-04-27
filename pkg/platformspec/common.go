@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -88,23 +89,22 @@ func initializeHTTPClient() {
 	}
 }
 
-// flattenTagsMap takes a map[string][]string and returns a flattened list
-// of "key:value" strings, sorted deterministically.
-// Returns an empty slice if the input map is nil or empty.
-func flattenTagsMap(tags map[string][]string) []string {
+// flattenTagsMap: **UPDATE SIGNATURE**
+// Takes map[string]StringOrSlice and returns a flattened list.
+func flattenTagsMap(tags map[string]StringOrSlice) []string { // *** SIGNATURE UPDATED ***
 	// Handle nil or empty map gracefully
 	if tags == nil || len(tags) == 0 {
 		return []string{} // Return empty slice, not nil
 	}
 
-	// Estimate capacity to potentially reduce reallocations
+	// Estimate capacity
 	estimatedCapacity := 0
-	for _, values := range tags {
-		estimatedCapacity += len(values)
+	for _, values := range tags { // values is type StringOrSlice
+		estimatedCapacity += len(values) // len() works on StringOrSlice
 	}
 	flattened := make([]string, 0, estimatedCapacity)
 
-	// Get keys and sort them for deterministic output order
+	// Get keys and sort
 	keys := make([]string, 0, len(tags))
 	for k := range tags {
 		keys = append(keys, k)
@@ -113,18 +113,52 @@ func flattenTagsMap(tags map[string][]string) []string {
 
 	// Iterate over sorted keys
 	for _, key := range keys {
-		values := tags[key]
+		values := tags[key] // values is type StringOrSlice
 
-		// Sort values within each key for consistency.
-		// Create a copy to sort if preserving original order matters elsewhere.
+		// Sort values: Can sort StringOrSlice directly as it's []string.
+		// Create a copy to avoid modifying the map's slice in place.
 		sortedValues := make([]string, len(values))
-		copy(sortedValues, values)
+		copy(sortedValues, values) // Copy works between StringOrSlice and []string
 		sort.Strings(sortedValues) // Sort the copy
 
-		for _, value := range sortedValues {
-			// Assuming prior validation ensures key/value are non-empty if map entry exists
+		for _, value := range sortedValues { // value is type string
+			// Assuming prior validation ensures key/value are non-empty
 			flattened = append(flattened, fmt.Sprintf("%s:%s", key, value))
 		}
 	}
 	return flattened
+}
+
+// validateOptionalTagsMap: **UPDATE SIGNATURE**
+// Checks constraints on a tags map if it's present.
+func validateOptionalTagsMap(tags map[string]StringOrSlice, specContext string) error { // *** SIGNATURE UPDATED ***
+	if tags == nil {
+		return nil // Optional field is missing, valid.
+	}
+	if len(tags) == 0 {
+		log.Printf("Warning: %s: tags field exists but is empty.", specContext)
+		return nil // Empty map is allowed (with warning).
+	}
+
+	// Check key and value constraints
+	for key, values := range tags { // values is StringOrSlice ([]string)
+		if !isNonEmpty(key) {
+			return fmt.Errorf("%s: tags keys cannot be empty", specContext)
+		}
+		// Decide if empty list of values is allowed. Current validation forbids.
+		if len(values) == 0 {
+			return fmt.Errorf("%s: tags value list for key '%s' cannot be empty", specContext, key)
+		}
+		for j, val := range values { // val is string
+			if !isNonEmpty(val) {
+				return fmt.Errorf("%s: tags value entry %d for key '%s' cannot be empty", specContext, j, key)
+			}
+		}
+	}
+	return nil // Tags are valid
+}
+
+// isNonEmpty checks if a string is non-empty after trimming whitespace.
+func isNonEmpty(s string) bool {
+	return strings.TrimSpace(s) != ""
 }
