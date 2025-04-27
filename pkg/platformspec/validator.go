@@ -112,6 +112,90 @@ type Validator interface {
 	//   bool: True if the platform version is supported, false otherwise.
 	//   error: An error if the specification is nil, platformVersion is empty, or if version/constraint parsing fails.
 	CheckPlatformSupport(pluginSpec *PluginSpecification, platformVersion string) (bool, error)
+
+	// IdentifySpecificationTypes reads a specification file and quickly identifies the primary type
+	// and counts known embedded types (like the discovery task in a plugin) without full validation.
+	//
+	// Parameters:
+	//   filePath: Path to the specification YAML file.
+	//
+	// Returns:
+	//   *SpecificationTypeInfo: A struct containing the primary type and a map of embedded type counts.
+	//   error: An error if reading or basic parsing fails.
+	IdentifySpecificationTypes(filePath string) (*SpecificationTypeInfo, error)
+}
+
+// --- Type Identification ---
+
+// SpecificationTypeInfo holds the results of type identification.
+type SpecificationTypeInfo struct {
+	PrimaryType   string
+	EmbeddedTypes map[string]int // Key: type name (e.g., "task"), Value: count
+}
+
+// Minimal struct to check for embedded discovery task in plugins.
+// We use interface{} because we only care about the key's presence, not its content.
+type pluginDiscoveryCheck struct {
+	Plugin struct {
+		Components struct {
+			Discovery interface{} `yaml:"discovery"`
+		} `yaml:"components"`
+	} `yaml:"plugin"`
+}
+
+// IdentifySpecificationTypes reads a specification file and quickly identifies the primary type
+// and counts known embedded types (like the discovery task in a plugin) without full validation.
+func (v *defaultValidator) IdentifySpecificationTypes(filePath string) (*SpecificationTypeInfo, error) {
+	log.Printf("Identifying specification types in file: %s", filePath)
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file '%s' for type identification: %w", filePath, err)
+	}
+
+	// 1. Base Parse for Primary Type
+	var base BaseSpecification
+	if err := yaml.Unmarshal(data, &base); err != nil {
+		return nil, fmt.Errorf("failed to parse base specification fields (type) from '%s': %w", filePath, err)
+	}
+
+	if !isNonEmpty(base.Type) {
+		return nil, fmt.Errorf("specification file '%s' is missing required top-level 'type' field", filePath)
+	}
+	primaryType := strings.ToLower(base.Type)
+	log.Printf("Identified primary type: '%s'", primaryType)
+
+	// Initialize result
+	info := &SpecificationTypeInfo{
+		PrimaryType:   primaryType,
+		EmbeddedTypes: make(map[string]int),
+	}
+
+	// 2. Check for Known Embeddings based on Primary Type
+	switch primaryType {
+	case SpecTypePlugin:
+		// Check for embedded discovery task
+		var pluginCheck pluginDiscoveryCheck
+		// Unmarshal again into the minimal struct. Ignore errors here, as we only care if discovery exists.
+		if err := yaml.Unmarshal(data, &pluginCheck); err == nil {
+			// Check if the path plugin.components.discovery exists
+			if pluginCheck.Plugin.Components.Discovery != nil {
+				log.Printf("Found embedded 'discovery' component (type: %s)", SpecTypeTask)
+				info.EmbeddedTypes[SpecTypeTask] = 1 // Currently only one known embedded task
+			}
+		} else {
+			log.Printf("Warning: Could not perform minimal parse for embedded discovery check in '%s': %v", filePath, err)
+		}
+
+	// Add cases here for other primary types that might embed known types in the future
+	// case SpecTypeWorkflow:
+	//    // Check for embedded tasks or queries...
+
+	default:
+		// No known embedded types for other current types (task, query, control)
+		log.Printf("No known embedded types defined for primary type '%s'.", primaryType)
+	}
+
+	return info, nil
 }
 
 // --- Concrete Implementation ---

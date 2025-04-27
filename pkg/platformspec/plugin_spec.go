@@ -30,7 +30,7 @@ func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platf
 	}
 
 	log.Println("Validating plugin specification structure...")
-	// Defaulting for embedded task ID/Type happens inside validatePluginStructure
+	// Defaulting for embedded task ID/Type/Name/Description happens inside validatePluginStructure
 	if err := v.validatePluginStructure(&spec); err != nil {
 		return nil, fmt.Errorf("plugin specification structure validation failed: %w", err)
 	}
@@ -57,6 +57,7 @@ func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platf
 	// Artifact Validation
 	if !skipArtifactValidation {
 		log.Println("Starting plugin artifact validation...")
+		// Assumes validatePluginArtifacts is defined elsewhere (e.g., artifact_validation.go)
 		if err := v.validatePluginArtifacts(&spec, artifactValidationType); err != nil {
 			return nil, fmt.Errorf("plugin artifact validation failed: %w", err)
 		}
@@ -70,7 +71,7 @@ func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platf
 
 // validatePluginStructure performs structural checks specific to 'plugin' specifications,
 // including metadata (date, license) and the embedded discovery task. It also handles
-// defaulting for the embedded task's ID and Type.
+// defaulting for the embedded task's ID, Type, Name, and Description.
 func (v *defaultValidator) validatePluginStructure(spec *PluginSpecification) error {
 	if spec == nil {
 		return errors.New("plugin specification cannot be nil")
@@ -111,17 +112,30 @@ func (v *defaultValidator) validatePluginStructure(spec *PluginSpecification) er
 
 	// *** Validate Embedded Discovery Task Structure ***
 	// Pass 'false' for isStandalone. Metadata and APIVersion checks happen inside.
-	// ID and Type are now optional for embedded tasks within this function.
+	// ID, Name, Description, Type are optional here.
 	// Assumes validateTaskStructure exists in task_spec.go
 	if err := v.validateTaskStructure(&components.Discovery, false); err != nil { // false = embedded
 		return fmt.Errorf("plugin.components.discovery task validation failed: %w", err)
 	}
 
-	// *** Default ID and Type for Embedded Discovery Task ***
+	// *** Default ID, Type, Name, Description for Embedded Discovery Task ***
 	discoveryTask := &components.Discovery // Use pointer to modify
+	defaultSuffix := "-task"               // Suffix for default values
+	defaultID := plugin.Name + defaultSuffix
+	defaultName := plugin.Name + defaultSuffix
+	defaultDescription := plugin.Name + " Task" // Default description
+
 	if !isNonEmpty(discoveryTask.ID) {
-		log.Printf("Info: Embedded discovery task for plugin '%s' is missing 'id'. Defaulting to plugin name.", plugin.Name)
-		discoveryTask.ID = plugin.Name // Default ID to plugin name
+		log.Printf("Info: Embedded discovery task for plugin '%s' is missing 'id'. Defaulting to '%s'.", plugin.Name, defaultID)
+		discoveryTask.ID = defaultID
+	}
+	if !isNonEmpty(discoveryTask.Name) {
+		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'name'. Defaulting to '%s'.", plugin.Name, discoveryTask.ID, defaultName)
+		discoveryTask.Name = defaultName
+	}
+	if !isNonEmpty(discoveryTask.Description) {
+		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'description'. Defaulting to '%s'.", plugin.Name, discoveryTask.ID, defaultDescription)
+		discoveryTask.Description = defaultDescription
 	}
 	if !isNonEmpty(discoveryTask.Type) {
 		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'type'. Defaulting to '%s'.", plugin.Name, discoveryTask.ID, SpecTypeTask)
@@ -177,7 +191,7 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 
 	log.Printf("Getting task details from pre-validated plugin specification: %s (Version: %s)", pluginSpec.Plugin.Name, pluginSpec.Plugin.Version)
 
-	// 1. Access the embedded discovery task (ID and Type are guaranteed to be set by ProcessSpecification/validatePluginStructure)
+	// 1. Access the embedded discovery task (ID, Name, Description, Type are guaranteed to be set by ProcessSpecification/validatePluginStructure)
 	discoveryTask := pluginSpec.Plugin.Components.Discovery
 
 	// 2. Validate the Image URL existence (Format check was done during ProcessSpecification)
@@ -193,9 +207,10 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 	// 3. Populate the TaskDetails struct, including inherited fields
 	details := &TaskDetails{
 		// Task-specific fields
-		TaskID:            discoveryTask.ID, // This ID includes the default if it was applied
-		TaskName:          discoveryTask.Name,
-		ValidatedImageURI: discoveryTask.ImageURL, // Use the validated URL
+		TaskID:            discoveryTask.ID,          // Includes defaults if applied
+		TaskName:          discoveryTask.Name,        // Includes defaults if applied
+		TaskDescription:   discoveryTask.Description, // Includes defaults if applied
+		ValidatedImageURI: discoveryTask.ImageURL,    // Use the validated URL
 		Command:           discoveryTask.Command,
 		Timeout:           discoveryTask.Timeout,
 		ScaleConfig:       discoveryTask.ScaleConfig,
@@ -267,6 +282,7 @@ func (v *defaultValidator) validatePluginArtifacts(spec *PluginSpecification, ar
 	// --- Validate Discovery Task Image ---
 	if validateDiscovery {
 		log.Printf("Validating Discovery Image: %s", discoveryImageURL)
+		// Assumes validateImageManifestExists is defined elsewhere (e.g., artifact_validation.go)
 		discoveryErr := v.validateImageManifestExists(discoveryImageURL) // This performs retries internally
 		if discoveryErr != nil {
 			log.Printf("Error validating Discovery Image '%s': %v", discoveryImageURL, discoveryErr)
@@ -284,6 +300,7 @@ func (v *defaultValidator) validatePluginArtifacts(spec *PluginSpecification, ar
 			log.Printf("Validating PlatformBinary artifact: %s", comp.URI)
 			var err error
 			// Use exported constant for component name
+			// Assumes validateSingleDownloadableComponent is defined elsewhere (e.g., artifact_validation.go)
 			platformData, err = v.validateSingleDownloadableComponent(comp, ArtifactTypePlatformBinary) // Retries handled inside
 			if err != nil {
 				log.Printf("Error validating PlatformBinary artifact '%s': %v", comp.URI, err)
@@ -302,6 +319,7 @@ func (v *defaultValidator) validatePluginArtifacts(spec *PluginSpecification, ar
 			defer wg.Done()
 			log.Printf("Validating CloudQLBinary artifact (separate URI): %s", comp.URI)
 			// Use exported constant for component name
+			// Assumes validateSingleDownloadableComponent is defined elsewhere (e.g., artifact_validation.go)
 			_, err := v.validateSingleDownloadableComponent(comp, ArtifactTypeCloudQLBinary) // Retries handled inside
 			if err != nil {
 				log.Printf("Error validating CloudQLBinary artifact (separate URI) '%s': %v", comp.URI, err)

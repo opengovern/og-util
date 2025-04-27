@@ -46,7 +46,8 @@ func (v *defaultValidator) processTaskSpec(data []byte, filePath string, skipArt
 	// Task Image Validation (optional)
 	if !skipArtifactValidation && isNonEmpty(spec.ImageURL) {
 		log.Println("Initiating standalone task image validation...")
-		err := v.validateImageManifestExists(spec.ImageURL) // Assumes this function exists in artifact_validation.go
+		// Assumes validateImageManifestExists exists in artifact_validation.go
+		err := v.validateImageManifestExists(spec.ImageURL)
 		if err != nil {
 			return nil, fmt.Errorf("standalone task image validation failed for '%s': %w", spec.ImageURL, err)
 		}
@@ -107,7 +108,7 @@ func (v *defaultValidator) GetTaskDefinition(filePath string) (*TaskSpecificatio
 // validateTaskStructure performs structural checks specific to 'task' specifications.
 // The isStandalone flag determines if APIVersion, Metadata, and SupportedPlatformVersions are required (true)
 // or must be absent (false, for embedded discovery tasks).
-// For embedded tasks (isStandalone=false), ID and Type are optional here, defaulting happens in validatePluginStructure.
+// For embedded tasks (isStandalone=false), ID, Name, Description, and Type are optional here, defaulting happens in validatePluginStructure.
 func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStandalone bool) error {
 	if spec == nil {
 		return errors.New("task specification cannot be nil")
@@ -122,18 +123,19 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 			taskDesc = "standalone task (ID missing)" // ID is required for standalone
 		}
 	} else {
-		// For embedded, ID might be missing at this stage, use Name if available
+		// For embedded, ID/Name might be missing at this stage
 		if isNonEmpty(spec.ID) {
 			taskDesc = fmt.Sprintf("embedded discovery task (ID: %s)", spec.ID)
 		} else if isNonEmpty(spec.Name) {
-			taskDesc = fmt.Sprintf("embedded discovery task (Name: %s, ID defaults to plugin name)", spec.Name)
+			taskDesc = fmt.Sprintf("embedded discovery task (Name: %s, ID/Name default later)", spec.Name)
+		} else {
+			taskDesc = "embedded discovery task (ID/Name default later)"
 		}
 	}
 
 	// --- Standalone vs Embedded Field Requirements ---
 	if isStandalone {
 		// These fields are REQUIRED for standalone tasks.
-		// API Version check (allowing default)
 		if !isNonEmpty(spec.APIVersion) || spec.APIVersion != APIVersionV1 {
 			// This check might be redundant if ProcessSpecification already defaulted/checked, but keep for direct GetTaskDefinition calls
 			return fmt.Errorf("%s: api-version is required and must be '%s' (or omitted to default), got: '%s'", taskDesc, APIVersionV1, spec.APIVersion)
@@ -142,6 +144,7 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 			return fmt.Errorf("%s: metadata section is required for standalone task", taskDesc)
 		}
 		// Validate the metadata content using the helper
+		// Assumes validateMetadata exists in metadata_validation.go
 		if err := v.validateMetadata(spec.Metadata, fmt.Sprintf("%s metadata", taskDesc)); err != nil {
 			return err // Error already contextualized
 		}
@@ -156,9 +159,15 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 				return fmt.Errorf("%s: supported-platform-versions entry %d ('%s') is not a valid semantic version constraint for standalone task: %w", taskDesc, i, constraintStr, err)
 			}
 		}
-		// Standalone tasks MUST have ID and Type specified
+		// Standalone tasks MUST have ID, Name, Description, and Type specified
 		if !isNonEmpty(spec.ID) {
 			return fmt.Errorf("%s: id is required for standalone task", taskDesc)
+		}
+		if !isNonEmpty(spec.Name) {
+			return fmt.Errorf("%s: name is required for standalone task", taskDesc)
+		}
+		if !isNonEmpty(spec.Description) {
+			return fmt.Errorf("%s: description is required for standalone task", taskDesc)
 		}
 		if !isNonEmpty(spec.Type) || spec.Type != SpecTypeTask {
 			return fmt.Errorf("%s: type is required and must be '%s' for standalone task, got: '%s'", taskDesc, SpecTypeTask, spec.Type)
@@ -175,29 +184,23 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 		if len(spec.SupportedPlatformVersions) > 0 {
 			return fmt.Errorf("%s: must not contain supported-platform-versions (it's inherited from plugin), but found: %v", taskDesc, spec.SupportedPlatformVersions)
 		}
-		// ID and Type are OPTIONAL here for embedded tasks. Defaulting happens in validatePluginStructure.
+		// ID, Name, Description, Type are OPTIONAL here for embedded tasks. Defaulting happens in validatePluginStructure.
 		// However, if Type *is* specified, it must be "task".
 		if isNonEmpty(spec.Type) && spec.Type != SpecTypeTask {
 			return fmt.Errorf("%s: if type is specified for embedded task, it must be '%s', got: '%s'", taskDesc, SpecTypeTask, spec.Type)
 		}
 	}
 
-	// --- Common Task Field Checks (Required for both Standalone and Embedded) ---
-	// ID and Type presence/value checked above based on isStandalone flag and defaulting logic.
+	// --- Common Task Field Checks (Required for both Standalone and Embedded, except where noted for embedded) ---
+	// ID, Name, Description, Type presence/value checked above based on isStandalone flag and defaulting logic.
 
-	if !isNonEmpty(spec.Name) {
-		return fmt.Errorf("%s: name is required", taskDesc)
-	}
-	// Note: Task has its own Description field, separate from Metadata.Description
-	if !isNonEmpty(spec.Description) {
-		return fmt.Errorf("%s: description is required", taskDesc)
-	}
 	// IsEnabled is a boolean, always present.
 
 	if !isNonEmpty(spec.ImageURL) {
 		return fmt.Errorf("%s: image_url is required", taskDesc)
 	}
 	// ** Enforce Digest Format for ImageURL **
+	// Assumes imageDigestRegex is initialized in validator.go
 	if !imageDigestRegex.MatchString(spec.ImageURL) {
 		return fmt.Errorf("%s: image_url ('%s') must be in digest format (e.g., registry/repository/image@sha256:hash)", taskDesc, spec.ImageURL)
 	}

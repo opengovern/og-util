@@ -34,7 +34,7 @@ type Metadata struct {
 
 // Plugin defines the core details specified for a plugin.
 type Plugin struct {
-	Name                      string           `yaml:"name" json:"name"`                                               // Required: Name of the plugin. Used as default ID for embedded discovery task if ID is omitted.
+	Name                      string           `yaml:"name" json:"name"`                                               // Required: Name of the plugin. Used as default ID/name base for embedded discovery task if omitted.
 	Version                   string           `yaml:"version" json:"version"`                                         // Required: Semantic version of the plugin (e.g., "1.2.3").
 	SupportedPlatformVersions []string         `yaml:"supported-platform-versions" json:"supported-platform-versions"` // Required: List of platform version constraints (e.g., ">=1.0.0, <2.0.0").
 	Metadata                  Metadata         `yaml:"metadata" json:"metadata"`                                       // Required: Metadata about the plugin.
@@ -44,7 +44,10 @@ type Plugin struct {
 
 // PluginComponents holds the different component definitions specified for a 'plugin'.
 type PluginComponents struct {
-	Discovery      TaskSpecification `yaml:"discovery" json:"discovery"`             // Embedded task definition. ID/Type default if omitted.
+	// Discovery component IS the embedded task definition used for discovering resources.
+	// It inherits metadata implicitly from the parent Plugin.
+	// Its 'id', 'name', 'description', 'type' default if omitted.
+	Discovery      TaskSpecification `yaml:"discovery" json:"discovery"`
 	PlatformBinary Component         `yaml:"platform-binary" json:"platform-binary"` // Required downloadable artifact.
 	CloudQLBinary  Component         `yaml:"cloudql-binary" json:"cloudql-binary"`   // Required downloadable artifact.
 }
@@ -80,18 +83,18 @@ type TaskSpecification struct {
 	SupportedPlatformVersions []string  `yaml:"supported-platform-versions,omitempty"` // Required for standalone. Must be ABSENT for embedded.
 
 	// --- Common Task Fields (Standalone and Embedded) ---
-	ID          string             `yaml:"id,omitempty"`   // Optional for embedded (defaults to plugin name). Required for standalone.
-	Name        string             `yaml:"name"`           // Required.
-	Description string             `yaml:"description"`    // Required (distinct from Metadata.Description).
-	IsEnabled   bool               `yaml:"is_enabled"`     // Required.
-	Type        string             `yaml:"type,omitempty"` // Optional for embedded (defaults to "task"). Required ("task") for standalone.
-	ImageURL    string             `yaml:"image_url"`      // Required (digest format).
-	Command     string             `yaml:"command"`        // Required.
-	Timeout     string             `yaml:"timeout"`        // Required (< 24h).
-	ScaleConfig ScaleConfig        `yaml:"scale_config"`   // Required.
-	Params      []string           `yaml:"params"`         // Required (can be empty []).
-	Configs     []interface{}      `yaml:"configs"`        // Required (can be empty []).
-	RunSchedule []RunScheduleEntry `yaml:"run_schedule"`   // Required (min 1 entry).
+	ID          string             `yaml:"id,omitempty"`          // Optional for embedded (defaults to plugin name + "-task"). Required for standalone.
+	Name        string             `yaml:"name,omitempty"`        // Optional for embedded (defaults to plugin name + "-task"). Required for standalone.
+	Description string             `yaml:"description,omitempty"` // Optional for embedded (defaults to plugin name + " Task"). Required for standalone.
+	IsEnabled   bool               `yaml:"is_enabled"`            // Required.
+	Type        string             `yaml:"type,omitempty"`        // Optional for embedded (defaults to "task"). Required ("task") for standalone.
+	ImageURL    string             `yaml:"image_url"`             // Required (digest format).
+	Command     string             `yaml:"command"`               // Required.
+	Timeout     string             `yaml:"timeout"`               // Required (< 24h).
+	ScaleConfig ScaleConfig        `yaml:"scale_config"`          // Required.
+	Params      []string           `yaml:"params"`                // Required (can be empty []).
+	Configs     []interface{}      `yaml:"configs"`               // Required (can be empty []).
+	RunSchedule []RunScheduleEntry `yaml:"run_schedule"`          // Required (min 1 entry).
 }
 
 // TaskDetails holds extracted and validated details for a specific task,
@@ -99,8 +102,9 @@ type TaskSpecification struct {
 // Includes fields inherited from the parent PluginSpecification for context.
 type TaskDetails struct {
 	// Fields specific to the task definition
-	TaskID            string             // The unique ID of the task (defaults to plugin name if omitted in embedded task).
-	TaskName          string             // The human-readable name of the task.
+	TaskID            string             // The unique ID of the task (includes defaults if embedded).
+	TaskName          string             // The human-readable name of the task (includes defaults if embedded).
+	TaskDescription   string             // The description of the task (includes defaults if embedded).
 	ValidatedImageURI string             // The container image URI, validated for format and registry existence.
 	Command           string             // The command executed by the task container.
 	Timeout           string             // The execution timeout duration string.
@@ -119,7 +123,6 @@ type TaskDetails struct {
 // --- Placeholder Structs for Future Extensibility ---
 
 // QuerySpecification represents a future 'query' type specification.
-// Note: It does NOT embed the common Metadata struct. It would have its own fields.
 type QuerySpecification struct {
 	APIVersion string `yaml:"api-version"` // Defaults to v1 if omitted.
 	Type       string `yaml:"type"`        // Must be 'query'.
@@ -132,7 +135,6 @@ type QuerySpecification struct {
 }
 
 // ControlSpecification represents a future 'control' type specification.
-// Note: It does NOT embed the common Metadata struct. It would have its own fields.
 type ControlSpecification struct {
 	APIVersion string `yaml:"api-version"` // Defaults to v1 if omitted.
 	Type       string `yaml:"type"`        // Must be 'control'.
