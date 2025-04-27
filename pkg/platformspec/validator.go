@@ -1,0 +1,249 @@
+// Package platformspec provides utilities for loading, validating, and verifying
+// various specification types (plugin, task, query, control, etc.).
+package platformspec
+
+import (
+	"fmt"
+	"log"
+	"math/rand" // Needed for init
+	"net/http"  // Needed for init
+	"os"
+	"regexp" // Needed for init
+	"strings"
+	"time" // Needed for init
+
+	"gopkg.in/yaml.v3"
+)
+
+// --- Configuration Constants ---
+const (
+	// Standard Specification Types
+	SpecTypePlugin  = "plugin"
+	SpecTypeTask    = "task"
+	SpecTypeQuery   = "query"   // Example future type
+	SpecTypeControl = "control" // Example future type
+
+	// Standard API Version
+	APIVersionV1 = "v1"
+
+	// Date format for PublishedDate (used in metadata_validation.go)
+	PublishedDateFormat = "2006-01-02" // Go's reference date format
+
+	// Constants for artifact validation types used in ProcessSpecification
+	// Exported constants (uppercase)
+	ArtifactTypeDiscovery      = "discovery"       // Validate only the discovery task's image.
+	ArtifactTypePlatformBinary = "platform-binary" // Validate only the platform binary artifact.
+	ArtifactTypeCloudQLBinary  = "cloudql-binary"  // Validate only the CloudQL binary artifact.
+	ArtifactTypeAll            = "all"             // Validate all artifacts (default).
+)
+
+// --- Global Resources (Initialized in init) ---
+// Shared HTTP client optimized for potentially frequent requests to registries and artifact servers.
+var httpClient *http.Client
+
+// Regex to validate that an image URL uses the digest format (e.g., image@sha256:...).
+var imageDigestRegex *regexp.Regexp
+
+// init initializes package-level resources.
+func init() {
+	// Seed random number generator (used in artifact_validation.go)
+	rand.Seed(time.Now().UnixNano())
+	// Initialize HTTP client (defined in http_client.go)
+	initializeHTTPClient()
+	// Compile regex (used in task_spec.go and artifact_validation.go)
+	imageDigestRegex = regexp.MustCompile(`^.+@sha256:[a-fA-F0-9]{64}$`)
+	// Initialize SPDX (defined in metadata_validation.go)
+	initializeSPDX()
+
+	log.Println("Platform specification validator package initialized.")
+}
+
+// --- Interface Definition ---
+
+// Validator defines the interface for processing, validating, and retrieving information from specifications.
+// It promotes a "one call" pattern: call ProcessSpecification once, then use the returned validated
+// specification object (*PluginSpecification, *TaskSpecification, etc.) with other functions.
+type Validator interface {
+	// ProcessSpecification is the primary entry point. It reads a specification file, determines its type,
+	// performs full structural validation according to that type (including specific metadata, date, SPDX license checks where applicable),
+	// checks platform compatibility (for plugins), and optionally validates artifacts based on the flags.
+	// On success, it returns the fully parsed and validated specification struct (e.g., *PluginSpecification, *TaskSpecification,
+	// *QuerySpecification - type-assert the returned interface{} to access specific fields) and a nil error.
+	// Call this function ONCE per specification file.
+	//
+	// Parameters:
+	//   filePath: Path to the specification YAML file.
+	//   platformVersion: The current platform version string (e.g., "1.5.2") to check compatibility against (only for plugin specifications). Leave empty to skip check.
+	//   artifactValidationType: Specifies which artifacts to validate ("discovery", "platform-binary", "cloudql-binary", "all"). Default is "all". Applies only to plugin specs.
+	//   skipArtifactValidation: If true, completely skips all artifact/image download and validation checks. Applies only to plugin and standalone task specs.
+	//
+	// Returns:
+	//   interface{}: A pointer to the specific validated specification struct (e.g., *PluginSpecification) if validation succeeds. Use type assertion.
+	//   error: An error if reading, parsing, or validation fails.
+	ProcessSpecification(filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error)
+
+	// GetTaskDefinition reads a specification file specifically expecting a *standalone* 'task' type,
+	// parses it, validates its structure (including metadata), and returns the TaskSpecification struct or an error.
+	// Consider using ProcessSpecification instead for a unified approach.
+	GetTaskDefinition(filePath string) (*TaskSpecification, error)
+
+	// GetTaskDetailsFromPluginSpecification extracts the details of the embedded 'discovery' task from an *already validated* PluginSpecification.
+	// It includes inherited fields (APIVersion, SupportedPlatformVersions, Metadata) from the parent plugin for complete context.
+	// It performs an additional validation step to ensure the task's image exists in the registry.
+	// Use this function *after* successfully calling ProcessSpecification for a plugin.
+	//
+	// Parameters:
+	//   pluginSpec: A pointer to a validated PluginSpecification struct (obtained from ProcessSpecification).
+	//
+	// Returns:
+	//   *TaskDetails: A struct containing details of the discovery task, including inherited fields and its validated image URI.
+	//   error: An error if the input specification is nil or if the image existence check fails.
+	GetTaskDetailsFromPluginSpecification(pluginSpec *PluginSpecification) (*TaskDetails, error)
+
+	// CheckPlatformSupport checks if a given PluginSpecification supports a specific platform version string
+	// based on the specification's `supported-platform-versions` constraints.
+	// Use this function *after* successfully calling ProcessSpecification for a plugin.
+	//
+	// Parameters:
+	//   pluginSpec: A pointer to a validated PluginSpecification struct (obtained from ProcessSpecification).
+	//   platformVersion: The platform version string to check (e.g., "1.5.2").
+	//
+	// Returns:
+	//   bool: True if the platform version is supported, false otherwise.
+	//   error: An error if the specification is nil, platformVersion is empty, or if version/constraint parsing fails.
+	CheckPlatformSupport(pluginSpec *PluginSpecification, platformVersion string) (bool, error)
+}
+
+// --- Concrete Implementation ---
+
+// defaultValidator implements the Validator interface using the defined structs and helper methods.
+type defaultValidator struct{}
+
+// NewDefaultValidator creates a new instance of the default validator.
+func NewDefaultValidator() Validator {
+	return &defaultValidator{}
+}
+
+// --- Interface Method Implementations ---
+
+// ProcessSpecification reads, identifies, validates structure (incl. date/SPDX license), checks platform (if applicable),
+// and validates artifacts (if applicable and requested). This is the main entry point.
+func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error) {
+	log.Printf("Processing specification file: %s (Platform Version: %s, Artifact Validation: %s, Skip Artifacts: %t)",
+		filePath, platformVersion, artifactValidationType, skipArtifactValidation)
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
+	}
+
+	// 1. Determine Base Type, ID, and API Version
+	var base BaseSpecification
+	if err := yaml.Unmarshal(data, &base); err != nil {
+		return nil, fmt.Errorf("failed to parse base specification fields (type, id, api-version) from '%s': %w", filePath, err)
+	}
+
+	// Check required Type field
+	if !isNonEmpty(base.Type) {
+		return nil, fmt.Errorf("specification file '%s' is missing required top-level 'type' field", filePath)
+	}
+	specType := strings.ToLower(base.Type)
+	log.Printf("Detected specification type: '%s'", specType)
+
+	// Handle API Version Defaulting (defaults to v1 for non-plugin types if missing)
+	// Store original for potential validation later if needed
+	originalAPIVersion := base.APIVersion
+	defaultedAPIVersion := base.APIVersion
+	if !isNonEmpty(base.APIVersion) {
+		if specType != SpecTypePlugin {
+			log.Printf("Info: Specification '%s' (type: %s) missing 'api-version', defaulting to '%s'.", filePath, specType, APIVersionV1)
+			defaultedAPIVersion = APIVersionV1
+		} else {
+			// Plugins MUST specify api-version: v1 explicitly
+			return nil, fmt.Errorf("plugin specification '%s' is missing required top-level 'api-version' field (must be '%s')", filePath, APIVersionV1)
+		}
+	}
+
+	// 2. Process based on Type - dispatch to type-specific processors
+	switch specType {
+	case SpecTypePlugin:
+		// Plugin validation handles API version check internally as it must be v1 explicitly
+		return v.processPluginSpec(data, filePath, platformVersion, artifactValidationType, skipArtifactValidation)
+
+	case SpecTypeTask:
+		// Task validation handles API version check internally (allows default)
+		return v.processTaskSpec(data, filePath, skipArtifactValidation, defaultedAPIVersion, originalAPIVersion)
+
+	case SpecTypeQuery: // Example future type
+		var spec QuerySpecification
+		if err := yaml.Unmarshal(data, &spec); err != nil {
+			return nil, fmt.Errorf("failed to parse specification file '%s' as query: %w", filePath, err)
+		}
+		// Apply defaulted API version if necessary
+		if !isNonEmpty(spec.APIVersion) {
+			spec.APIVersion = defaultedAPIVersion
+		}
+		spec.Type = specType // Ensure type is set
+
+		// Basic validation for common fields
+		if spec.APIVersion != APIVersionV1 {
+			return nil, fmt.Errorf("query specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, originalAPIVersion)
+		}
+		if !isNonEmpty(spec.ID) {
+			return nil, fmt.Errorf("query specification '%s': id is required", filePath)
+		}
+
+		log.Println("Validating query specification structure...")
+		// if err := v.validateQueryStructure(&spec); err != nil { // Define this function later
+		// 	return nil, fmt.Errorf("query specification structure validation failed: %w", err)
+		// }
+		log.Println("Query specification structure validation successful (Placeholder - validation not implemented).")
+		// No artifact validation for queries currently defined
+		return &spec, nil
+
+	case SpecTypeControl: // Example future type
+		var spec ControlSpecification
+		if err := yaml.Unmarshal(data, &spec); err != nil {
+			return nil, fmt.Errorf("failed to parse specification file '%s' as control: %w", filePath, err)
+		}
+		// Apply defaulted API version if necessary
+		if !isNonEmpty(spec.APIVersion) {
+			spec.APIVersion = defaultedAPIVersion
+		}
+		spec.Type = specType // Ensure type is set
+
+		// Basic validation for common fields
+		if spec.APIVersion != APIVersionV1 {
+			return nil, fmt.Errorf("control specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, originalAPIVersion)
+		}
+		if !isNonEmpty(spec.ID) {
+			return nil, fmt.Errorf("control specification '%s': id is required", filePath)
+		}
+
+		log.Println("Validating control specification structure...")
+		// if err := v.validateControlStructure(&spec); err != nil { // Define this function later
+		//  return nil, fmt.Errorf("control specification structure validation failed: %w", err)
+		// }
+		log.Println("Control specification structure validation successful (Placeholder - validation not implemented).")
+		// Potentially validate control logic source artifact?
+		// if !skipArtifactValidation && spec.LogicSource.URI != "" { ... call artifact validation ... }
+		return &spec, nil
+
+	default:
+		return nil, fmt.Errorf("unknown or unsupported specification type '%s' in file '%s'", base.Type, filePath)
+	}
+}
+
+// --- Helper Functions ---
+
+// isNonEmpty checks if a string is non-empty after trimming whitespace.
+// Moved to utils.go if desired, keeping here for self-containment in this example.
+func isNonEmpty(s string) bool {
+	return strings.TrimSpace(s) != ""
+}
+
+// --- Getters and Platform Check (Delegated to specific files) ---
+
+// GetTaskDefinition is implemented in task_spec.go
+// GetTaskDetailsFromPluginSpecification is implemented in plugin_spec.go
+// CheckPlatformSupport is implemented in plugin_spec.go
