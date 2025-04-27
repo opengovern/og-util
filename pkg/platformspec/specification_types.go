@@ -32,14 +32,19 @@ type Metadata struct {
 
 // --- Plugin Specific Structs ---
 
+// DiscoveryComponent defines how a plugin specifies its discovery mechanism:
+// either by referencing an existing task ID or embedding a full task specification.
+type DiscoveryComponent struct {
+	TaskID   string             `yaml:"task-id,omitempty" json:"task-id,omitempty"`     // Reference to a standalone TaskSpecification ID. Mutually exclusive with TaskSpec.
+	TaskSpec *TaskSpecification `yaml:"task-spec,omitempty" json:"task-spec,omitempty"` // Embedded TaskSpecification details. Mutually exclusive with TaskID.
+}
+
 // PluginComponents holds the different component definitions specified for a 'plugin'.
 type PluginComponents struct {
-	// Discovery component IS the embedded task definition used for discovering resources.
-	// It inherits metadata implicitly from the parent PluginSpecification.
-	// Its 'id', 'name', 'description', 'type' default if omitted.
-	Discovery      TaskSpecification `yaml:"discovery" json:"discovery"`
-	PlatformBinary Component         `yaml:"platform-binary" json:"platform-binary"` // Required downloadable artifact.
-	CloudQLBinary  Component         `yaml:"cloudql-binary" json:"cloudql-binary"`   // Required downloadable artifact.
+	// Discovery specifies how the plugin discovers resources. Uses DiscoveryComponent struct.
+	Discovery      DiscoveryComponent `yaml:"discovery" json:"discovery"`
+	PlatformBinary Component          `yaml:"platform-binary" json:"platform-binary"` // Required downloadable artifact.
+	CloudQLBinary  Component          `yaml:"cloudql-binary" json:"cloudql-binary"`   // Required downloadable artifact.
 }
 
 // PluginSpecification is the top-level structure for the 'plugin' type specification file.
@@ -73,7 +78,7 @@ type RunScheduleEntry struct {
 	Frequency string            `yaml:"frequency" json:"frequency"` // Required: How often the task should run (format depends on scheduler implementation, e.g., cron string, interval).
 }
 
-// TaskSpecification defines the structure for a task, used standalone or embedded in PluginComponents.Discovery.
+// TaskSpecification defines the structure for a task, used standalone or embedded within a DiscoveryComponent.
 type TaskSpecification struct {
 	// --- Fields used ONLY by Standalone Task Specifications ---
 	APIVersion                string    `yaml:"api-version,omitempty"`                 // Required for standalone (defaults to v1 if omitted). Must be ABSENT for embedded.
@@ -98,6 +103,7 @@ type TaskSpecification struct {
 // TaskDetails holds extracted and validated details for a specific task,
 // typically retrieved via GetTaskDetailsFromPluginSpecification.
 // Includes fields inherited from the parent PluginSpecification for context.
+// Will contain an error if the discovery component was a task-id reference.
 type TaskDetails struct {
 	// Fields specific to the task definition
 	TaskID            string             // The unique ID of the task (includes defaults if embedded).
@@ -116,6 +122,10 @@ type TaskDetails struct {
 	APIVersion                string   // API version from the parent plugin specification.
 	SupportedPlatformVersions []string // Supported platform versions from the parent plugin.
 	Metadata                  Metadata // Metadata from the parent plugin.
+
+	// Flag indicating if the details came from a reference
+	IsReference      bool   // True if discovery used task-id, meaning details above are incomplete.
+	ReferencedTaskID string // The ID used in task-id if IsReference is true.
 }
 
 // --- Query Specific Structs ---
