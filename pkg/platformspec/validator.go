@@ -145,7 +145,6 @@ type Validator interface {
 	//   string: The generated specification string in the requested format.
 	//   error: An error if the input specification is nil, uses task-id, or marshaling fails.
 	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error)
-
 	// NOTE: GetFlattenedTags is NO LONGER part of the interface.
 	// Use the package-level function GetFlattenedTags(spec interface{}) instead.
 }
@@ -307,4 +306,16 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 	default:
 		return nil, fmt.Errorf("unknown or unsupported specification type '%s' in file '%s'", base.Type, filePath)
 	}
+}
+
+// GetTaskDetailsFromPluginSpecification implements the Validator interface method.
+func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *PluginSpecification) (*TaskDetails, error) {
+	// It calls the internal (lowercase g) implementation method defined in plugin_spec.go
+	return v.getTaskDetailsFromPluginSpecificationImpl(pluginSpec)
+}
+
+// GetEmbeddedTaskSpecification implements the Validator interface method.
+func (v *defaultValidator) GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error) {
+	// It calls the internal (lowercase g) implementation method defined in plugin_spec.go
+	return v.getEmbeddedTaskSpecificationImpl(pluginSpec, format)
 }

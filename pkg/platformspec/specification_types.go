@@ -127,6 +127,7 @@ type TaskSpecification struct {
 	Configs     []interface{}            `yaml:"configs"`
 	RunSchedule []RunScheduleEntry       `yaml:"run_schedule"`
 	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
+
 }
 
 // TaskDetails (Unchanged)
@@ -145,8 +146,10 @@ type TaskDetails struct {
 	APIVersion                string
 	SupportedPlatformVersions []string
 	Metadata                  Metadata
-	IsReference               bool   `json:"is_reference"`
-	ReferencedTaskID          string `json:"referenced_task_id,omitempty"`
+	IsReference               bool                     `json:"is_reference"`
+	ReferencedTaskID          string                   `json:"referenced_task_id,omitempty"`
+	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
+
 }
 
 // --- Query Specific Structs ---
