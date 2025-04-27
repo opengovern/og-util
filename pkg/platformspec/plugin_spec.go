@@ -1,6 +1,7 @@
 package platformspec
 
 import (
+	"encoding/json" // Added for JSON marshaling
 	"errors"
 	"fmt"
 	"log"
@@ -212,7 +213,7 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 		TaskName:          discoveryTask.Name,        // Includes defaults if applied
 		TaskDescription:   discoveryTask.Description, // Includes defaults if applied
 		ValidatedImageURI: discoveryTask.ImageURL,    // Use the validated URL
-		Command:           discoveryTask.Command,     // Currently string, would work if both were []string
+		Command:           discoveryTask.Command,     // Copy the command (string or []string)
 		Timeout:           discoveryTask.Timeout,
 		ScaleConfig:       discoveryTask.ScaleConfig,
 		Params:            discoveryTask.Params,
@@ -392,4 +393,74 @@ func (v *defaultValidator) validatePluginArtifacts(spec *PluginSpecification, ar
 
 	log.Println("--- Plugin Artifact Validation Completed Successfully ---")
 	return nil
+}
+
+// GetEmbeddedTaskSpecification generates a standalone TaskSpecification representation (YAML or JSON string)
+// from the embedded discovery task within a validated PluginSpecification.
+// It includes inherited metadata and platform support details.
+func (v *defaultValidator) GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error) {
+	if pluginSpec == nil {
+		return "", errors.New("input PluginSpecification cannot be nil")
+	}
+	// Assumes pluginSpec is already validated and defaulted
+
+	log.Printf("Generating standalone specification string (format: %s) for embedded task from plugin: %s", format, pluginSpec.Name)
+
+	// 1. Access the embedded discovery task (already defaulted)
+	embeddedTask := pluginSpec.Components.Discovery
+
+	// 2. Construct the standalone TaskSpecification struct
+	// Create copies of slices/maps/pointers to avoid modifying the original pluginSpec
+	metadataCopy := pluginSpec.Metadata // Shallow copy is okay for Metadata struct itself
+	supportedVersionsCopy := make([]string, len(pluginSpec.SupportedPlatformVersions))
+	copy(supportedVersionsCopy, pluginSpec.SupportedPlatformVersions)
+	// Create a pointer to the metadata copy for the standalone task struct
+	metadataPtr := &metadataCopy
+
+	standaloneTask := TaskSpecification{
+		// Inherited fields that are REQUIRED for standalone tasks
+		APIVersion:                pluginSpec.APIVersion, // Inherit API version
+		Type:                      SpecTypeTask,          // Explicitly set type to task
+		Metadata:                  metadataPtr,           // Use pointer to the copied metadata
+		SupportedPlatformVersions: supportedVersionsCopy, // Use copied slice
+
+		// Fields copied directly from the (defaulted) embedded task
+		ID:          embeddedTask.ID,
+		Name:        embeddedTask.Name,
+		Description: embeddedTask.Description,
+		IsEnabled:   embeddedTask.IsEnabled,
+		ImageURL:    embeddedTask.ImageURL,
+		Command:     embeddedTask.Command, // Copy the command (string or []string)
+		Timeout:     embeddedTask.Timeout,
+		ScaleConfig: embeddedTask.ScaleConfig, // Copy struct
+		Params:      embeddedTask.Params,      // Copy slice
+		Configs:     embeddedTask.Configs,     // Copy slice
+		RunSchedule: embeddedTask.RunSchedule, // Copy slice
+	}
+
+	// 3. Marshal the new struct to the requested format
+	var outputBytes []byte
+	var err error
+	outputFormat := strings.ToLower(strings.TrimSpace(format))
+
+	if outputFormat == FormatJSON {
+		// Use json.MarshalIndent for pretty-printed JSON output
+		outputBytes, err = json.MarshalIndent(&standaloneTask, "", "  ") // Use 2 spaces for indentation
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal standalone task specification to JSON: %w", err)
+		}
+		log.Printf("Successfully marshaled task spec to JSON.")
+	} else {
+		// Default to YAML
+		if outputFormat != FormatYAML && format != "" {
+			log.Printf("Warning: Invalid format '%s' requested, defaulting to '%s'.", format, FormatYAML)
+		}
+		outputBytes, err = yaml.Marshal(&standaloneTask)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal standalone task specification to YAML: %w", err)
+		}
+		log.Printf("Successfully marshaled task spec to YAML.")
+	}
+
+	return string(outputBytes), nil
 }

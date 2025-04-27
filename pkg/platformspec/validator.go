@@ -35,6 +35,10 @@ const (
 	ArtifactTypePlatformBinary = "platform-binary" // Validate only the platform binary artifact.
 	ArtifactTypeCloudQLBinary  = "cloudql-binary"  // Validate only the CloudQL binary artifact.
 	ArtifactTypeAll            = "all"             // Validate all artifacts (default).
+
+	// Output Formats for GetTaskSpecification
+	FormatYAML = "yaml"
+	FormatJSON = "json"
 )
 
 // --- Global Resources (Initialized in init) ---
@@ -123,6 +127,20 @@ type Validator interface {
 	//   *SpecificationTypeInfo: A struct containing the primary type and a map of embedded type counts.
 	//   error: An error if reading or basic parsing fails.
 	IdentifySpecificationTypes(filePath string) (*SpecificationTypeInfo, error)
+
+	// GetTaskSpecification generates a standalone TaskSpecification representation (YAML or JSON string)
+	// from the embedded discovery task within a validated PluginSpecification.
+	// It includes inherited metadata and platform support details.
+	// Use this function *after* successfully calling ProcessSpecification for a plugin.
+	//
+	// Parameters:
+	//   pluginSpec: A pointer to a validated PluginSpecification struct (obtained from ProcessSpecification).
+	//   format: The desired output format ("yaml" or "json"). Defaults to "yaml" if empty or invalid.
+	//
+	// Returns:
+	//   string: The generated specification string in the requested format.
+	//   error: An error if the input specification is nil or marshaling fails.
+	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error)
 }
 
 // --- Type Identification ---
@@ -330,3 +348,4 @@ func isNonEmpty(s string) bool {
 // GetTaskDefinition is implemented in task_spec.go
 // GetTaskDetailsFromPluginSpecification is implemented in plugin_spec.go
 // CheckPlatformSupport is implemented in plugin_spec.go
+// GetTaskSpecification is implemented in plugin_spec.go
