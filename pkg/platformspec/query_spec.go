@@ -120,9 +120,7 @@ func (v *defaultValidator) validateQueryStructure(spec *QuerySpecification) erro
 	if !isNonEmpty(spec.Title) {
 		return fmt.Errorf("%s: title is required", specContext)
 	}
-	if len(spec.IntegrationType) == 0 {
-		return fmt.Errorf("%s: integration_type is required and cannot be empty", specContext)
-	}
+
 	for i, itype := range spec.IntegrationType {
 		if !isNonEmpty(itype) {
 			return fmt.Errorf("%s: integration_type entry %d cannot be empty", specContext, i)

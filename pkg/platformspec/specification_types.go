@@ -3,28 +3,33 @@ package platformspec
 
 import (
 	"fmt"
-	"log"
 
 	"gopkg.in/yaml.v3" // Ensure yaml.v3 is imported
+	// Removed "log" import as debug line is removed
 )
 
-// --- Custom Type for Flexible Tag Values ---
+// --- Custom Type for Flexible Tag/IntegrationType Values ---
 
 // StringOrSlice is a slice of strings that can be unmarshalled from
 // either a single YAML string or a YAML sequence of strings.
 type StringOrSlice []string
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface for StringOrSlice.
-// This allows the 'tags' field to accept either a single string or a list of strings in the YAML.
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface for StringOrSlice.
+// This allows fields like 'tags' or 'integration_type' to accept either
+// a single string or a list of strings in the YAML.
 func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
-	// *** ADD THIS LINE FOR DEBUGGING ***
-	log.Printf("DEBUG: StringOrSlice.UnmarshalYAML called - Node Kind: %v, Tag: %s, Value: %q", node.Kind, node.Tag, node.Value)
+	// Removed Debug log line
+	// log.Printf("DEBUG: StringOrSlice.UnmarshalYAML called - Node Kind: %v, Tag: %s, Value: %q", node.Kind, node.Tag, node.Value)
 
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" {
 		// Handle single string value
-		*s = StringOrSlice{node.Value} // Wrap the string in a slice
+		if node.Value == "" {
+			// Treat explicitly empty string as empty slice? Or error?
+			// Let's treat as empty slice for flexibility, like !!null.
+			*s = StringOrSlice{}
+			return nil
+		}
+		*s = StringOrSlice{node.Value} // Wrap the non-empty string in a slice
 		return nil
 	}
 	if node.Kind == yaml.SequenceNode {
@@ -32,26 +37,38 @@ func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
 		var multi []string
 		err := node.Decode(&multi) // Decode sequence into a standard string slice
 		if err != nil {
-			// Provide more context on sequence decoding failure
+			// Check specifically for non-string elements in the sequence
 			for _, itemNode := range node.Content {
-				if itemNode.Kind != yaml.ScalarNode || itemNode.Tag != "!!str" {
-					return fmt.Errorf("cannot unmarshal YAML sequence element (kind %v, tag %s) into string within StringOrSlice", itemNode.Kind, itemNode.Tag)
+				// Allow !!null within sequences? Let's disallow for now unless needed.
+				// Allow empty strings "" within sequences? Let's disallow for now.
+				if itemNode.Kind != yaml.ScalarNode || itemNode.Tag != "!!str" || itemNode.Value == "" {
+					// Added check for empty string value within sequence
+					return fmt.Errorf("cannot unmarshal YAML sequence element (kind %v, tag %s, value %q) into non-empty string within StringOrSlice", itemNode.Kind, itemNode.Tag, itemNode.Value)
 				}
 			}
+			// If the loop didn't find a specific non-string/empty item, return the original decode error
 			return fmt.Errorf("failed to decode YAML sequence into []string for StringOrSlice: %w", err)
 		}
+		// Check for empty strings within the successfully decoded slice
+		// (Redundant if checked above, but safe)
+		// for i, item := range multi {
+		//     if item == "" {
+		//        return fmt.Errorf("empty string at index %d is not allowed in StringOrSlice sequence", i)
+		//    }
+		// }
 		*s = StringOrSlice(multi) // Assign the decoded slice
 		return nil
 	}
+	// Handle explicit null as empty slice
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
-		*s = StringOrSlice{}
+		*s = StringOrSlice{} // Assign empty slice for null input
 		return nil
 	}
 
 	return fmt.Errorf("cannot unmarshal YAML node (kind %v, tag %s) into StringOrSlice", node.Kind, node.Tag)
 }
 
-// --- BaseSpecification, Component, Metadata (Unchanged) ---
+// --- BaseSpecification, Component, Metadata (Unchanged from your 'current' version) ---
 type BaseSpecification struct {
 	APIVersion string `yaml:"api-version"`
 	Type       string `yaml:"type"`
@@ -86,7 +103,6 @@ type PluginComponents struct {
 	CloudQLBinary  Component          `yaml:"cloudql-binary" json:"cloudql-binary"`
 }
 
-// PluginSpecification: Update Tags field type
 type PluginSpecification struct {
 	APIVersion string `yaml:"api-version"`
 	Type       string `yaml:"type"`
@@ -97,7 +113,7 @@ type PluginSpecification struct {
 	Metadata                  Metadata                 `yaml:"metadata"`
 	Components                PluginComponents         `yaml:"components"`
 	SampleData                *Component               `yaml:"sample-data,omitempty"`
-	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
+	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"` // Using StringOrSlice
 }
 
 // --- Task Specific Structs ---
@@ -113,7 +129,6 @@ type RunScheduleEntry struct {
 	Frequency string            `yaml:"frequency" json:"frequency"`
 }
 
-// TaskSpecification: Update Tags field type
 type TaskSpecification struct {
 	APIVersion                string    `yaml:"api-version,omitempty"`
 	Metadata                  *Metadata `yaml:"metadata,omitempty"`
@@ -131,11 +146,9 @@ type TaskSpecification struct {
 	Params      []string                 `yaml:"params"`
 	Configs     []interface{}            `yaml:"configs"`
 	RunSchedule []RunScheduleEntry       `yaml:"run_schedule"`
-	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
-
+	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // Using StringOrSlice
 }
 
-// TaskDetails (Unchanged)
 type TaskDetails struct {
 	TaskID                    string
 	TaskName                  string
@@ -153,8 +166,7 @@ type TaskDetails struct {
 	Metadata                  Metadata
 	IsReference               bool                     `json:"is_reference"`
 	ReferencedTaskID          string                   `json:"referenced_task_id,omitempty"`
-	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
-
+	Tags                      map[string]StringOrSlice `json:"tags,omitempty"` // Using StringOrSlice
 }
 
 // --- Query Specific Structs ---
@@ -163,29 +175,26 @@ type QueryParameter struct {
 	Value string `yaml:"value"`
 }
 
-// QuerySpecification: Update Tags field type
 type QuerySpecification struct {
-	APIVersion string `yaml:"api-version"`
-	Type       string `yaml:"type"`
-	ID         string `yaml:"id"`
+	APIVersion string `yaml:"api-version"` // Defaults to v1 if omitted via processing logic
+	Type       string `yaml:"type"`        // Must be 'query'
+	ID         string `yaml:"id"`          // Required
 
-	Title           string                   `yaml:"title"`
-	Description     string                   `yaml:"description,omitempty"`
-	IntegrationType []string                 `yaml:"integration_type"`
-	Query           string                   `yaml:"query"`
-	PrimaryTable    string                   `yaml:"primary_table,omitempty"`
-	Metadata        map[string]string        `yaml:"metadata,omitempty"`
-	IsView          bool                     `yaml:"is_view"`
-	Parameters      []QueryParameter         `yaml:"parameters"`
-	Tags            map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
-	Classification  [][]string               `yaml:"classification,omitempty"`
+	Title           string                   `yaml:"title"`                      // Required
+	Description     string                   `yaml:"description,omitempty"`      // Optional
+	IntegrationType StringOrSlice            `yaml:"integration_type,omitempty"` // *** UPDATED TYPE + omitempty ***
+	Query           string                   `yaml:"query"`                      // Required
+	PrimaryTable    string                   `yaml:"primary_table,omitempty"`    // Optional
+	Metadata        map[string]string        `yaml:"metadata,omitempty"`         // Optional
+	IsView          bool                     `yaml:"is_view"`                    // Optional, defaults false
+	Parameters      []QueryParameter         `yaml:"parameters"`                 // Optional, defaults empty slice
+	Tags            map[string]StringOrSlice `yaml:"tags,omitempty"`             // Optional, Using StringOrSlice
+	Classification  [][]string               `yaml:"classification,omitempty"`   // Optional
 
-	DetectedParams []string `yaml:"-" json:"-"`
+	DetectedParams []string `yaml:"-" json:"-"` // Internal field
 }
 
 // --- Control Specific Structs (Placeholder) ---
-
-// ControlSpecification: Update Tags field type
 type ControlSpecification struct {
 	APIVersion string `yaml:"api-version"`
 	Type       string `yaml:"type"`
@@ -197,6 +206,6 @@ type ControlSpecification struct {
 	Frameworks  []string                 `yaml:"frameworks,omitempty"`
 	LogicSource Component                `yaml:"logic-source"`
 	Parameters  map[string]interface{}   `yaml:"parameters,omitempty"`
-	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // *** UPDATED TYPE ***
+	Tags        map[string]StringOrSlice `yaml:"tags,omitempty"` // Using StringOrSlice
 	// ... other control-specific fields ...
 }
