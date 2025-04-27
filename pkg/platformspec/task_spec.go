@@ -172,6 +172,13 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 		if !isNonEmpty(spec.Type) || spec.Type != SpecTypeTask {
 			return fmt.Errorf("%s: type is required and must be '%s' for standalone task, got: '%s'", taskDesc, SpecTypeTask, spec.Type)
 		}
+		// Standalone tasks MUST have a non-empty command list with a non-empty first element
+		if spec.Command == nil || len(spec.Command) == 0 {
+			return fmt.Errorf("%s: command is required and cannot be empty for standalone task", taskDesc)
+		}
+		if !isNonEmpty(spec.Command[0]) {
+			return fmt.Errorf("%s: the first element of the command list (the executable) cannot be empty for standalone task", taskDesc)
+		}
 
 	} else { // Embedded task specific checks
 		// These fields MUST NOT be present for embedded discovery tasks (they are inherited from the plugin).
@@ -190,6 +197,13 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 			return fmt.Errorf("%s: if type is specified for embedded task, it must be '%s', got: '%s'", taskDesc, SpecTypeTask, spec.Type)
 		}
 		// Name and Description are now optional for embedded tasks, no check needed here.
+		// Command list check for embedded (must not be empty if provided)
+		if spec.Command != nil && len(spec.Command) == 0 {
+			return fmt.Errorf("%s: command list cannot be empty if provided", taskDesc)
+		}
+		if spec.Command != nil && len(spec.Command) > 0 && !isNonEmpty(spec.Command[0]) {
+			return fmt.Errorf("%s: the first element of the command list (the executable) cannot be empty if command is provided", taskDesc)
+		}
 	}
 
 	// --- Common Task Field Checks (Required for both Standalone and Embedded, except where noted for embedded) ---
@@ -205,9 +219,14 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 	if !imageDigestRegex.MatchString(spec.ImageURL) {
 		return fmt.Errorf("%s: image_url ('%s') must be in digest format (e.g., registry/repository/image@sha256:hash)", taskDesc, spec.ImageURL)
 	}
-	if len(spec.Command) > 0 && !isNonEmpty(spec.Command[0]) {
-		return fmt.Errorf("%s: command is required", taskDesc)
+	// Command presence check (must have at least one element)
+	if spec.Command == nil || len(spec.Command) == 0 {
+		return fmt.Errorf("%s: command is required and must contain at least the executable path", taskDesc)
 	}
+	if !isNonEmpty(spec.Command[0]) {
+		return fmt.Errorf("%s: the first element of the command list (the executable) cannot be empty", taskDesc)
+	}
+
 	if !isNonEmpty(spec.Timeout) {
 		return fmt.Errorf("%s: timeout is required", taskDesc)
 	}

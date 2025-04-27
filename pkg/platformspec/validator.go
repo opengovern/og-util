@@ -101,7 +101,7 @@ type Validator interface {
 	//
 	// Returns:
 	//   *TaskDetails: A struct containing details of the discovery task, including inherited fields and its validated image URI.
-	//   error: An error if the input specification is nil or if the image existence check fails.
+	//   error: An error if the input specification is nil, if the discovery component used a task-id reference, or if the image existence check fails.
 	GetTaskDetailsFromPluginSpecification(pluginSpec *PluginSpecification) (*TaskDetails, error)
 
 	// CheckPlatformSupport checks if a given PluginSpecification supports a specific platform version string
@@ -131,6 +131,7 @@ type Validator interface {
 	// GetEmbeddedTaskSpecification generates a standalone TaskSpecification representation (YAML or JSON string)
 	// from the embedded discovery task within a validated PluginSpecification.
 	// It includes inherited metadata and platform support details.
+	// Returns an error if the plugin specification uses a task-id reference instead of embedding the task spec.
 	// Use this function *after* successfully calling ProcessSpecification for a plugin.
 	//
 	// Parameters:
@@ -139,8 +140,8 @@ type Validator interface {
 	//
 	// Returns:
 	//   string: The generated specification string in the requested format.
-	//   error: An error if the input specification is nil or marshaling fails.
-	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error) // Renamed method
+	//   error: An error if the input specification is nil, uses task-id, or marshaling fails.
+	GetEmbeddedTaskSpecification(pluginSpec *PluginSpecification, format string) (string, error)
 
 	// GetFlattenedTags extracts tags from a QuerySpecification and returns them as a flat list ["key:value"].
 	// Use this function *after* successfully calling ProcessSpecification for a query.
@@ -162,11 +163,13 @@ type SpecificationTypeInfo struct {
 }
 
 // Minimal struct to check for embedded discovery task in plugins (flattened structure).
-// We use interface{} because we only care about the key's presence, not its content.
+// Checks for the presence of the task-spec key.
 type pluginDiscoveryCheck struct {
-	// Check directly under the root for 'components', then 'discovery'
 	Components struct {
-		Discovery interface{} `yaml:"discovery"`
+		Discovery struct {
+			// We only need to know if task-spec exists, value can be anything here.
+			TaskSpec interface{} `yaml:"task-spec"`
+		} `yaml:"discovery"`
 	} `yaml:"components"`
 }
 
@@ -204,10 +207,12 @@ func (v *defaultValidator) IdentifySpecificationTypes(filePath string) (*Specifi
 		var pluginCheck pluginDiscoveryCheck
 		// Unmarshal again into the minimal struct. Ignore errors here, as we only care if discovery exists.
 		if err := yaml.Unmarshal(data, &pluginCheck); err == nil {
-			// Check if the path components.discovery exists
-			if pluginCheck.Components.Discovery != nil {
+			// Check if the path components.discovery.task-spec exists and is not null
+			if pluginCheck.Components.Discovery.TaskSpec != nil {
 				log.Printf("Found embedded 'discovery' component (type: %s)", SpecTypeTask)
 				info.EmbeddedTypes[SpecTypeTask] = 1 // Currently only one known embedded task
+			} else {
+				log.Printf("Plugin discovery component does not contain an embedded 'task-spec'. It might be a 'task-id' reference.")
 			}
 		} else {
 			log.Printf("Warning: Could not perform minimal parse for embedded discovery check in '%s': %v", filePath, err)
@@ -332,7 +337,7 @@ func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion
 // --- Helper Functions ---
 
 // isNonEmpty checks if a string is non-empty after trimming whitespace.
-// Moved to utils.go if desired, keeping here for self-containment in this example.
+// Consider moving to a utils.go file if more helpers are added.
 func isNonEmpty(s string) bool {
 	return strings.TrimSpace(s) != ""
 }

@@ -36,12 +36,13 @@ type Metadata struct {
 // either by referencing an existing task ID or embedding a full task specification.
 type DiscoveryComponent struct {
 	TaskID   string             `yaml:"task-id,omitempty" json:"task-id,omitempty"`     // Reference to a standalone TaskSpecification ID. Mutually exclusive with TaskSpec.
-	TaskSpec *TaskSpecification `yaml:"task-spec,omitempty" json:"task-spec,omitempty"` // Embedded TaskSpecification details. Mutually exclusive with TaskID.
+	TaskSpec *TaskSpecification `yaml:"task-spec,omitempty" json:"task-spec,omitempty"` // Embedded TaskSpecification details. Mutually exclusive with TaskID. Use pointer to differentiate between empty and absent.
 }
 
 // PluginComponents holds the different component definitions specified for a 'plugin'.
 type PluginComponents struct {
 	// Discovery specifies how the plugin discovers resources. Uses DiscoveryComponent struct.
+	// Exactly one of task-id or task-spec must be provided under discovery.
 	Discovery      DiscoveryComponent `yaml:"discovery" json:"discovery"`
 	PlatformBinary Component          `yaml:"platform-binary" json:"platform-binary"` // Required downloadable artifact.
 	CloudQLBinary  Component          `yaml:"cloudql-binary" json:"cloudql-binary"`   // Required downloadable artifact.
@@ -124,8 +125,8 @@ type TaskDetails struct {
 	Metadata                  Metadata // Metadata from the parent plugin.
 
 	// Flag indicating if the details came from a reference
-	IsReference      bool   // True if discovery used task-id, meaning details above are incomplete.
-	ReferencedTaskID string // The ID used in task-id if IsReference is true.
+	IsReference      bool   `json:"is_reference"`                 // True if discovery used task-id, meaning details above are incomplete.
+	ReferencedTaskID string `json:"referenced_task_id,omitempty"` // The ID used in task-id if IsReference is true.
 }
 
 // --- Query Specific Structs ---

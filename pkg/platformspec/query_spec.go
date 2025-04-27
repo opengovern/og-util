@@ -14,7 +14,7 @@ import (
 // Compile regex for parameter detection once
 var queryParamRegex = regexp.MustCompile(`\{\{\.(.*?)\}\}`)
 
-// Compile regex for ID validation once
+// Compile regex for ID validation once (alphanumeric + hyphen, no leading/trailing hyphen)
 var idFormatRegex = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`)
 
 // detectQueryParams finds unique template parameters like {{.ParamName}} in a query string.

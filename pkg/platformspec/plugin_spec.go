@@ -32,7 +32,7 @@ func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platf
 	}
 
 	log.Println("Validating plugin specification structure...")
-	// Validation and defaulting for discovery component happens inside validatePluginStructure
+	// Defaulting for embedded task ID/Type/Name/Description happens inside validatePluginStructure
 	if err := v.validatePluginStructure(&spec); err != nil {
 		return nil, fmt.Errorf("plugin specification structure validation failed: %w", err)
 	}
@@ -112,7 +112,7 @@ func (v *defaultValidator) validatePluginStructure(spec *PluginSpecification) er
 	// --- Components Block Fields ---
 	components := &spec.Components // Use pointer for modification
 
-	// *** Validate Discovery Component ***
+	// *** Validate Discovery Component (Task ID Reference or Embedded Task Spec) ***
 	discoveryComp := &components.Discovery // Use pointer
 	hasTaskID := isNonEmpty(discoveryComp.TaskID)
 	hasTaskSpec := discoveryComp.TaskSpec != nil
@@ -216,20 +216,29 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 
 	discoveryComp := pluginSpec.Components.Discovery
 
-	// Check if the discovery component is a reference
+	// Check if the discovery component is a reference or missing the spec
 	if isNonEmpty(discoveryComp.TaskID) {
-		return nil, fmt.Errorf("cannot get full task details for plugin '%s': discovery component uses a task-id reference ('%s'), not an embedded task-spec", pluginSpec.Name, discoveryComp.TaskID)
+		// Return details containing mostly inherited info and the reference ID
+		log.Printf("Returning partial task details for referenced task ID '%s' from plugin '%s'", discoveryComp.TaskID, pluginSpec.Name)
+		return &TaskDetails{
+			PluginName:                pluginSpec.Name,
+			APIVersion:                pluginSpec.APIVersion,
+			SupportedPlatformVersions: pluginSpec.SupportedPlatformVersions, // Copy slice
+			Metadata:                  pluginSpec.Metadata,                  // Copy struct
+			IsReference:               true,
+			ReferencedTaskID:          discoveryComp.TaskID,
+			// Other fields (TaskID, TaskName, Image, Command etc.) are unknown
+		}, nil // Not an error, but indicates partial data
 	}
-
-	// Check if the embedded spec is somehow nil (shouldn't happen after validation)
 	if discoveryComp.TaskSpec == nil {
+		// This case should ideally be caught by validatePluginStructure, but check defensively
 		return nil, fmt.Errorf("internal error: plugin '%s' discovery component has neither task-id nor task-spec", pluginSpec.Name)
 	}
 
 	log.Printf("Getting task details from pre-validated plugin specification: %s (Version: %s)", pluginSpec.Name, pluginSpec.Version) // Use spec.Name, spec.Version
 
 	// 1. Access the embedded discovery task (ID, Name, Description, Type are guaranteed to be set by ProcessSpecification/validatePluginStructure)
-	embeddedTask := discoveryComp.TaskSpec // Use the embedded spec
+	embeddedTask := discoveryComp.TaskSpec // Use the embedded spec pointer
 
 	// 2. Validate the Image URL existence (Format check was done during ProcessSpecification)
 	log.Printf("Validating image existence for discovery task (ID: %s, Image: %s)...", embeddedTask.ID, embeddedTask.ImageURL)
@@ -262,8 +271,7 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 		Metadata:                  pluginSpec.Metadata,                  // Copy struct from spec
 
 		// Indicate this was not from a reference
-		IsReference:      false,
-		ReferencedTaskID: "",
+		IsReference: false,
 	}
 
 	log.Printf("Successfully retrieved and validated task details for task ID '%s' from plugin '%s'", details.TaskID, details.PluginName)
@@ -459,12 +467,12 @@ func (v *defaultValidator) GetEmbeddedTaskSpecification(pluginSpec *PluginSpecif
 	discoveryComp := pluginSpec.Components.Discovery
 
 	// Check if the discovery component is a reference or missing the spec
-	if !isNonEmpty(discoveryComp.TaskID) && discoveryComp.TaskSpec == nil {
-		// This case should ideally be caught by validatePluginStructure, but check defensively
-		return "", fmt.Errorf("plugin '%s' discovery component has neither task-id nor task-spec", pluginSpec.Name)
-	}
 	if isNonEmpty(discoveryComp.TaskID) {
 		return "", fmt.Errorf("plugin '%s' uses task-id reference ('%s') for discovery; cannot generate embedded specification", pluginSpec.Name, discoveryComp.TaskID)
+	}
+	if discoveryComp.TaskSpec == nil {
+		// This case should ideally be caught by validatePluginStructure, but check defensively
+		return "", fmt.Errorf("internal error: plugin '%s' discovery component has neither task-id nor task-spec", pluginSpec.Name)
 	}
 
 	log.Printf("Generating standalone specification string (format: %s) for embedded task from plugin: %s", format, pluginSpec.Name)
