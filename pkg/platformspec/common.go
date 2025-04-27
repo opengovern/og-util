@@ -40,7 +40,7 @@ func (v *defaultValidator) CheckPlatformSupport(pluginSpec *PluginSpecification,
 		return false, fmt.Errorf("invalid platform version format '%s': %w", platformVersion, err)
 	}
 
-	supportedVersions := pluginSpec.Plugin.SupportedPlatformVersions
+	supportedVersions := pluginSpec.SupportedPlatformVersions // Access directly from spec
 	// Structure validation already ensured this is not empty.
 
 	// Check against each constraint defined in the manifest
@@ -54,14 +54,14 @@ func (v *defaultValidator) CheckPlatformSupport(pluginSpec *PluginSpecification,
 		}
 		// Check if the current platform version satisfies the constraint
 		if constraints.Check(currentV) {
-			log.Printf("Platform version '%s' matches constraint '%s' for plugin '%s'.", platformVersion, constraintStr, pluginSpec.Plugin.Name)
-			return true, nil // Found a matching constraint
+			log.Printf("Platform version '%s' matches constraint '%s' for plugin '%s'.", platformVersion, constraintStr, pluginSpec.Name) // Use spec.Name
+			return true, nil                                                                                                              // Found a matching constraint
 		}
 	}
 
 	// If no constraint matched
 	log.Printf("Platform version '%s' does not satisfy any supported-platform-versions constraints %v for plugin '%s'.",
-		platformVersion, supportedVersions, pluginSpec.Plugin.Name)
+		platformVersion, supportedVersions, pluginSpec.Name) // Use spec.Name
 	return false, nil
 }
 

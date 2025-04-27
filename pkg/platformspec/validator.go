@@ -133,14 +133,13 @@ type SpecificationTypeInfo struct {
 	EmbeddedTypes map[string]int // Key: type name (e.g., "task"), Value: count
 }
 
-// Minimal struct to check for embedded discovery task in plugins.
+// Minimal struct to check for embedded discovery task in plugins (flattened structure).
 // We use interface{} because we only care about the key's presence, not its content.
 type pluginDiscoveryCheck struct {
-	Plugin struct {
-		Components struct {
-			Discovery interface{} `yaml:"discovery"`
-		} `yaml:"components"`
-	} `yaml:"plugin"`
+	// Check directly under the root for 'components', then 'discovery'
+	Components struct {
+		Discovery interface{} `yaml:"discovery"`
+	} `yaml:"components"`
 }
 
 // IdentifySpecificationTypes reads a specification file and quickly identifies the primary type
@@ -173,12 +172,12 @@ func (v *defaultValidator) IdentifySpecificationTypes(filePath string) (*Specifi
 	// 2. Check for Known Embeddings based on Primary Type
 	switch primaryType {
 	case SpecTypePlugin:
-		// Check for embedded discovery task
+		// Check for embedded discovery task using the updated minimal struct
 		var pluginCheck pluginDiscoveryCheck
 		// Unmarshal again into the minimal struct. Ignore errors here, as we only care if discovery exists.
 		if err := yaml.Unmarshal(data, &pluginCheck); err == nil {
-			// Check if the path plugin.components.discovery exists
-			if pluginCheck.Plugin.Components.Discovery != nil {
+			// Check if the path components.discovery exists
+			if pluginCheck.Components.Discovery != nil {
 				log.Printf("Found embedded 'discovery' component (type: %s)", SpecTypeTask)
 				info.EmbeddedTypes[SpecTypeTask] = 1 // Currently only one known embedded task
 			}

@@ -15,6 +15,7 @@ import (
 // It's called by ProcessSpecification in validator.go.
 func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (*PluginSpecification, error) {
 	var spec PluginSpecification
+	// Unmarshal directly into the flattened PluginSpecification struct
 	if err := yaml.Unmarshal(data, &spec); err != nil {
 		return nil, fmt.Errorf("failed to parse specification file '%s' as plugin: %w", filePath, err)
 	}
@@ -42,13 +43,13 @@ func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platf
 		log.Printf("Checking platform support for version: %s", platformVersion)
 		supported, supportErr := v.CheckPlatformSupport(&spec, platformVersion)
 		if supportErr != nil {
-			log.Printf("Warning: Error checking platform support for plugin '%s': %v", spec.Plugin.Name, supportErr)
+			log.Printf("Warning: Error checking platform support for plugin '%s': %v", spec.Name, supportErr) // Use spec.Name
 		} else {
 			status := "IS NOT"
 			if supported {
 				status = "IS"
 			}
-			log.Printf("Platform version %s %s supported by plugin '%s' version '%s'.", platformVersion, status, spec.Plugin.Name, spec.Plugin.Version)
+			log.Printf("Platform version %s %s supported by plugin '%s' version '%s'.", platformVersion, status, spec.Name, spec.Version) // Use spec.Name, spec.Version
 		}
 	} else {
 		log.Println("Skipping platform support check (no platform version provided).")
@@ -78,72 +79,72 @@ func (v *defaultValidator) validatePluginStructure(spec *PluginSpecification) er
 	}
 	// API Version and Type already validated by processPluginSpec
 
-	// --- Plugin Block Fields ---
-	plugin := &spec.Plugin // Use pointer for potential modification of embedded task
-	if !isNonEmpty(plugin.Name) {
-		return errors.New("plugin.name is required")
+	// --- Top-Level Plugin Fields ---
+	if !isNonEmpty(spec.Name) {
+		return errors.New("plugin name is required at the top level")
 	}
-	if !isNonEmpty(plugin.Version) {
-		return errors.New("plugin.version is required")
+	if !isNonEmpty(spec.Version) {
+		return errors.New("plugin version is required at the top level")
 	}
-	if _, err := semver.NewVersion(plugin.Version); err != nil {
-		return fmt.Errorf("plugin.version: invalid semantic version format '%s': %w", plugin.Version, err)
+	if _, err := semver.NewVersion(spec.Version); err != nil {
+		return fmt.Errorf("plugin version: invalid semantic version format '%s': %w", spec.Version, err)
 	}
-	if len(plugin.SupportedPlatformVersions) == 0 {
-		return errors.New("plugin.supported-platform-versions requires at least one constraint entry")
+	if len(spec.SupportedPlatformVersions) == 0 {
+		return errors.New("plugin supported-platform-versions requires at least one constraint entry at the top level")
 	}
-	for i, constraintStr := range plugin.SupportedPlatformVersions {
+	for i, constraintStr := range spec.SupportedPlatformVersions {
 		if !isNonEmpty(constraintStr) {
-			return fmt.Errorf("plugin.supported-platform-versions entry %d: cannot be empty", i)
+			return fmt.Errorf("plugin supported-platform-versions entry %d: cannot be empty", i)
 		}
 		if _, err := semver.NewConstraint(constraintStr); err != nil {
-			return fmt.Errorf("plugin.supported-platform-versions entry %d ('%s'): is not a valid semantic version constraint: %w", i, constraintStr, err)
+			return fmt.Errorf("plugin supported-platform-versions entry %d ('%s'): is not a valid semantic version constraint: %w", i, constraintStr, err)
 		}
 	}
 
 	// --- Metadata Block Fields ---
+	// Use the helper function for metadata validation
 	// Assumes validateMetadata exists in metadata_validation.go
-	if err := v.validateMetadata(&plugin.Metadata, fmt.Sprintf("plugin '%s' metadata", plugin.Name)); err != nil {
+	if err := v.validateMetadata(&spec.Metadata, fmt.Sprintf("plugin '%s' metadata", spec.Name)); err != nil {
 		return err // Error from validateMetadata is already contextualized
 	}
 
 	// --- Components Block Fields ---
-	components := &plugin.Components // Use pointer for modification
+	components := &spec.Components // Use pointer for modification
 
 	// *** Validate Embedded Discovery Task Structure ***
 	// Pass 'false' for isStandalone. Metadata and APIVersion checks happen inside.
 	// ID, Name, Description, Type are optional here.
 	// Assumes validateTaskStructure exists in task_spec.go
 	if err := v.validateTaskStructure(&components.Discovery, false); err != nil { // false = embedded
-		return fmt.Errorf("plugin.components.discovery task validation failed: %w", err)
+		return fmt.Errorf("plugin components.discovery task validation failed: %w", err)
 	}
 
 	// *** Default ID, Type, Name, Description for Embedded Discovery Task ***
-	discoveryTask := &components.Discovery // Use pointer to modify
-	defaultSuffix := "-task"               // Suffix for default values
-	defaultID := plugin.Name + defaultSuffix
-	defaultName := plugin.Name + defaultSuffix
-	defaultDescription := plugin.Name + " Task" // Default description
+	discoveryTask := &components.Discovery    // Use pointer to modify
+	defaultSuffix := "-task"                  // Suffix for default values
+	defaultID := spec.Name + defaultSuffix    // Use top-level Name
+	defaultName := spec.Name + defaultSuffix  // Use top-level Name
+	defaultDescription := spec.Name + " Task" // Use top-level Name
 
 	if !isNonEmpty(discoveryTask.ID) {
-		log.Printf("Info: Embedded discovery task for plugin '%s' is missing 'id'. Defaulting to '%s'.", plugin.Name, defaultID)
+		log.Printf("Info: Embedded discovery task for plugin '%s' is missing 'id'. Defaulting to '%s'.", spec.Name, defaultID)
 		discoveryTask.ID = defaultID
 	}
 	if !isNonEmpty(discoveryTask.Name) {
-		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'name'. Defaulting to '%s'.", plugin.Name, discoveryTask.ID, defaultName)
+		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'name'. Defaulting to '%s'.", spec.Name, discoveryTask.ID, defaultName)
 		discoveryTask.Name = defaultName
 	}
 	if !isNonEmpty(discoveryTask.Description) {
-		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'description'. Defaulting to '%s'.", plugin.Name, discoveryTask.ID, defaultDescription)
+		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'description'. Defaulting to '%s'.", spec.Name, discoveryTask.ID, defaultDescription)
 		discoveryTask.Description = defaultDescription
 	}
 	if !isNonEmpty(discoveryTask.Type) {
-		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'type'. Defaulting to '%s'.", plugin.Name, discoveryTask.ID, SpecTypeTask)
+		log.Printf("Info: Embedded discovery task for plugin '%s' (ID: %s) is missing 'type'. Defaulting to '%s'.", spec.Name, discoveryTask.ID, SpecTypeTask)
 		discoveryTask.Type = SpecTypeTask // Default Type to "task"
 	}
 	// Post-defaulting check: Ensure type is indeed "task" (covers case where it was specified incorrectly)
 	if discoveryTask.Type != SpecTypeTask {
-		return fmt.Errorf("plugin.components.discovery task (ID: %s): type must be '%s' if specified, got '%s'", discoveryTask.ID, SpecTypeTask, discoveryTask.Type)
+		return fmt.Errorf("plugin components.discovery task (ID: %s): type must be '%s' if specified, got '%s'", discoveryTask.ID, SpecTypeTask, discoveryTask.Type)
 	}
 
 	// *** Validate Downloadable Component References ***
@@ -151,30 +152,30 @@ func (v *defaultValidator) validatePluginStructure(spec *PluginSpecification) er
 	cloudqlComp := components.CloudQLBinary
 
 	if !isNonEmpty(platformComp.URI) {
-		return errors.New("plugin.components.platform-binary.uri is required")
+		return errors.New("plugin components.platform-binary.uri is required")
 	}
 	if !isNonEmpty(cloudqlComp.URI) {
-		return errors.New("plugin.components.cloudql-binary.uri is required")
+		return errors.New("plugin components.cloudql-binary.uri is required")
 	}
 
 	// If URIs are the same, both components MUST specify a PathInArchive.
 	if platformComp.URI == cloudqlComp.URI {
 		log.Printf("Info: PlatformBinary and CloudQLBinary share the same URI: %s. PathInArchive is required for both.", platformComp.URI)
 		if !isNonEmpty(platformComp.PathInArchive) {
-			return fmt.Errorf("plugin.components.platform-binary.path-in-archive is required when its URI ('%s') matches cloudql-binary.uri", platformComp.URI)
+			return fmt.Errorf("plugin components.platform-binary.path-in-archive is required when its URI ('%s') matches cloudql-binary.uri", platformComp.URI)
 		}
 		if !isNonEmpty(cloudqlComp.PathInArchive) {
-			return fmt.Errorf("plugin.components.cloudql-binary.path-in-archive is required when its URI ('%s') matches platform-binary.uri", cloudqlComp.URI)
+			return fmt.Errorf("plugin components.cloudql-binary.path-in-archive is required when its URI ('%s') matches platform-binary.uri", cloudqlComp.URI)
 		}
 		if platformComp.PathInArchive == cloudqlComp.PathInArchive {
-			return fmt.Errorf("plugin.components.platform-binary.path-in-archive ('%s') cannot be the same as cloudql-binary.path-in-archive ('%s') when URIs match", platformComp.PathInArchive, cloudqlComp.PathInArchive)
+			return fmt.Errorf("plugin components.platform-binary.path-in-archive ('%s') cannot be the same as cloudql-binary.path-in-archive ('%s') when URIs match", platformComp.PathInArchive, cloudqlComp.PathInArchive)
 		}
 	}
 
 	// --- Sample Data (Optional) ---
-	if plugin.SampleData != nil {
-		if !isNonEmpty(plugin.SampleData.URI) {
-			return errors.New("plugin.sample-data.uri is required when the sample-data section is present")
+	if spec.SampleData != nil { // Access SampleData directly from spec
+		if !isNonEmpty(spec.SampleData.URI) {
+			return errors.New("plugin sample-data.uri is required when the sample-data section is present")
 		}
 	}
 
@@ -189,10 +190,10 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 	}
 	// Assume pluginSpec is already structurally validated and defaulted by ProcessSpecification
 
-	log.Printf("Getting task details from pre-validated plugin specification: %s (Version: %s)", pluginSpec.Plugin.Name, pluginSpec.Plugin.Version)
+	log.Printf("Getting task details from pre-validated plugin specification: %s (Version: %s)", pluginSpec.Name, pluginSpec.Version) // Use spec.Name, spec.Version
 
 	// 1. Access the embedded discovery task (ID, Name, Description, Type are guaranteed to be set by ProcessSpecification/validatePluginStructure)
-	discoveryTask := pluginSpec.Plugin.Components.Discovery
+	discoveryTask := pluginSpec.Components.Discovery // Access components directly
 
 	// 2. Validate the Image URL existence (Format check was done during ProcessSpecification)
 	log.Printf("Validating image existence for discovery task (ID: %s, Image: %s)...", discoveryTask.ID, discoveryTask.ImageURL)
@@ -200,7 +201,7 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 	if err := v.validateImageManifestExists(discoveryTask.ImageURL); err != nil {
 		// Wrap error for better context
 		return nil, fmt.Errorf("discovery task image URI existence check failed for '%s' (plugin: %s): %w",
-			discoveryTask.ImageURL, pluginSpec.Plugin.Name, err)
+			discoveryTask.ImageURL, pluginSpec.Name, err) // Use spec.Name
 	}
 	log.Printf("Image existence validated successfully for: %s", discoveryTask.ImageURL)
 
@@ -219,10 +220,10 @@ func (v *defaultValidator) GetTaskDetailsFromPluginSpecification(pluginSpec *Plu
 		RunSchedule:       discoveryTask.RunSchedule,
 
 		// Inherited fields from PluginSpecification
-		PluginName:                pluginSpec.Plugin.Name,
+		PluginName:                pluginSpec.Name, // Use spec.Name
 		APIVersion:                pluginSpec.APIVersion,
-		SupportedPlatformVersions: pluginSpec.Plugin.SupportedPlatformVersions, // Copy slice
-		Metadata:                  pluginSpec.Plugin.Metadata,                  // Copy struct
+		SupportedPlatformVersions: pluginSpec.SupportedPlatformVersions, // Copy slice from spec
+		Metadata:                  pluginSpec.Metadata,                  // Copy struct from spec
 	}
 
 	log.Printf("Successfully retrieved and validated task details for task ID '%s' from plugin '%s'", details.TaskID, details.PluginName)
@@ -274,10 +275,11 @@ func (v *defaultValidator) validatePluginArtifacts(spec *PluginSpecification, ar
 	errChan := make(chan error, 3) // Buffered channel to collect errors from goroutines
 	var platformData []byte        // To store downloaded data for shared URI case
 
-	platformComp := spec.Plugin.Components.PlatformBinary
-	cloudqlComp := spec.Plugin.Components.CloudQLBinary
-	// Use ImageURL from embedded task (ID/Type are guaranteed to be set by validatePluginStructure)
-	discoveryImageURL := spec.Plugin.Components.Discovery.ImageURL
+	// Access components directly from spec
+	platformComp := spec.Components.PlatformBinary
+	cloudqlComp := spec.Components.CloudQLBinary
+	// Use ImageURL from embedded task (ID/Type/Name/Desc are guaranteed to be set by validatePluginStructure)
+	discoveryImageURL := spec.Components.Discovery.ImageURL
 
 	// --- Validate Discovery Task Image ---
 	if validateDiscovery {

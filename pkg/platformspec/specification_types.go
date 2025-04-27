@@ -32,20 +32,10 @@ type Metadata struct {
 
 // --- Plugin Specific Structs ---
 
-// Plugin defines the core details specified for a plugin.
-type Plugin struct {
-	Name                      string           `yaml:"name" json:"name"`                                               // Required: Name of the plugin. Used as default ID/name base for embedded discovery task if omitted.
-	Version                   string           `yaml:"version" json:"version"`                                         // Required: Semantic version of the plugin (e.g., "1.2.3").
-	SupportedPlatformVersions []string         `yaml:"supported-platform-versions" json:"supported-platform-versions"` // Required: List of platform version constraints (e.g., ">=1.0.0, <2.0.0").
-	Metadata                  Metadata         `yaml:"metadata" json:"metadata"`                                       // Required: Metadata about the plugin.
-	Components                PluginComponents `yaml:"components" json:"components"`                                   // Required: Defines the core functional parts of the plugin.
-	SampleData                *Component       `yaml:"sample-data,omitempty" json:"sample-data,omitempty"`             // Optional: Reference to downloadable sample data.
-}
-
 // PluginComponents holds the different component definitions specified for a 'plugin'.
 type PluginComponents struct {
 	// Discovery component IS the embedded task definition used for discovering resources.
-	// It inherits metadata implicitly from the parent Plugin.
+	// It inherits metadata implicitly from the parent PluginSpecification.
 	// Its 'id', 'name', 'description', 'type' default if omitted.
 	Discovery      TaskSpecification `yaml:"discovery" json:"discovery"`
 	PlatformBinary Component         `yaml:"platform-binary" json:"platform-binary"` // Required downloadable artifact.
@@ -53,10 +43,18 @@ type PluginComponents struct {
 }
 
 // PluginSpecification is the top-level structure for the 'plugin' type specification file.
+// Fields previously under 'plugin:' are now direct fields of this struct.
 type PluginSpecification struct {
-	APIVersion string `yaml:"api-version"` // Will be validated to be v1.
-	Type       string `yaml:"type"`        // Will be validated to be 'plugin'.
-	Plugin     Plugin `yaml:"plugin"`      // Contains the plugin details.
+	APIVersion string `yaml:"api-version"` // Required: Must be "v1".
+	Type       string `yaml:"type"`        // Required: Must be "plugin".
+
+	// --- Fields moved from nested Plugin struct ---
+	Name                      string           `yaml:"name"`                        // Required: Name of the plugin. Used as default ID/name base for embedded discovery task if omitted.
+	Version                   string           `yaml:"version"`                     // Required: Semantic version of the plugin (e.g., "1.2.3").
+	SupportedPlatformVersions []string         `yaml:"supported-platform-versions"` // Required: List of platform version constraints (e.g., ">=1.0.0, <2.0.0").
+	Metadata                  Metadata         `yaml:"metadata"`                    // Required: Metadata about the plugin.
+	Components                PluginComponents `yaml:"components"`                  // Required: Defines the core functional parts of the plugin.
+	SampleData                *Component       `yaml:"sample-data,omitempty"`       // Optional: Reference to downloadable sample data.
 }
 
 // --- Task Specific Structs ---
