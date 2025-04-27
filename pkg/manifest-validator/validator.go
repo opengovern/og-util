@@ -328,12 +328,10 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 
 	// 1. Determine Manifest Type
 	var base manifestBase
+	// FIX #1: Use err.Error() for yaml.TypeError as Line field is not available.
+	// The default error message from yaml.v3 usually includes line info.
 	if err := yaml.Unmarshal(data, &base); err != nil {
-		var yamlErr *yaml.TypeError
-		if errors.As(err, &yamlErr) {
-			return nil, fmt.Errorf("failed to parse manifest type from '%s' (YAML error on line %d: %s): %w", filePath, yamlErr.Line, yamlErr.Errors, err)
-		}
-		return nil, fmt.Errorf("failed to parse manifest type from '%s' (invalid YAML structure?): %w", filePath, err)
+		return nil, fmt.Errorf("failed to parse manifest type from '%s': %w", filePath, err)
 	}
 	log.Printf("Detected manifest type: '%s'", base.Type)
 
@@ -342,6 +340,7 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 	case ManifestTypePlugin:
 		var manifest PluginManifest
 		if err := yaml.Unmarshal(data, &manifest); err != nil {
+			// FIX #1 (applied here too)
 			return nil, fmt.Errorf("failed to parse manifest file '%s' as plugin: %w", filePath, err)
 		}
 
@@ -383,6 +382,7 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 	case ManifestTypeTask:
 		var manifest TaskManifest
 		if err := yaml.Unmarshal(data, &manifest); err != nil {
+			// FIX #1 (applied here too)
 			return nil, fmt.Errorf("failed to parse manifest file '%s' as task: %w", filePath, err)
 		}
 
@@ -422,6 +422,7 @@ func (v *defaultValidator) GetTaskDefinition(filePath string) (*TaskManifest, er
 
 	var base manifestBase
 	if err := yaml.Unmarshal(data, &base); err != nil {
+		// FIX #1 (applied here too)
 		return nil, fmt.Errorf("failed to parse manifest type from '%s' (invalid YAML?): %w", filePath, err)
 	}
 	if strings.ToLower(base.Type) != ManifestTypeTask {
@@ -430,6 +431,7 @@ func (v *defaultValidator) GetTaskDefinition(filePath string) (*TaskManifest, er
 
 	var manifest TaskManifest
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		// FIX #1 (applied here too)
 		return nil, fmt.Errorf("failed to parse manifest file '%s' as task (check syntax): %w", filePath, err)
 	}
 
@@ -1014,9 +1016,10 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 		}
 
 		// 3. Resolve the manifest by digest
-		log.Printf("Attempting to resolve digest '%s' in repository '%s'...", ref.Reference, repo.Reference().Repository)
-		_, err = repo.Resolve(ctx, ref.Reference)
-		cancel() // Release context resources after the operation
+		// FIX #2: Use ref.Repository and ref.Reference from the parsed reference, not repo.Reference
+		log.Printf("Attempting to resolve digest '%s' in repository '%s'...", ref.Reference, ref.Repository)
+		_, err = repo.Resolve(ctx, ref.Reference) // ref.Reference contains the digest
+		cancel()                                  // Release context resources after the operation
 
 		// 4. Handle results
 		if err == nil {
