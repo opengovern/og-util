@@ -17,6 +17,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.3.0
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/envoyproxy/go-control-plane v0.13.0
+	github.com/github/go-spdx/v2 v2.3.2
 	github.com/globocom/echo-prometheus v0.1.2
 	github.com/gogo/googleapis v1.4.1
 	github.com/golang/protobuf v1.5.4

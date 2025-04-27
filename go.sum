@@ -399,6 +399,8 @@ github.com/gertd/go-pluralize v0.2.1 h1:M3uASbVjMnTsPb0PNqg+E/24Vwigyo/tvyMTtAlL
 github.com/gertd/go-pluralize v0.2.1/go.mod h1:rbYaKDbsXxmRfr8uygAEKhOWsjyrrqrkHVpZvoOp8zk=
 github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
+github.com/github/go-spdx/v2 v2.3.2 h1:IfdyNHTqzs4zAJjXdVQfRnxt1XMfycXoHBE2Vsm1bjs=
+github.com/github/go-spdx/v2 v2.3.2/go.mod h1:2ZxKsOhvBp+OYBDlsGnUMcchLeo2mrpEBn2L1C+U3IQ=
 github.com/globocom/echo-prometheus v0.1.2 h1:tyusm7z6+873CHVhnl6QN8VOaKvNVgWfbNaiELkTRGc=
 github.com/globocom/echo-prometheus v0.1.2/go.mod h1:3oQLuoG5ZI5nufWK0ILpMl4vmw1q9OIPe2iy+ToRE+A=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
