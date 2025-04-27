@@ -27,7 +27,7 @@ const (
 )
 
 // CheckPlatformSupport checks platform compatibility using an already validated PluginSpecification.
-func (v *defaultValidator) CheckPlatformSupport(pluginSpec *PluginSpecification, platformVersion string) (bool, error) {
+func (v *defaultValidator) checkPlatformSupportImpl(pluginSpec *PluginSpecification, platformVersion string) (bool, error) {
 	if pluginSpec == nil {
 		return false, errors.New("plugin specification cannot be nil for platform support check")
 	}
