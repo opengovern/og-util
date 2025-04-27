@@ -3,6 +3,7 @@ package platformspec
 
 import (
 	"fmt"
+	"log"
 
 	"gopkg.in/yaml.v3" // Ensure yaml.v3 is imported
 )
@@ -15,7 +16,12 @@ type StringOrSlice []string
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface for StringOrSlice.
 // This allows the 'tags' field to accept either a single string or a list of strings in the YAML.
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface for StringOrSlice.
 func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
+	// *** ADD THIS LINE FOR DEBUGGING ***
+	log.Printf("DEBUG: StringOrSlice.UnmarshalYAML called - Node Kind: %v, Tag: %s, Value: %q", node.Kind, node.Tag, node.Value)
+
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" {
 		// Handle single string value
 		*s = StringOrSlice{node.Value} // Wrap the string in a slice
@@ -37,7 +43,6 @@ func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
 		*s = StringOrSlice(multi) // Assign the decoded slice
 		return nil
 	}
-	// Handle explicit null as empty slice
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!null" {
 		*s = StringOrSlice{}
 		return nil
