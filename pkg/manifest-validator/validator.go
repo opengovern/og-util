@@ -1,6 +1,6 @@
 // Package pluginmanifest provides utilities for loading, validating, and verifying plugin manifests
 // (both 'plugin' and 'task' types) and their associated downloadable components.
-package manifestvalidator
+package pluginmanifest
 
 import (
 	// Standard library imports
@@ -37,96 +37,99 @@ import (
 )
 
 // --- Struct Definitions ---
-// (Struct definitions for PluginManifest, TaskManifest, Component, Metadata, etc. remain the same)
 
-// Component represents a single functional part of the plugin or task.
+// Component represents a downloadable component part of a plugin (PlatformBinary, CloudQLBinary, SampleData).
 type Component struct {
 	URI           string `yaml:"uri,omitempty" json:"uri,omitempty"`
-	ImageURI      string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"` // Used by Plugin:Discovery
 	PathInArchive string `yaml:"path-in-archive,omitempty" json:"path-in-archive,omitempty"`
 	Checksum      string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
+	// ImageURI removed as it's handled within TaskManifest now
 }
 
 // Metadata holds descriptive information about the plugin.
 type Metadata struct {
-	Author        string `yaml:"author" json:"author"`
-	PublishedDate string `yaml:"published-date" json:"published-date"`
-	Contact       string `yaml:"contact" json:"contact"`
-	License       string `yaml:"license" json:"license"`
-	Description   string `yaml:"description,omitempty" json:"description,omitempty"`
-	Website       string `yaml:"website,omitempty" json:"website,omitempty"`
+	Author        string `yaml:"author" json:"author"`                               // Required
+	PublishedDate string `yaml:"published-date" json:"published-date"`               // Required
+	Contact       string `yaml:"contact" json:"contact"`                             // Required
+	License       string `yaml:"license" json:"license"`                             // Required
+	Description   string `yaml:"description,omitempty" json:"description,omitempty"` // Optional
+	Website       string `yaml:"website,omitempty" json:"website,omitempty"`         // Optional
 }
 
-// Plugin defines the core details of the plugin.
+// ScaleConfig defines the scaling parameters for a task.
+type ScaleConfig struct {
+	LagThreshold string `yaml:"lag_threshold" json:"lag_threshold"` // Required: string representing positive integer
+	MinReplica   int    `yaml:"min_replica" json:"min_replica"`     // Required: >= 0
+	MaxReplica   int    `yaml:"max_replica" json:"max_replica"`     // Required: >= MinReplica
+}
+
+// RunScheduleEntry defines a single scheduled run configuration for a task.
+type RunScheduleEntry struct {
+	ID        string            `yaml:"id" json:"id"`               // Required
+	Params    map[string]string `yaml:"params" json:"params"`       // Required
+	Frequency string            `yaml:"frequency" json:"frequency"` // Required
+}
+
+// TaskManifest defines the structure for a task, used standalone or embedded in PluginComponents.Discovery.
+type TaskManifest struct {
+	// APIVersion of the manifest schema (Required ONLY for standalone tasks, must be "v1").
+	APIVersion string `yaml:"api-version,omitempty" json:"api-version,omitempty"`
+	// ID is the unique identifier for the task (Required).
+	ID string `yaml:"id" json:"id"`
+	// Name is the human-readable name of the task (Required).
+	Name string `yaml:"name" json:"name"`
+	// Description explains the purpose of the task (Required).
+	Description string `yaml:"description" json:"description"`
+	// IsEnabled determines if the task is active (Required).
+	IsEnabled bool `yaml:"is_enabled" json:"is_enabled"`
+	// Type must be "task" (Required).
+	Type string `yaml:"type" json:"type"`
+	// ImageURL is the container image URI (digest format required) (Required).
+	ImageURL string `yaml:"image_url" json:"image_url"`
+	// Command is the entrypoint command for the container (Required).
+	Command string `yaml:"command" json:"command"`
+	// Timeout specifies the maximum execution time (e.g., "5m", "1h") (Required, < 24h).
+	Timeout string `yaml:"timeout" json:"timeout"`
+	// ScaleConfig defines scaling parameters (Required).
+	ScaleConfig ScaleConfig `yaml:"scale_config" json:"scale_config"`
+	// Params lists the expected parameter names for the task (Required, list, can be empty).
+	Params []string `yaml:"params" json:"params"`
+	// Configs lists any required configuration identifiers (Required, list, can be empty).
+	Configs []interface{} `yaml:"configs" json:"configs"`
+	// RunSchedule defines when and how the task runs (Required, list, min 1 entry, needs default if params exist).
+	RunSchedule []RunScheduleEntry `yaml:"run_schedule" json:"run_schedule"`
+	// SupportedPlatformVersions lists platform versions compatible ONLY for standalone tasks (Optional in YAML, Required if standalone).
+	SupportedPlatformVersions []string `yaml:"supported-platform-versions,omitempty" json:"supported-platform-versions,omitempty"`
+}
+
+// PluginComponents holds the different component definitions for a 'plugin' manifest.
+type PluginComponents struct {
+	// Discovery component IS the embedded task definition.
+	Discovery TaskManifest `yaml:"discovery" json:"discovery"` // Changed type to TaskManifest
+	// PlatformBinary component is a downloadable artifact.
+	PlatformBinary Component `yaml:"platform-binary" json:"platform-binary"`
+	// CloudQLBinary component is a downloadable artifact.
+	CloudQLBinary Component `yaml:"cloudql-binary" json:"cloudql-binary"`
+}
+
+// Plugin defines the core details of the plugin manifest type.
 type Plugin struct {
 	Name                      string           `yaml:"name" json:"name"`
 	Version                   string           `yaml:"version" json:"version"`
 	SupportedPlatformVersions []string         `yaml:"supported-platform-versions" json:"supported-platform-versions"`
 	Metadata                  Metadata         `yaml:"metadata" json:"metadata"`
 	Components                PluginComponents `yaml:"components" json:"components"`
-	SampleData                *Component       `yaml:"sample-data,omitempty" json:"sample-data,omitempty"`
-}
-
-// PluginComponents holds the different component definitions.
-type PluginComponents struct {
-	Discovery      Component `yaml:"discovery" json:"discovery"`
-	PlatformBinary Component `yaml:"platform-binary" json:"platform-binary"`
-	CloudQLBinary  Component `yaml:"cloudql-binary" json:"cloudql-binary"`
+	SampleData                *Component       `yaml:"sample-data,omitempty" json:"sample-data,omitempty"` // Sample data still uses basic component
 }
 
 // PluginManifest is the top-level structure for the 'plugin' type manifest file.
 type PluginManifest struct {
+	// APIVersion of the manifest schema (Required for plugins, must be "v1").
 	APIVersion string `yaml:"api-version" json:"api-version"`
-	Type       string `yaml:"type" json:"type"` // Should be "plugin"
-	Plugin     Plugin `yaml:"plugin" json:"plugin"`
-}
-
-// ScaleConfig defines the scaling parameters for a task.
-type ScaleConfig struct {
-	// LagThreshold is the threshold (e.g., queue size) triggering scaling. (Required, string representing positive integer)
-	LagThreshold string `yaml:"lag_threshold" json:"lag_threshold"`
-	// MinReplica is the minimum number of replicas. (Required, >= 0)
-	MinReplica int `yaml:"min_replica" json:"min_replica"`
-	// MaxReplica is the maximum number of replicas. (Required, >= MinReplica)
-	MaxReplica int `yaml:"max_replica" json:"max_replica"`
-}
-
-// RunScheduleEntry defines a single scheduled run configuration for a task.
-type RunScheduleEntry struct {
-	// ID is the unique identifier for this schedule entry. (Required)
-	ID string `yaml:"id" json:"id"`
-	// Params specific to this scheduled run. (Required, map)
-	Params map[string]string `yaml:"params" json:"params"`
-	// Frequency defines how often this schedule runs (e.g., "1d", "15m", cron format). (Required)
-	Frequency string `yaml:"frequency" json:"frequency"`
-}
-
-// TaskManifest is the top-level structure for the 'task' type manifest file.
-type TaskManifest struct {
-	// ID is the unique identifier for the task. (Required)
-	ID string `yaml:"id" json:"id"`
-	// Name is the human-readable name of the task. (Required)
-	Name string `yaml:"name" json:"name"`
-	// Description explains the purpose of the task. (Required)
-	Description string `yaml:"description" json:"description"`
-	// IsEnabled determines if the task is active. (Required)
-	IsEnabled bool `yaml:"is_enabled" json:"is_enabled"`
-	// Type must be "task". (Required)
+	// Type of the manifest (Required, must be "plugin").
 	Type string `yaml:"type" json:"type"`
-	// ImageURL is the container image URI (tag or digest). (Required)
-	ImageURL string `yaml:"image_url" json:"image_url"`
-	// Command is the entrypoint command for the container. (Required)
-	Command string `yaml:"command" json:"command"`
-	// Timeout specifies the maximum execution time (e.g., "5m", "1h"). (Required, < 24h)
-	Timeout string `yaml:"timeout" json:"timeout"`
-	// ScaleConfig defines scaling parameters. (Required)
-	ScaleConfig ScaleConfig `yaml:"scale_config" json:"scale_config"`
-	// Params lists the expected parameter names for the task. (Required, list, can be empty)
-	Params []string `yaml:"params" json:"params"`
-	// Configs lists any required configuration identifiers. (Required, list, can be empty)
-	Configs []interface{} `yaml:"configs" json:"configs"`
-	// RunSchedule defines when and how the task runs. (Required, list, min 1 entry)
-	RunSchedule []RunScheduleEntry `yaml:"run_schedule" json:"run_schedule"`
+	// Plugin definition (Required).
+	Plugin Plugin `yaml:"plugin" json:"plugin"`
 }
 
 // --- Generic Manifest Type for initial parsing ---
@@ -145,10 +148,14 @@ const (
 	OverallRequestTimeout  = 60 * time.Second
 	MaxDownloadSizeBytes   = 1 * 1024 * 1024 * 1024 // 1 GiB limit
 
-	ArtifactTypeDiscovery      = "discovery"
+	// ArtifactTypeDiscovery identifies the discovery image component (for plugin manifests).
+	ArtifactTypeDiscovery = "discovery"
+	// ArtifactTypePlatformBinary identifies the platform-binary component (for plugin manifests).
 	ArtifactTypePlatformBinary = "platform-binary"
-	ArtifactTypeCloudQLBinary  = "cloudql-binary"
-	ArtifactTypeAll            = "all"
+	// ArtifactTypeCloudQLBinary identifies the cloudql-binary component (for plugin manifests).
+	ArtifactTypeCloudQLBinary = "cloudql-binary"
+	// ArtifactTypeAll indicates validation for all relevant components (for plugin manifests).
+	ArtifactTypeAll = "all"
 )
 
 // --- Global HTTP Client ---
@@ -156,7 +163,8 @@ var httpClient *http.Client
 
 // --- Regular Expressions ---
 var imageDigestRegex = regexp.MustCompile(`^.+@sha256:[a-fA-F0-9]{64}$`)
-var dockerURIRegex = regexp.MustCompile(`^([a-zA-Z0-9.-]+(:\d+)?\/)?([a-zA-Z0-9._-]+)(\/[a-zA-Z0-9._-]+)*(:[a-zA-Z0-9._-]+|@sha256:[a-fA-F0-9]{64})?$`)
+
+// dockerURIRegex removed as image URLs now must be digests
 
 // init initializes the package-level resources.
 func init() {
@@ -191,7 +199,11 @@ type Validator interface {
 	// parses it, and returns the TaskManifest struct. It performs minimal validation
 	// (checks if type is 'task') but does not validate the full structure or artifacts.
 	// Returns the parsed task manifest or an error if reading, parsing, or type check fails.
-	GetTaskDefinition(filePath string) (*TaskManifest, error) // New Method
+	GetTaskDefinition(filePath string) (*TaskManifest, error)
+
+	// CheckPlatformSupport checks if the plugin manifest supports a given platform version.
+	// Note: Platform support for standalone tasks is validated within ProcessManifest.
+	CheckPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error)
 }
 
 // --- Concrete Implementation ---
@@ -200,7 +212,7 @@ type Validator interface {
 type defaultValidator struct{}
 
 // NewDefaultValidator creates a new instance of the default validator.
-func NewDefaultValidator() Validator { // Return the new interface type
+func NewDefaultValidator() Validator {
 	return &defaultValidator{}
 }
 
@@ -215,14 +227,10 @@ func isNonEmpty(s string) bool {
 // and validates artifacts (if applicable and requested).
 func (v *defaultValidator) ProcessManifest(filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error) {
 	log.Printf("Processing manifest file: %s", filePath)
-
-	// 1. Read file content
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
 	}
-
-	// 2. Determine manifest type
 	var base manifestBase
 	err = yaml.Unmarshal(data, &base)
 	if err != nil {
@@ -230,7 +238,6 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 	}
 	log.Printf("Detected manifest type: %s", base.Type)
 
-	// 3. Process based on type
 	switch strings.ToLower(base.Type) {
 	case "plugin":
 		var manifest PluginManifest
@@ -238,12 +245,15 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse manifest file '%s' as plugin: %w", filePath, err)
 		}
-		log.Println("Validating plugin manifest structure...")
+		log.Println("Validating plugin manifest structure (including embedded discovery task)...")
+		// Validate plugin structure, which internally validates the embedded task (as non-standalone)
 		err = v.validatePluginManifestStructure(&manifest)
 		if err != nil {
 			return nil, fmt.Errorf("plugin manifest structure validation failed: %w", err)
 		}
 		log.Println("Plugin manifest structure validation successful.")
+
+		// Check platform support using plugin's versions
 		if isNonEmpty(platformVersion) {
 			log.Printf("Checking platform support for version: %s", platformVersion)
 			supported, err := v.checkPlatformSupport(&manifest, platformVersion)
@@ -259,6 +269,8 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 		} else {
 			log.Println("Skipping platform support check.")
 		}
+
+		// Validate artifacts (discovery image + downloadable binaries) if requested
 		if !skipArtifactValidation {
 			err = v.validatePluginArtifacts(&manifest, artifactValidationType)
 			if err != nil {
@@ -276,24 +288,26 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse manifest file '%s' as task: %w", filePath, err)
 		}
-		log.Println("Validating task manifest structure...")
-		err = v.validateTaskManifestStructure(&manifest)
+		log.Println("Validating task manifest structure (standalone)...")
+		// Pass true for isStandalone to enforce API version and platform checks
+		err = v.validateTaskManifestStructure(&manifest, true)
 		if err != nil {
 			return nil, fmt.Errorf("task manifest structure validation failed: %w", err)
 		}
 		log.Println("Task manifest structure validation successful.")
+
+		// Validate task image existence if requested and URL is a digest
 		if !skipArtifactValidation && isNonEmpty(manifest.ImageURL) {
-			log.Println("Initiating Task image validation...")
 			if imageDigestRegex.MatchString(manifest.ImageURL) {
-				err = v.validateImageManifestExists(manifest.ImageURL)
+				log.Println("Initiating Task image validation...")
+				err = v.validateImageManifestExists(manifest.ImageURL) // Use internal helper
 				if err != nil {
 					return nil, fmt.Errorf("task image validation failed: %w", err)
 				}
 				log.Println("Task image validation successful.")
-			} else if dockerURIRegex.MatchString(manifest.ImageURL) {
-				log.Printf("Task image URI '%s' uses a tag. Skipping registry existence check (only digest format is checked).", manifest.ImageURL)
 			} else {
-				return nil, fmt.Errorf("task image validation failed: invalid image_url format '%s'", manifest.ImageURL)
+				// This case should be caught by structure validation, but log defensively
+				log.Printf("Task image URI '%s' is not in digest format. Skipping registry existence check.", manifest.ImageURL)
 			}
 		} else if !skipArtifactValidation {
 			log.Println("Skipping task image validation (image_url empty or validation skipped).")
@@ -306,39 +320,61 @@ func (v *defaultValidator) ProcessManifest(filePath string, platformVersion stri
 }
 
 // GetTaskDefinition reads a manifest file specifically expecting a 'task' type and parses it.
-// It performs only basic type checking, not full structure or artifact validation.
 func (v *defaultValidator) GetTaskDefinition(filePath string) (*TaskManifest, error) {
 	log.Printf("Loading task definition from: %s", filePath)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
 	}
-
-	// Attempt to unmarshal directly into TaskManifest
 	var manifest TaskManifest
 	err = yaml.Unmarshal(data, &manifest)
 	if err != nil {
-		// Check if parsing failed because it's the wrong type (e.g., a plugin manifest)
 		var base manifestBase
 		if typeErr := yaml.Unmarshal(data, &base); typeErr == nil && strings.ToLower(base.Type) != "task" {
 			return nil, fmt.Errorf("expected manifest type 'task' but got '%s' in file %s", base.Type, filePath)
 		}
-		// Otherwise, return the original parsing error
 		return nil, fmt.Errorf("failed to parse manifest file '%s' as task (check syntax): %w", filePath, err)
 	}
-
-	// Explicitly check the type field after successful parsing
 	if strings.ToLower(manifest.Type) != "task" {
 		return nil, fmt.Errorf("expected manifest type 'task' but got '%s' in file %s", manifest.Type, filePath)
 	}
-
 	log.Printf("Successfully loaded task definition for: %s", manifest.ID)
 	return &manifest, nil
 }
 
+// CheckPlatformSupport checks if the plugin manifest supports a given platform version.
+func (v *defaultValidator) CheckPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error) {
+	if manifest == nil {
+		return false, fmt.Errorf("plugin manifest cannot be nil")
+	}
+	if !isNonEmpty(platformVersion) {
+		return false, fmt.Errorf("platformVersion cannot be empty")
+	}
+	currentV, err := semver.NewVersion(platformVersion)
+	if err != nil {
+		return false, fmt.Errorf("invalid platform version format '%s': %w", platformVersion, err)
+	}
+	if len(manifest.Plugin.SupportedPlatformVersions) == 0 {
+		log.Printf("Warning: Checking support for platform %s against plugin %s with no defined supported versions.", platformVersion, manifest.Plugin.Name)
+		return false, nil
+	}
+	for _, constraintStr := range manifest.Plugin.SupportedPlatformVersions {
+		constraints, err := semver.NewConstraint(constraintStr)
+		if err != nil {
+			log.Printf("Warning: Skipping invalid constraint '%s' during support check.", constraintStr)
+			continue
+		}
+		if constraints.Check(currentV) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // --- Internal Helper Methods ---
 
-// validatePluginManifestStructure performs structural checks specific to 'plugin' manifests.
+// validatePluginManifestStructure performs structural checks specific to 'plugin' manifests,
+// including validating the embedded discovery task.
 func (v *defaultValidator) validatePluginManifestStructure(manifest *PluginManifest) error {
 	if manifest == nil {
 		return fmt.Errorf("plugin manifest cannot be nil")
@@ -381,13 +417,17 @@ func (v *defaultValidator) validatePluginManifestStructure(manifest *PluginManif
 	if !isNonEmpty(manifest.Plugin.Metadata.License) {
 		return fmt.Errorf("plugin.metadata.license is required")
 	}
-	discoveryURI := manifest.Plugin.Components.Discovery.ImageURI
-	if !isNonEmpty(discoveryURI) {
-		return fmt.Errorf("plugin.components.discovery.image-uri is required")
+
+	// *** Validate Embedded Discovery Task ***
+	// Pass false for isStandalone, as APIVersion/SupportedPlatforms are inherited
+	log.Println("Validating embedded discovery task structure...")
+	err := v.validateTaskManifestStructure(&manifest.Plugin.Components.Discovery, false)
+	if err != nil {
+		return fmt.Errorf("plugin.components.discovery task validation failed: %w", err)
 	}
-	if !imageDigestRegex.MatchString(discoveryURI) {
-		return fmt.Errorf("plugin.components.discovery.image-uri ('%s') must be in digest format (e.g., repository/image@sha256:hash)", discoveryURI)
-	}
+	log.Println("Embedded discovery task structure validation successful.")
+	// *** End Embedded Task Validation ***
+
 	platformComp := manifest.Plugin.Components.PlatformBinary
 	cloudqlComp := manifest.Plugin.Components.CloudQLBinary
 	if !isNonEmpty(platformComp.URI) {
@@ -411,10 +451,39 @@ func (v *defaultValidator) validatePluginManifestStructure(manifest *PluginManif
 }
 
 // validateTaskManifestStructure performs structural checks specific to 'task' manifests.
-func (v *defaultValidator) validateTaskManifestStructure(manifest *TaskManifest) error {
+// The isStandalone flag determines if APIVersion and SupportedPlatformVersions are required.
+func (v *defaultValidator) validateTaskManifestStructure(manifest *TaskManifest, isStandalone bool) error {
 	if manifest == nil {
 		return fmt.Errorf("task manifest cannot be nil")
 	}
+
+	// --- Standalone-Specific Checks ---
+	if isStandalone {
+		if !isNonEmpty(manifest.APIVersion) || manifest.APIVersion != "v1" {
+			return fmt.Errorf("api-version must be 'v1' for standalone task")
+		}
+		if len(manifest.SupportedPlatformVersions) == 0 {
+			return fmt.Errorf("supported-platform-versions requires at least one entry for standalone task")
+		}
+		for i, constraintStr := range manifest.SupportedPlatformVersions {
+			if !isNonEmpty(constraintStr) {
+				return fmt.Errorf("supported-platform-versions entry %d cannot be empty for standalone task", i)
+			}
+			if _, err := semver.NewConstraint(constraintStr); err != nil {
+				return fmt.Errorf("invalid constraint string '%s' in supported-platform-versions for standalone task: %w", constraintStr, err)
+			}
+		}
+	} else {
+		// Ensure these fields are NOT set for embedded tasks
+		if isNonEmpty(manifest.APIVersion) {
+			return fmt.Errorf("embedded discovery task must not contain api-version (inherited from plugin)")
+		}
+		if len(manifest.SupportedPlatformVersions) > 0 {
+			return fmt.Errorf("embedded discovery task must not contain supported-platform-versions (inherited from plugin)")
+		}
+	}
+
+	// --- Common Task Field Checks ---
 	if !isNonEmpty(manifest.ID) {
 		return fmt.Errorf("id is required")
 	}
@@ -426,12 +495,13 @@ func (v *defaultValidator) validateTaskManifestStructure(manifest *TaskManifest)
 	}
 	if manifest.Type != "task" {
 		return fmt.Errorf("type must be 'task'")
-	}
+	} // Check type consistency
 	if !isNonEmpty(manifest.ImageURL) {
 		return fmt.Errorf("image_url is required")
 	}
-	if !dockerURIRegex.MatchString(manifest.ImageURL) {
-		return fmt.Errorf("image_url ('%s') is not a valid container image URI (e.g., host/repo:tag or host/repo@digest)", manifest.ImageURL)
+	// ** Enforce Digest Format for ImageURL **
+	if !imageDigestRegex.MatchString(manifest.ImageURL) {
+		return fmt.Errorf("image_url ('%s') must be in digest format (e.g., repository/image@sha256:hash)", manifest.ImageURL)
 	}
 	if !isNonEmpty(manifest.Command) {
 		return fmt.Errorf("command is required")
@@ -450,7 +520,7 @@ func (v *defaultValidator) validateTaskManifestStructure(manifest *TaskManifest)
 		return fmt.Errorf("timeout '%s' must be a positive duration", manifest.Timeout)
 	}
 
-	// *** Updated Lag Threshold Validation ***
+	// --- Scale Config Check ---
 	if !isNonEmpty(manifest.ScaleConfig.LagThreshold) {
 		return fmt.Errorf("scale_config.lag_threshold is required and must be a non-empty string")
 	}
@@ -461,27 +531,28 @@ func (v *defaultValidator) validateTaskManifestStructure(manifest *TaskManifest)
 	if lagInt <= 0 {
 		return fmt.Errorf("scale_config.lag_threshold ('%s') must be a positive integer string", manifest.ScaleConfig.LagThreshold)
 	}
-	// *** End Updated Lag Threshold Validation ***
-
 	if manifest.ScaleConfig.MinReplica < 0 {
 		return fmt.Errorf("scale_config.min_replica (%d) cannot be negative", manifest.ScaleConfig.MinReplica)
 	}
 	if manifest.ScaleConfig.MaxReplica < manifest.ScaleConfig.MinReplica {
 		return fmt.Errorf("scale_config.max_replica (%d) must be greater than or equal to min_replica (%d)", manifest.ScaleConfig.MaxReplica, manifest.ScaleConfig.MinReplica)
 	}
+
+	// --- Params & Configs Check ---
 	if manifest.Params == nil {
 		return fmt.Errorf("params field is required (can be empty list [])")
 	}
 	if manifest.Configs == nil {
 		return fmt.Errorf("configs field is required (can be empty list [])")
 	}
+
+	// --- Run Schedule Check ---
 	if manifest.RunSchedule == nil {
 		return fmt.Errorf("run_schedule field is required")
 	}
 	if len(manifest.RunSchedule) < 1 {
 		return fmt.Errorf("run_schedule must contain at least one entry")
 	}
-
 	defaultScheduleFound := false
 	var defaultScheduleParams map[string]string
 	paramSet := make(map[string]struct{})
@@ -512,36 +583,8 @@ func (v *defaultValidator) validateTaskManifestStructure(manifest *TaskManifest)
 	if !defaultScheduleFound && len(manifest.Params) > 0 {
 		return fmt.Errorf("at least one run_schedule entry must have id 'describe-all' or 'default' to cover top-level params")
 	}
-	return nil
-}
 
-// checkPlatformSupport checks if the plugin manifest supports a given platform version.
-func (v *defaultValidator) checkPlatformSupport(manifest *PluginManifest, platformVersion string) (bool, error) {
-	if manifest == nil {
-		return false, fmt.Errorf("plugin manifest cannot be nil")
-	}
-	if !isNonEmpty(platformVersion) {
-		return false, fmt.Errorf("platformVersion cannot be empty")
-	}
-	currentV, err := semver.NewVersion(platformVersion)
-	if err != nil {
-		return false, fmt.Errorf("invalid platform version format '%s': %w", platformVersion, err)
-	}
-	if len(manifest.Plugin.SupportedPlatformVersions) == 0 {
-		log.Printf("Warning: Checking support for platform %s against plugin %s with no defined supported versions.", platformVersion, manifest.Plugin.Name)
-		return false, nil
-	}
-	for _, constraintStr := range manifest.Plugin.SupportedPlatformVersions {
-		constraints, err := semver.NewConstraint(constraintStr)
-		if err != nil {
-			log.Printf("Warning: Skipping invalid constraint '%s' during support check.", constraintStr)
-			continue
-		}
-		if constraints.Check(currentV) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return nil
 }
 
 // validatePluginArtifacts handles the download and validation logic for 'plugin' type artifacts.
@@ -584,13 +627,22 @@ func (v *defaultValidator) validatePluginArtifacts(manifest *PluginManifest, art
 	platformComp := manifest.Plugin.Components.PlatformBinary
 	cloudqlComp := manifest.Plugin.Components.CloudQLBinary
 
+	// Use the ImageURL from the embedded task for discovery validation
+	discoveryImageURL := manifest.Plugin.Components.Discovery.ImageURL
 	if validateDiscovery {
 		log.Println("Initiating Discovery image validation...")
-		discoveryErr = v.validateImageManifestExists(manifest.Plugin.Components.Discovery.ImageURI)
-		if discoveryErr != nil {
-			log.Printf("Discovery image validation failed: %v", discoveryErr)
+		if imageDigestRegex.MatchString(discoveryImageURL) { // Only check if it's a digest
+			discoveryErr = v.validateImageManifestExists(discoveryImageURL)
+			if discoveryErr != nil {
+				log.Printf("Discovery image validation failed: %v", discoveryErr)
+			} else {
+				log.Println("Discovery image validation successful.")
+			}
 		} else {
-			log.Println("Discovery image validation successful.")
+			log.Printf("Discovery image URI '%s' uses a tag or invalid format. Skipping registry existence check.", discoveryImageURL)
+			// Optionally return an error here if only digest is strictly allowed by policy,
+			// even though structure validation already checked format.
+			// discoveryErr = fmt.Errorf("discovery image URI must use digest format for existence check")
 		}
 	}
 
@@ -649,7 +701,6 @@ func (v *defaultValidator) validatePluginArtifacts(manifest *PluginManifest, art
 		return errors.New(strings.Join(combinedErrors, "; "))
 	}
 
-	// log.Println("--- All requested plugin artifact validations successful ---") // Let caller log overall success
 	return nil
 }
 
@@ -658,8 +709,9 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 	if !isNonEmpty(imageURI) {
 		return fmt.Errorf("image URI is empty")
 	}
-	// Digest format check is done in Validate(Plugin)ManifestStructure
-	// if !imageDigestRegex.MatchString(imageURI) { return fmt.Errorf("image URI ('%s') must be in digest format", imageURI) }
+	if !imageDigestRegex.MatchString(imageURI) {
+		return fmt.Errorf("image URI ('%s') must be in digest format for existence check", imageURI)
+	} // Enforce digest here
 
 	log.Printf("--- Checking Image Manifest Existence for: %s ---", imageURI)
 	var lastErr error
@@ -675,26 +727,25 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 		}
 		log.Printf("Image resolve attempt %d/%d for %s...", attempt+1, MaxRegistryRetries+1, imageURI)
 		ctx, cancel := context.WithTimeout(context.Background(), OverallRequestTimeout)
-		defer cancel() // Ensure cancel is called
+		defer cancel()
 
 		ref, err := registry.ParseReference(imageURI)
 		if err != nil {
 			return fmt.Errorf("attempt %d: failed to parse image reference '%s': %w", attempt+1, imageURI, err)
-		} // No retry needed
-		fullRepo := fmt.Sprintf("%s/%s", ref.Host(), ref.Repository) // Combine host and repo path
+		}
+		fullRepo := fmt.Sprintf("%s/%s", ref.Host(), ref.Repository)
 		repo, err := remote.NewRepository(fullRepo)
 		if err != nil {
 			lastErr = fmt.Errorf("attempt %d: failed create repository client for '%s': %w", attempt+1, fullRepo, err)
 			continue
-		} // Retry if client creation fails
-		repo.Client = httpClient // Use global client directly for default/anonymous auth
+		}
+		repo.Client = httpClient // Use global client
 
-		// log.Printf("[DEBUG] Attempting to resolve manifest using ORAS default client for host: %s, repository: %s", repo.Reference.Registry, repo.Reference.Repository)
-		_, err = repo.Resolve(ctx, ref.Reference) // ref.Reference is the digest
+		_, err = repo.Resolve(ctx, ref.Reference) // Attempt to resolve digest
 
-		if err == nil { /* log.Printf("Successfully resolved image manifest for %s.", imageURI); */
+		if err == nil {
 			return nil
-		} // Success (reduced logging)
+		} // Success
 
 		lastErr = fmt.Errorf("attempt %d: failed resolve image manifest for '%s': %w", attempt+1, imageURI, err)
 		log.Printf("Error details: %v", err)
@@ -713,7 +764,6 @@ func (v *defaultValidator) validateImageManifestExists(imageURI string) error {
 
 // validateSingleDownloadableComponent downloads and validates a specific downloadable binary component.
 func (v *defaultValidator) validateSingleDownloadableComponent(component Component, componentName string) ([]byte, error) {
-	// log.Printf("--- Validating Downloadable Component: %s ---", componentName) // Reduced logging
 	if !isNonEmpty(component.URI) {
 		return nil, fmt.Errorf("%s validation failed: URI is missing", componentName)
 	}
