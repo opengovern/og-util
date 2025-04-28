@@ -122,15 +122,20 @@ type PluginSpecification struct {
 
 // --- Task Specific Structs ---
 type ScaleConfig struct {
-	LagThreshold string `yaml:"lag_threshold" json:"lag_threshold"`
-	MinReplica   int    `yaml:"min_replica" json:"min_replica"`
-	MaxReplica   int    `yaml:"max_replica" json:"max_replica"`
+	Stream       string `json:"stream" yaml:"stream"`
+	Consumer     string `json:"consumer" yaml:"consumer"`
+	LagThreshold string `json:"lag_threshold" yaml:"lag_threshold"`
+	MinReplica   int    `json:"min_replica" yaml:"min_replica"`
+	MaxReplica   int    `json:"max_replica" yaml:"max_replica"`
+
+	PollingInterval int `json:"polling_interval" yaml:"polling_interval"`
+	CooldownPeriod  int `json:"cooldown_period" yaml:"cooldown_period"`
 }
 
 type RunScheduleEntry struct {
-	ID        string            `yaml:"id" json:"id"`
-	Params    map[string]string `yaml:"params" json:"params"`
-	Frequency string            `yaml:"frequency" json:"frequency"`
+	ID        string         `yaml:"id" json:"id"`
+	Params    map[string]any `yaml:"params" json:"params"`
+	Frequency string         `yaml:"frequency" json:"frequency"`
 }
 
 type TaskSpecification struct {
