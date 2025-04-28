@@ -25,7 +25,7 @@ func (v *defaultValidator) processPluginSpec(data []byte, filePath string, platf
 
 	// --- Core Validation ---
 	if !isNonEmpty(spec.APIVersion) || spec.APIVersion != APIVersionV1 {
-		return nil, fmt.Errorf("plugin specification '%s': api-version is required and must be '%s', got '%s'", filePath, APIVersionV1, spec.APIVersion)
+		return nil, fmt.Errorf("plugin specification '%s': api_version is required and must be '%s', got '%s'", filePath, APIVersionV1, spec.APIVersion)
 	}
 	if !isNonEmpty(spec.Type) || spec.Type != SpecTypePlugin {
 		return nil, fmt.Errorf("plugin specification '%s': type is required and must be '%s', got '%s'", filePath, SpecTypePlugin, spec.Type)

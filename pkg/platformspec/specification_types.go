@@ -104,15 +104,15 @@ type PluginComponents struct {
 }
 
 type PluginSpecification struct {
-	APIVersion string `yaml:"api-version"`
+	APIVersion string `yaml:"api_version"`
 	Type       string `yaml:"type"`
 
 	Name                      string                   `yaml:"name"`
 	Version                   string                   `yaml:"version"`
-	SupportedPlatformVersions []string                 `yaml:"supported-platform-versions"`
+	SupportedPlatformVersions []string                 `yaml:"supported_platform_versions"`
 	Metadata                  Metadata                 `yaml:"metadata"`
 	Components                PluginComponents         `yaml:"components"`
-	SampleData                *Component               `yaml:"sample-data,omitempty"`
+	SampleData                *Component               `yaml:"sample_data,omitempty"`
 	Tags                      map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
 	Classification            [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
 }

@@ -32,7 +32,7 @@ func (v *defaultValidator) processTaskSpec(data []byte, filePath string, skipArt
 		if isNonEmpty(spec.APIVersion) && spec.APIVersion != defaultedAPIVersion {
 			actualVersion = spec.APIVersion
 		}
-		return nil, fmt.Errorf("task specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, actualVersion)
+		return nil, fmt.Errorf("task specification '%s': api_version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, actualVersion)
 	}
 	// Ensure type is set correctly (should be 'task' from base parse)
 	if !isNonEmpty(spec.Type) {
@@ -118,7 +118,7 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 	if isStandalone {
 		// --- Standalone: Required Fields ---
 		if !isNonEmpty(spec.APIVersion) || spec.APIVersion != APIVersionV1 {
-			return fmt.Errorf("%s: api-version is required and must be '%s', got: '%s'", taskDesc, APIVersionV1, spec.APIVersion)
+			return fmt.Errorf("%s: api_version is required and must be '%s', got: '%s'", taskDesc, APIVersionV1, spec.APIVersion)
 		}
 		if spec.Metadata == nil {
 			return fmt.Errorf("%s: metadata section is required", taskDesc)
@@ -163,7 +163,7 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 	} else { // --- Embedded task specific checks ---
 		// Ensure standalone-only fields are ABSENT
 		if isNonEmpty(spec.APIVersion) {
-			return fmt.Errorf("%s: must not contain api-version", taskDesc)
+			return fmt.Errorf("%s: must not contain api_version", taskDesc)
 		}
 		if spec.Metadata != nil {
 			return fmt.Errorf("%s: must not contain metadata section", taskDesc)

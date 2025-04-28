@@ -62,7 +62,7 @@ func (v *defaultValidator) processQuerySpec(data []byte, filePath string, defaul
 		spec.APIVersion = defaultedAPIVersion
 		// Log defaulting only if it actually happens and wasn't already defaulted
 		if defaultedAPIVersion == APIVersionV1 && originalAPIVersion != APIVersionV1 {
-			log.Printf("Info: Specification '%s' (type: %s) missing 'api-version', defaulting to '%s'.", filePath, spec.Type, APIVersionV1)
+			log.Printf("Info: Specification '%s' (type: %s) missing 'api_version', defaulting to '%s'.", filePath, spec.Type, APIVersionV1)
 		}
 	}
 	// Ensure parsed APIVersion matches base (and is v1 after defaulting)
@@ -71,7 +71,7 @@ func (v *defaultValidator) processQuerySpec(data []byte, filePath string, defaul
 		if isNonEmpty(spec.APIVersion) && spec.APIVersion != defaultedAPIVersion {
 			actualVersion = spec.APIVersion
 		}
-		return nil, fmt.Errorf("query specification '%s': api-version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, actualVersion)
+		return nil, fmt.Errorf("query specification '%s': api_version must be '%s' (or omitted to default), got '%s'", filePath, APIVersionV1, actualVersion)
 	}
 	// Ensure type is set correctly (should be 'query' from base parse)
 	if !isNonEmpty(spec.Type) {

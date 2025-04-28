@@ -46,10 +46,10 @@ type Component struct {
 	URI string `yaml:"uri,omitempty" json:"uri,omitempty"`
 	// ImageURI for container image components (e.g., discovery).
 	// Must be in digest format (e.g., repo/image@sha256:hash).
-	ImageURI string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"`
+	ImageURI string `yaml:"image_uri,omitempty" json:"image_uri,omitempty"`
 	// PathInArchive specifies the relative path to the executable or file
 	// within a downloaded archive (if URI points to an archive).
-	PathInArchive string `yaml:"path-in-archive,omitempty" json:"path-in-archive,omitempty"`
+	PathInArchive string `yaml:"path_in_archive,omitempty" json:"path_in_archive,omitempty"`
 	// Checksum for verifying file integrity (e.g., "sha256:<hex_hash>").
 	// For downloadable archives, it's the hash of the archive file.
 	// Generally not used for ImageURI as the digest serves this purpose.
@@ -61,7 +61,7 @@ type Metadata struct {
 	// Author of the plugin (Required).
 	Author string `yaml:"author" json:"author"`
 	// PublishedDate of this plugin version (YYYY-MM-DD format recommended) (Required).
-	PublishedDate string `yaml:"published-date" json:"published-date"`
+	PublishedDate string `yaml:"published_date" json:"published_date"`
 	// Contact information for the author or support (Required).
 	Contact string `yaml:"contact" json:"contact"`
 	// License identifier (SPDX format recommended, e.g., "Apache-2.0") (Required).
@@ -80,13 +80,13 @@ type Plugin struct {
 	Version string `yaml:"version" json:"version"`
 	// SupportedPlatformVersions lists the platform versions this plugin is compatible with,
 	// using SemVer constraint strings (e.g., ">=1.2.0, <2.0.0") (Required, non-empty).
-	SupportedPlatformVersions []string `yaml:"supported-platform-versions" json:"supported-platform-versions"`
+	SupportedPlatformVersions []string `yaml:"supported_platform_versions" json:"supported_platform_versions"`
 	// Metadata about the plugin (Required).
 	Metadata Metadata `yaml:"metadata" json:"metadata"`
 	// Components defines the functional parts of the plugin (Required).
 	Components PluginComponents `yaml:"components" json:"components"`
 	// SampleData provides information about optional sample data (Optional).
-	SampleData *Component `yaml:"sample-data,omitempty" json:"sample-data,omitempty"`
+	SampleData *Component `yaml:"sample_data,omitempty" json:"sample_data,omitempty"`
 }
 
 // PluginComponents holds the different component definitions.
@@ -94,15 +94,15 @@ type PluginComponents struct {
 	// Discovery component, typically a container image (Required).
 	Discovery Component `yaml:"discovery" json:"discovery"`
 	// PlatformBinary component, typically a downloadable executable or archive (Required).
-	PlatformBinary Component `yaml:"platform-binary" json:"platform-binary"`
+	PlatformBinary Component `yaml:"platform_binary" json:"platform_binary"`
 	// CloudQLBinary component, typically a downloadable executable or archive (Required).
-	CloudQLBinary Component `yaml:"cloudql-binary" json:"cloudql-binary"`
+	CloudQLBinary Component `yaml:"cloudql_binary" json:"cloudql_binary"`
 }
 
 // PluginManifest is the top-level structure for the manifest file.
 type PluginManifest struct {
 	// APIVersion of the manifest schema (Required, must be "v1").
-	APIVersion string `yaml:"api-version" json:"api-version"`
+	APIVersion string `yaml:"api_version" json:"api_version"`
 	// Type of the manifest (Required, must be "plugin").
 	Type string `yaml:"type" json:"type"`
 	// Plugin definition (Required).
@@ -131,9 +131,9 @@ const (
 	// ArtifactTypeDiscovery identifies the discovery image component.
 	ArtifactTypeDiscovery = "discovery"
 	// ArtifactTypePlatformBinary identifies the platform-binary component.
-	ArtifactTypePlatformBinary = "platform-binary"
+	ArtifactTypePlatformBinary = "platform_binary"
 	// ArtifactTypeCloudQLBinary identifies the cloudql-binary component.
-	ArtifactTypeCloudQLBinary = "cloudql-binary"
+	ArtifactTypeCloudQLBinary = "cloudql_binary"
 	// ArtifactTypeAll indicates validation for all relevant components.
 	ArtifactTypeAll = "all"
 )
@@ -217,7 +217,7 @@ func (v *defaultValidator) ValidateManifestStructure(manifest *PluginManifest) e
 		return fmt.Errorf("manifest cannot be nil")
 	}
 	if !isNonEmpty(manifest.APIVersion) || manifest.APIVersion != "v1" {
-		return fmt.Errorf("api-version must be 'v1'")
+		return fmt.Errorf("api_version must be 'v1'")
 	}
 	if !isNonEmpty(manifest.Type) || manifest.Type != "plugin" {
 		return fmt.Errorf("type must be 'plugin'")
@@ -232,11 +232,11 @@ func (v *defaultValidator) ValidateManifestStructure(manifest *PluginManifest) e
 		return fmt.Errorf("invalid plugin.version format '%s': %w", manifest.Plugin.Version, err)
 	}
 	if len(manifest.Plugin.SupportedPlatformVersions) == 0 {
-		return fmt.Errorf("plugin.supported-platform-versions requires at least one entry")
+		return fmt.Errorf("plugin.supported_platform_versions requires at least one entry")
 	}
 	for i, constraintStr := range manifest.Plugin.SupportedPlatformVersions {
 		if !isNonEmpty(constraintStr) {
-			return fmt.Errorf("plugin.supported-platform-versions entry %d cannot be empty", i)
+			return fmt.Errorf("plugin.supported_platform_versions entry %d cannot be empty", i)
 		}
 		if _, err := semver.NewConstraint(constraintStr); err != nil {
 			return fmt.Errorf("invalid constraint string '%s': %w", constraintStr, err)
@@ -246,7 +246,7 @@ func (v *defaultValidator) ValidateManifestStructure(manifest *PluginManifest) e
 		return fmt.Errorf("plugin.metadata.author is required")
 	}
 	if !isNonEmpty(manifest.Plugin.Metadata.PublishedDate) {
-		return fmt.Errorf("plugin.metadata.published-date is required")
+		return fmt.Errorf("plugin.metadata.published_date is required")
 	}
 	if !isNonEmpty(manifest.Plugin.Metadata.Contact) {
 		return fmt.Errorf("plugin.metadata.contact is required")
@@ -256,29 +256,29 @@ func (v *defaultValidator) ValidateManifestStructure(manifest *PluginManifest) e
 	}
 	discoveryURI := manifest.Plugin.Components.Discovery.ImageURI
 	if !isNonEmpty(discoveryURI) {
-		return fmt.Errorf("plugin.components.discovery.image-uri is required")
+		return fmt.Errorf("plugin.components.discovery.image_uri is required")
 	}
 	if !imageDigestRegex.MatchString(discoveryURI) {
-		return fmt.Errorf("plugin.components.discovery.image-uri ('%s') must be in digest format (e.g., repository/image@sha256:hash)", discoveryURI)
+		return fmt.Errorf("plugin.components.discovery.image_uri ('%s') must be in digest format (e.g., repository/image@sha256:hash)", discoveryURI)
 	}
 	platformComp := manifest.Plugin.Components.PlatformBinary
 	cloudqlComp := manifest.Plugin.Components.CloudQLBinary
 	if !isNonEmpty(platformComp.URI) {
-		return fmt.Errorf("plugin.components.platform-binary.uri is required")
+		return fmt.Errorf("plugin.components.platform_binary.uri is required")
 	}
 	if !isNonEmpty(cloudqlComp.URI) {
-		return fmt.Errorf("plugin.components.cloudql-binary.uri is required")
+		return fmt.Errorf("plugin.components.cloudql_binary.uri is required")
 	}
 	if platformComp.URI == cloudqlComp.URI {
 		if !isNonEmpty(platformComp.PathInArchive) {
-			return fmt.Errorf("plugin.components.platform-binary.path-in-archive required when URIs match ('%s')", platformComp.URI)
+			return fmt.Errorf("plugin.components.platform_binary.path_in_archive required when URIs match ('%s')", platformComp.URI)
 		}
 		if !isNonEmpty(cloudqlComp.PathInArchive) {
-			return fmt.Errorf("plugin.components.cloudql-binary.path-in-archive required when URIs match ('%s')", cloudqlComp.URI)
+			return fmt.Errorf("plugin.components.cloudql_binary.path_in_archive required when URIs match ('%s')", cloudqlComp.URI)
 		}
 	}
 	if manifest.Plugin.SampleData != nil && !isNonEmpty(manifest.Plugin.SampleData.URI) {
-		return fmt.Errorf("plugin.sample-data.uri required when sample-data section present")
+		return fmt.Errorf("plugin.sample_data.uri required when sample_data section present")
 	}
 	return nil
 }
@@ -409,10 +409,10 @@ func (v *defaultValidator) ValidateArtifact(manifest *PluginManifest, artifactTy
 		combinedErrors = append(combinedErrors, fmt.Sprintf("discovery image validation failed: %v", discoveryErr))
 	}
 	if platformErr != nil {
-		combinedErrors = append(combinedErrors, fmt.Errorf("platform-binary artifact validation failed: %w", platformErr).Error())
+		combinedErrors = append(combinedErrors, fmt.Errorf("platform_binary artifact validation failed: %w", platformErr).Error())
 	}
 	if cloudqlErr != nil && !(platformComp.URI == cloudqlComp.URI && platformErr != nil) {
-		combinedErrors = append(combinedErrors, fmt.Errorf("cloudql-binary artifact validation failed: %w", cloudqlErr).Error())
+		combinedErrors = append(combinedErrors, fmt.Errorf("cloudql_binary artifact validation failed: %w", cloudqlErr).Error())
 	}
 	if len(combinedErrors) > 0 {
 		return errors.New(strings.Join(combinedErrors, "; "))

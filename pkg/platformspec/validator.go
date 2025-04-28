@@ -169,7 +169,7 @@ func (v *defaultValidator) ProcessSpecification(data []byte, filePath string, pl
 		if specType != SpecTypePlugin {
 			defaultedAPIVersion = APIVersionV1
 		} else {
-			return nil, fmt.Errorf("plugin specification '%s' missing required 'api-version'", filePath)
+			return nil, fmt.Errorf("plugin specification '%s' missing required 'api_version'", filePath)
 		}
 	}
 
@@ -192,7 +192,7 @@ func (v *defaultValidator) ProcessSpecification(data []byte, filePath string, pl
 		}
 		spec.Type = specType
 		if spec.APIVersion != APIVersionV1 {
-			return nil, fmt.Errorf("control '%s': invalid api-version '%s'", filePath, originalAPIVersion)
+			return nil, fmt.Errorf("control '%s': invalid api_version '%s'", filePath, originalAPIVersion)
 		}
 		if !isNonEmpty(spec.ID) {
 			return nil, fmt.Errorf("control '%s': id is required", filePath)
