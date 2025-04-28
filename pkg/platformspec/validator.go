@@ -84,7 +84,7 @@ type SpecificationTypeInfo struct {
 type pluginDiscoveryCheck struct {
 	Components struct {
 		Discovery struct {
-			TaskSpec interface{} `yaml:"task-spec"`
+			TaskSpec interface{} `yaml:"task_spec"`
 		} `yaml:"discovery"`
 	} `yaml:"components"`
 }

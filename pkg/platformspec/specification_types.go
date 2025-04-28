@@ -70,21 +70,21 @@ func (s *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
 
 // --- BaseSpecification, Component, Metadata (Unchanged from your 'current' version) ---
 type BaseSpecification struct {
-	APIVersion string `yaml:"api-version"`
+	APIVersion string `yaml:"api_version"`
 	Type       string `yaml:"type"`
 	ID         string `yaml:"id"`
 }
 
 type Component struct {
 	URI           string `yaml:"uri,omitempty" json:"uri,omitempty"`
-	ImageURI      string `yaml:"image-uri,omitempty" json:"image-uri,omitempty"` // Deprecated
-	PathInArchive string `yaml:"path-in-archive,omitempty" json:"path-in-archive,omitempty"`
+	ImageURI      string `yaml:"image_uri,omitempty" json:"image_uri,omitempty"` // Deprecated
+	PathInArchive string `yaml:"path_in_archive,omitempty" json:"path_in_archive,omitempty"`
 	Checksum      string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
 }
 
 type Metadata struct {
 	Author        string `yaml:"author" json:"author"`
-	PublishedDate string `yaml:"published-date" json:"published-date"`
+	PublishedDate string `yaml:"published_date" json:"published_date"`
 	Contact       string `yaml:"contact" json:"contact"`
 	License       string `yaml:"license" json:"license"`
 	Description   string `yaml:"description,omitempty" json:"description,omitempty"`
@@ -93,14 +93,14 @@ type Metadata struct {
 
 // --- Plugin Specific Structs ---
 type DiscoveryComponent struct {
-	TaskID   string             `yaml:"task-id,omitempty" json:"task-id,omitempty"`
-	TaskSpec *TaskSpecification `yaml:"task-spec,omitempty" json:"task-spec,omitempty"`
+	TaskID   string             `yaml:"task_id,omitempty" json:"task_id,omitempty"`
+	TaskSpec *TaskSpecification `yaml:"task_spec,omitempty" json:"task_spec,omitempty"`
 }
 
 type PluginComponents struct {
 	Discovery      DiscoveryComponent `yaml:"discovery" json:"discovery"`
-	PlatformBinary Component          `yaml:"platform-binary" json:"platform-binary"`
-	CloudQLBinary  Component          `yaml:"cloudql-binary" json:"cloudql-binary"`
+	PlatformBinary Component          `yaml:"platform_binary" json:"platform_binary"`
+	CloudQLBinary  Component          `yaml:"cloudql_binary" json:"cloudql_binary"`
 }
 
 type PluginSpecification struct {
@@ -131,9 +131,9 @@ type RunScheduleEntry struct {
 }
 
 type TaskSpecification struct {
-	APIVersion                string    `yaml:"api-version,omitempty"`
+	APIVersion                string    `yaml:"api_version,omitempty"`
 	Metadata                  *Metadata `yaml:"metadata,omitempty"`
-	SupportedPlatformVersions []string  `yaml:"supported-platform-versions,omitempty"`
+	SupportedPlatformVersions []string  `yaml:"supported_platform_versions,omitempty"`
 
 	ID             string                   `yaml:"id,omitempty"`
 	Name           string                   `yaml:"name,omitempty"`
@@ -181,7 +181,7 @@ type QueryParameter struct {
 }
 
 type QuerySpecification struct {
-	APIVersion string `yaml:"api-version"` // Defaults to v1 if omitted via processing logic
+	APIVersion string `yaml:"api_version"` // Defaults to v1 if omitted via processing logic
 	Type       string `yaml:"type"`        // Must be 'query'
 	ID         string `yaml:"id"`          // Required
 
@@ -201,7 +201,7 @@ type QuerySpecification struct {
 
 // --- Control Specific Structs (Placeholder) ---
 type ControlSpecification struct {
-	APIVersion string `yaml:"api-version"`
+	APIVersion string `yaml:"api_version"`
 	Type       string `yaml:"type"`
 	ID         string `yaml:"id"`
 
@@ -209,7 +209,7 @@ type ControlSpecification struct {
 	Description    string                   `yaml:"description,omitempty"`
 	Severity       string                   `yaml:"severity"`
 	Frameworks     []string                 `yaml:"frameworks,omitempty"`
-	LogicSource    Component                `yaml:"logic-source"`
+	LogicSource    Component                `yaml:"logic_source"`
 	Parameters     map[string]interface{}   `yaml:"parameters,omitempty"`
 	Tags           map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
 	Classification [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
