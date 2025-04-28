@@ -64,8 +64,8 @@ func init() {
 
 // Validator defines the interface for processing, validating, and retrieving information from specifications.
 type Validator interface {
-	ProcessSpecification(filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error)
-	GetTaskDefinition(filePath string) (*TaskSpecification, error)
+	ProcessSpecification(data []byte, filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error)
+	GetTaskDefinition(data []byte, filePath string) (*TaskSpecification, error)
 	GetTaskDetailsFromPluginSpecification(pluginSpec *PluginSpecification) (*TaskDetails, error)
 	CheckPlatformSupport(pluginSpec *PluginSpecification, platformVersion string) (bool, error)
 	IdentifySpecificationTypes(filePath string) (*SpecificationTypeInfo, error)
@@ -142,11 +142,13 @@ func NewDefaultValidator() Validator {
 // ProcessSpecification reads, identifies, validates structure, checks platform, and validates artifacts.
 // It dispatches to internal type-specific processor methods (process*Spec).
 // Assumes isNonEmpty and process*Spec methods are defined elsewhere on *defaultValidator.
-func (v *defaultValidator) ProcessSpecification(filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error) {
-	// log.Printf("Processing specification file: %s ...", filePath) // Optional: Keep logs minimal
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
+func (v *defaultValidator) ProcessSpecification(data []byte, filePath string, platformVersion string, artifactValidationType string, skipArtifactValidation bool) (interface{}, error) {
+	var err error
+	if data == nil {
+		data, err = os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file '%s': %w", filePath, err)
+		}
 	}
 
 	var base BaseSpecification
@@ -221,6 +223,6 @@ func (v *defaultValidator) GetEmbeddedTaskSpecification(pluginSpec *PluginSpecif
 	return v.getEmbeddedTaskSpecificationImpl(pluginSpec, format)
 }
 
-func (v *defaultValidator) GetTaskDefinition(filePath string) (*TaskSpecification, error) {
-	return v.getTaskDefinitionImpl(filePath)
+func (v *defaultValidator) GetTaskDefinition(data []byte, filePath string) (*TaskSpecification, error) {
+	return v.getTaskDefinitionImpl(data, filePath)
 }

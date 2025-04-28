@@ -67,10 +67,10 @@ func (v *defaultValidator) processTaskSpec(data []byte, filePath string, skipArt
 // GetTaskDefinition reads a specification file specifically expecting a 'task' type and parses it.
 // It calls ProcessSpecification internally to ensure consistent validation.
 // Assumes isNonEmpty is defined elsewhere.
-func (v *defaultValidator) getTaskDefinitionImpl(filePath string) (*TaskSpecification, error) {
+func (v *defaultValidator) getTaskDefinitionImpl(data []byte, filePath string) (*TaskSpecification, error) {
 	// Delegate validation and parsing to ProcessSpecification
 	log.Printf("Loading standalone task definition from: %s (using ProcessSpecification)", filePath)
-	processedSpec, err := v.ProcessSpecification(filePath, "", "", true) // Skip platform/artifact checks
+	processedSpec, err := v.ProcessSpecification(data, filePath, "", "", true) // Skip platform/artifact checks
 	if err != nil {
 		return nil, err // Error already contextualized
 	}
