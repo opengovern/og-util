@@ -149,10 +149,19 @@ type TaskSpecification struct {
 	ScaleConfig    ScaleConfig              `yaml:"scale_config"`
 	Params         []string                 `yaml:"params"`
 	Configs        []interface{}            `yaml:"configs"`
+	NatsConfig     NatsConfig               `yaml:"nats_config"`
 	RunSchedule    []RunScheduleEntry       `yaml:"run_schedule"`
 	Tags           map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
 	Classification [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
 
+}
+
+type NatsConfig struct {
+	Stream         string `json:"stream" yaml:"stream"`
+	Topic          string `json:"topic" yaml:"topic"`
+	Consumer       string `json:"consumer" yaml:"consumer"`
+	ResultTopic    string `json:"result_topic" yaml:"result_topic"`
+	ResultConsumer string `json:"result_consumer" yaml:"result_consumer"`
 }
 
 type TaskDetails struct {
