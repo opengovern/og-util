@@ -3,6 +3,7 @@ package platformspec
 
 import (
 	"fmt"
+	"github.com/opengovern/og-util/pkg/integration"
 
 	"gopkg.in/yaml.v3" // Ensure yaml.v3 is imported
 	// Removed "log" import as debug line is removed
@@ -109,6 +110,7 @@ type PluginSpecification struct {
 
 	Name                      string                   `yaml:"name"`
 	Version                   string                   `yaml:"version"`
+	IntegrationType           integration.Type         `yaml:"integration_type,omitempty"`
 	SupportedPlatformVersions []string                 `yaml:"supported_platform_versions"`
 	Metadata                  Metadata                 `yaml:"metadata"`
 	Components                PluginComponents         `yaml:"components"`
@@ -135,21 +137,20 @@ type TaskSpecification struct {
 	Metadata                  *Metadata `yaml:"metadata,omitempty"`
 	SupportedPlatformVersions []string  `yaml:"supported_platform_versions,omitempty"`
 
-	ID              string                   `yaml:"id,omitempty"`
-	Name            string                   `yaml:"name,omitempty"`
-	IntegrationType string                   `yaml:"integration_type,omitempty"`
-	Description     string                   `yaml:"description,omitempty"`
-	IsEnabled       bool                     `yaml:"is_enabled"`
-	Type            string                   `yaml:"type,omitempty"`
-	ImageURL        string                   `yaml:"image_url"`
-	Command         []string                 `yaml:"command"`
-	Timeout         string                   `yaml:"timeout"`
-	ScaleConfig     ScaleConfig              `yaml:"scale_config"`
-	Params          []string                 `yaml:"params"`
-	Configs         []interface{}            `yaml:"configs"`
-	RunSchedule     []RunScheduleEntry       `yaml:"run_schedule"`
-	Tags            map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
-	Classification  [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
+	ID             string                   `yaml:"id,omitempty"`
+	Name           string                   `yaml:"name,omitempty"`
+	Description    string                   `yaml:"description,omitempty"`
+	IsEnabled      bool                     `yaml:"is_enabled"`
+	Type           string                   `yaml:"type,omitempty"`
+	ImageURL       string                   `yaml:"image_url"`
+	Command        []string                 `yaml:"command"`
+	Timeout        string                   `yaml:"timeout"`
+	ScaleConfig    ScaleConfig              `yaml:"scale_config"`
+	Params         []string                 `yaml:"params"`
+	Configs        []interface{}            `yaml:"configs"`
+	RunSchedule    []RunScheduleEntry       `yaml:"run_schedule"`
+	Tags           map[string]StringOrSlice `yaml:"tags,omitempty"`           // Using StringOrSlice
+	Classification [][]string               `yaml:"classification,omitempty"` // <<< Ensure Present & Optional
 
 }
 
