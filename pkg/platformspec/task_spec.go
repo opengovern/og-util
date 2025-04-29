@@ -253,7 +253,6 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 	}
 
 	// Detailed Run Schedule Entry checks
-	defaultScheduleFound := false
 	paramSet := make(map[string]struct{})
 	for _, p := range spec.Params {
 		if !isNonEmpty(p) {
@@ -281,23 +280,6 @@ func (v *defaultValidator) validateTaskStructure(spec *TaskSpecification, isStan
 		if !isNonEmpty(schedule.Frequency) {
 			return fmt.Errorf("%s: frequency field is required", entryContext)
 		}
-		if schedule.ID == "describe-all" || schedule.ID == "default" {
-			defaultScheduleFound = true
-			for requiredParam := range paramSet {
-				if _, ok := schedule.Params[requiredParam]; !ok {
-					return fmt.Errorf("%s: default schedule missing required parameter '%s'", entryContext, requiredParam)
-				}
-			}
-		} else {
-			for definedParam := range schedule.Params {
-				if _, ok := paramSet[definedParam]; !ok {
-					return fmt.Errorf("%s: defines parameter '%s' not declared in top-level 'params'", entryContext, definedParam)
-				}
-			}
-		}
-	}
-	if !defaultScheduleFound && len(paramSet) > 0 {
-		return fmt.Errorf("%s: task defines parameters but no run_schedule entry with id 'describe-all' or 'default' was found", taskDesc)
 	}
 
 	return nil // All checks passed
