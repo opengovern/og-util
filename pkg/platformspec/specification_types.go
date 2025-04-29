@@ -90,6 +90,7 @@ type Metadata struct {
 	License       string `yaml:"license" json:"license"`
 	Description   string `yaml:"description,omitempty" json:"description,omitempty"`
 	Website       string `yaml:"website,omitempty" json:"website,omitempty"`
+	Icon          string `yaml:"icon,omitempty"`
 }
 
 // --- Plugin Specific Structs ---
@@ -111,7 +112,6 @@ type PluginSpecification struct {
 	Name                      string                   `yaml:"name"`
 	Version                   string                   `yaml:"version"`
 	IntegrationType           integration.Type         `yaml:"integration_type,omitempty"`
-	Icon                      string                   `yaml:"icon,omitempty"`
 	SupportedPlatformVersions []string                 `yaml:"supported_platform_versions"`
 	Metadata                  Metadata                 `yaml:"metadata"`
 	Components                PluginComponents         `yaml:"components"`
