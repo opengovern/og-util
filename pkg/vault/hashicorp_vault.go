@@ -9,12 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
+	"strings"
+
 	vault "github.com/hashicorp/vault/api"
 	kubernetesAuth "github.com/hashicorp/vault/api/auth/kubernetes"
 	"go.uber.org/zap"
 	"k8s.io/client-go/rest"
-	"path"
-	"strings"
 )
 
 const (
@@ -409,4 +410,22 @@ func (a *HashiCorpVaultSealHandler) TryUnseal(ctx context.Context, keys []string
 	}
 
 	return nil
+}
+
+// *** ADDED Health Method ***
+// Health checks the status of the Vault instance using the /sys/health endpoint.
+func (a *HashiCorpVaultSealHandler) Health(ctx context.Context) (*vault.HealthResponse, error) {
+	if a.client == nil {
+		// This should ideally not happen if NewHashiCorpVaultSealHandler succeeded
+		return nil, errors.New("vault client is not initialized in SealHandler")
+	}
+	// Call the underlying Vault client's health check
+	healthResp, err := a.client.Sys().Health() // Pass context
+	if err != nil {
+		// Log internally, return error for caller to handle
+		a.logger.Error("Vault system health check failed", zap.Error(err))
+		return nil, err // Return the original error
+	}
+	// Return the response (can be nil even without error in some edge cases, caller should check)
+	return healthResp, nil
 }
