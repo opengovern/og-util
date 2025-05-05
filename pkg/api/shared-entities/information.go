@@ -1,6 +1,9 @@
 package shared_entities
 
-import "time"
+import (
+	"github.com/google/uuid"
+	"time"
+)
 
 // CspmUsageRequest is the request object for the call home feature data gathering
 type CspmUsageRequest struct {
@@ -10,4 +13,21 @@ type CspmUsageRequest struct {
 	Hostname             string         `json:"hostname"`
 	NumberOfUsers        int64          `json:"number_of_users"`
 	IntegrationTypeCount map[string]int `json:"integration_type_count"`
+}
+
+type UsageTrackerPluginInfo struct {
+	Name             string `json:"name"`
+	Version          string `json:"version"`
+	IntegrationCount int    `json:"integration_count"`
+}
+
+type UsageTrackerRequest struct {
+	InstanceID      uuid.UUID                `json:"instance_id"`
+	Time            time.Time                `json:"time"`
+	Version         string                   `json:"version"`
+	Hostname        string                   `json:"hostname"`
+	IsSsoConfigured bool                     `json:"is_sso_configured"`
+	UserCount       int64                    `json:"user_count"`
+	ApiKeyCount     int64                    `json:"api_key_count"`
+	Plugins         []UsageTrackerPluginInfo `json:"plugins"`
 }
