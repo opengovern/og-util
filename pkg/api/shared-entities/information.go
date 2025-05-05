@@ -17,7 +17,7 @@ type CspmUsageRequest struct {
 type UsageTrackerPluginInfo struct {
 	Name             string `json:"name"`
 	Version          string `json:"version"`
-	IntegrationCount int    `json:"integration_count"`
+	IntegrationCount int64  `json:"integration_count"`
 }
 
 type UsageTrackerRequest struct {
