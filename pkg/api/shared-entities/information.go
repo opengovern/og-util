@@ -1,7 +1,6 @@
 package shared_entities
 
 import (
-	"github.com/google/uuid"
 	"time"
 )
 
@@ -22,7 +21,7 @@ type UsageTrackerPluginInfo struct {
 }
 
 type UsageTrackerRequest struct {
-	InstanceID      uuid.UUID                `json:"instance_id"`
+	InstanceID      string                   `json:"instance_id"`
 	Time            time.Time                `json:"time"`
 	Version         string                   `json:"version"`
 	Hostname        string                   `json:"hostname"`
